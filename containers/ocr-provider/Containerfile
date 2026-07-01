@@ -1,0 +1,40 @@
+# Contenedor del OCR Provider FHS
+# Recubre el servicio OCR con el protocolo FHS WebSocket.
+# Expone tools FHS en puerto 43112.
+
+FROM docker.io/library/node:20-alpine AS builder
+WORKDIR /app
+
+COPY package*.json ./
+COPY packages/fhs-protocol/package.json ./packages/fhs-protocol/
+COPY examples/ocr-provider/package.json ./examples/ocr-provider/
+
+RUN npm ci
+
+COPY packages/fhs-protocol ./packages/fhs-protocol
+COPY examples/ocr-provider ./examples/ocr-provider
+
+RUN npm run build -w packages/fhs-protocol && \
+    npm run build -w examples/ocr-provider
+
+FROM docker.io/library/node:20-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages/fhs-protocol/package.json ./packages/fhs-protocol/
+COPY --from=builder /app/packages/fhs-protocol/dist ./packages/fhs-protocol/dist
+COPY --from=builder /app/examples/ocr-provider/package.json ./examples/ocr-provider/
+COPY --from=builder /app/examples/ocr-provider/dist ./examples/ocr-provider/dist
+
+WORKDIR /app/examples/ocr-provider
+EXPOSE 43112
+
+ENV OCR_PROVIDER_PORT=43112
+ENV REGISTRY_URL=ws://agent-server:8081/fhs/v1/ws
+ENV OCR_SERVICE_URL=http://ocr-mcp:8082
+ENV PROVIDER_ID=did:key:ocr-provider-01
+ENV PROVIDER_NAME="OCR FHS Provider"
+
+CMD ["node", "dist/index.js"]

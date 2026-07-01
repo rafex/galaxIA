@@ -1,0 +1,101 @@
+# galaxIA — Docker Compose para el bastion (192.168.3.173)
+#
+# Puertos externos usan rangos abiertos en UFW del bastion:
+#   3000       → Apps
+#   30000-30099 → Podman Web
+#   43110       → llama.cpp
+#
+# Servicios internos se comunican por Docker DNS (ej: agent-server:8081).
+
+services:
+  agent-server:
+    build:
+      context: ..
+      dockerfile: containers/agent-server/Containerfile
+    container_name: fhs-agent-server
+    ports:
+      - "30083:8081"
+    environment:
+      - PORT=8081
+      - HOST=0.0.0.0
+    networks:
+      - fhs
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: containers/web/Containerfile
+    container_name: fhs-web
+    ports:
+      - "3000:80"
+    depends_on:
+      - agent-server
+    networks:
+      - fhs
+    restart: unless-stopped
+
+  llm-provider:
+    build:
+      context: ..
+      dockerfile: containers/llm-provider/Containerfile
+    container_name: fhs-llm-provider
+    # Puerto externo solo para debug; agent-server lo alcanza por Docker DNS
+    ports:
+      - "30084:43111"
+    environment:
+      - LLM_PROVIDER_PORT=43111
+      - REGISTRY_URL=ws://agent-server:8081/fhs/v1/ws
+      - LLAMA_CPP_URL=http://host.containers.internal:43110/v1
+      - PROVIDER_ID=did:key:macmini-raul
+      - PROVIDER_NAME=Mac mini de Raul
+    extra_hosts:
+      - "host.containers.internal:host-gateway"
+    depends_on:
+      - agent-server
+    networks:
+      - fhs
+    restart: unless-stopped
+
+  ocr-provider:
+    build:
+      context: ..
+      dockerfile: containers/ocr-provider/Containerfile
+    container_name: fhs-ocr-provider
+    ports:
+      - "30085:43112"
+    environment:
+      - OCR_PROVIDER_PORT=43112
+      - REGISTRY_URL=ws://agent-server:8081/fhs/v1/ws
+      - OCR_SERVICE_URL=http://ocr-mcp:8082
+      - PROVIDER_ID=did:key:ocr-provider-01
+      - PROVIDER_NAME=OCR FHS Provider
+    depends_on:
+      - agent-server
+      - ocr-mcp
+    networks:
+      - fhs
+    restart: unless-stopped
+
+  ocr-mcp:
+    build:
+      context: ..
+      dockerfile: containers/ocr-mcp/Containerfile
+    container_name: fhs-ocr-mcp
+    ports:
+      - "30082:8082"
+    environment:
+      - PORT=8082
+      - REGISTRY_URL=ws://agent-server:8081/fhs/v1/ws
+      - PROVIDER_ID=did:key:ocr-container-01
+      - PROVIDER_NAME=OCR Container
+    depends_on:
+      - agent-server
+    networks:
+      - fhs
+    restart: unless-stopped
+
+networks:
+  fhs:
+    name: fhs
+    driver: bridge
