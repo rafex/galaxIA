@@ -1,0 +1,212 @@
+import WebSocket from "ws";
+import { randomUUID } from "node:crypto";
+import type {
+  GenerateRequest,
+  GenerateResponse,
+  ModelInfo,
+  ToolDefinition,
+  PublishedService,
+  ChatRequestMessage,
+  ChatDeltaMessage,
+  ChatCompletedMessage,
+  ChatErrorMessage,
+} from "@galaxia/fhs-protocol";
+
+export interface LlmProviderSelection {
+  nodeId: string;
+  providerName: string;
+  service: PublishedService;
+  model: ModelInfo;
+}
+
+export class LlmGateway {
+  async generate(
+    selection: LlmProviderSelection,
+    request: GenerateRequest
+  ): Promise<GenerateResponse> {
+    return this.fhsGenerate(selection.service.endpoint.url, request);
+  }
+
+  async *stream(
+    selection: LlmProviderSelection,
+    request: GenerateRequest
+  ): AsyncGenerator<string, GenerateResponse, unknown> {
+    return yield* this.fhsStream(selection.service.endpoint.url, request);
+  }
+
+  private fhsGenerate(
+    url: string,
+    request: GenerateRequest
+  ): Promise<GenerateResponse> {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(url);
+      const requestId = randomUUID();
+
+      const timeout = setTimeout(() => {
+        ws.close();
+        reject(new Error("Timeout esperando respuesta del LLM vía FHS"));
+      }, 60_000);
+
+      ws.on("open", () => {
+        const msg: ChatRequestMessage = {
+          type: "chat.request",
+          requestId,
+          request: { ...request, stream: false },
+        };
+        ws.send(JSON.stringify(msg));
+      });
+
+      ws.on("message", (raw) => {
+        try {
+          const msg = JSON.parse(raw.toString());
+          if (msg.requestId !== requestId) return;
+
+          if (msg.type === "chat.completed") {
+            clearTimeout(timeout);
+            ws.close();
+            resolve((msg as ChatCompletedMessage).response);
+          } else if (msg.type === "chat.error") {
+            clearTimeout(timeout);
+            ws.close();
+            reject(
+              new Error(
+                `FHS LLM error: ${(msg as ChatErrorMessage).message}`
+              )
+            );
+          }
+        } catch {
+          // ignorar mensajes no JSON
+        }
+      });
+
+      ws.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(new Error(`FHS WebSocket error: ${err.message}`));
+      });
+
+      ws.on("close", () => {
+        clearTimeout(timeout);
+      });
+    });
+  }
+
+  private async *fhsStream(
+    url: string,
+    request: GenerateRequest
+  ): AsyncGenerator<string, GenerateResponse, unknown> {
+    const ws = new WebSocket(url);
+    const requestId = randomUUID();
+
+    type QueueItem =
+      | { kind: "delta"; text: string }
+      | { kind: "completed"; response: GenerateResponse }
+      | { kind: "error"; message: string };
+
+    const queue: QueueItem[] = [];
+    let waiter: ((item: QueueItem) => void) | null = null;
+
+    const enqueue = (item: QueueItem) => {
+      if (waiter) {
+        waiter(item);
+        waiter = null;
+      } else {
+        queue.push(item);
+      }
+    };
+
+    const wait = (): Promise<QueueItem> =>
+      new Promise((resolve) => {
+        waiter = resolve;
+      });
+
+    ws.on("open", () => {
+      const msg: ChatRequestMessage = {
+        type: "chat.request",
+        requestId,
+        request: { ...request, stream: true },
+      };
+      ws.send(JSON.stringify(msg));
+    });
+
+    ws.on("message", (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString());
+        if (msg.requestId !== requestId) return;
+
+        if (msg.type === "chat.delta") {
+          enqueue({ kind: "delta", text: (msg as ChatDeltaMessage).delta });
+        } else if (msg.type === "chat.completed") {
+          enqueue({
+            kind: "completed",
+            response: (msg as ChatCompletedMessage).response,
+          });
+          ws.close();
+        } else if (msg.type === "chat.error") {
+          enqueue({
+            kind: "error",
+            message: (msg as ChatErrorMessage).message,
+          });
+          ws.close();
+        }
+      } catch {
+        // ignorar
+      }
+    });
+
+    ws.on("error", (err) => {
+      enqueue({ kind: "error", message: err.message });
+    });
+
+    const timeout = setTimeout(() => {
+      enqueue({ kind: "error", message: "Timeout esperando stream FHS" });
+      ws.close();
+    }, 120_000);
+
+    try {
+      while (true) {
+        const item = queue.length > 0 ? queue.shift()! : await wait();
+
+        if (item.kind === "delta") {
+          yield item.text;
+          continue;
+        }
+
+        if (item.kind === "completed") {
+          return item.response;
+        }
+
+        if (item.kind === "error") {
+          throw new Error(`FHS LLM stream error: ${item.message}`);
+        }
+      }
+    } finally {
+      clearTimeout(timeout);
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    }
+  }
+
+  // ── Utilidades ──────────────────────────────────────────────────────────
+
+  supportsToolCalling(model: ModelInfo): boolean {
+    return !!model.toolCalling?.supported;
+  }
+
+  toToolDefinitions(
+    tools: Array<{
+      name: string;
+      description?: string;
+      inputSchema?: any;
+    }>
+  ): ToolDefinition[] {
+    return tools.map((t) => ({
+      type: "function",
+      function: {
+        name: t.name,
+        description: t.description || `Tool ${t.name}`,
+        parameters: t.inputSchema || { type: "object", properties: {} },
+      },
+    }));
+  }
+}

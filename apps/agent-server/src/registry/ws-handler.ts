@@ -1,0 +1,73 @@
+import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { WebSocket } from "@fastify/websocket";
+import {
+  type HelloMessage,
+  type RegisterMessage,
+  type PingMessage,
+  type FhsMessage,
+} from "@galaxia/fhs-protocol";
+import { Registry } from "./registry.js";
+
+export async function setupWebSocket(app: FastifyInstance, registry: Registry) {
+  app.get("/fhs/v1/ws", { websocket: true }, (socket: WebSocket, req: FastifyRequest) => {
+    let providerId: string | null = null;
+    let pingTimer: NodeJS.Timeout | null = null;
+
+    const send = (msg: FhsMessage) => {
+      if (socket.readyState === 1) {
+        socket.send(JSON.stringify(msg));
+      }
+    };
+
+    socket.on("message", (raw: any) => {
+      try {
+        const msg = JSON.parse(raw.toString()) as FhsMessage;
+        handleMessage(msg);
+      } catch (err) {
+        send({ type: "error", data: { code: "PARSE_ERROR", message: "Invalid JSON" } } as any);
+      }
+    });
+
+    socket.on("close", () => {
+      if (providerId) {
+        registry.removeConnection(providerId);
+      }
+      if (pingTimer) clearInterval(pingTimer);
+    });
+
+    function handleMessage(msg: FhsMessage) {
+      switch (msg.type) {
+        case "hello": {
+          const hello = msg as HelloMessage;
+          providerId = hello.providerId;
+          registry.registerConnection(providerId, socket as any);
+          send({
+            type: "welcome",
+            registryId: "registry-001",
+            leaseSeconds: registry.leaseSeconds,
+          });
+          break;
+        }
+        case "register": {
+          const register = msg as RegisterMessage;
+          if (!providerId) {
+            send({ type: "error", data: { code: "NOT_IDENTIFIED", message: "Send hello first" } } as any);
+            return;
+          }
+          const accepted = registry.registerOrUpdate(providerId, register.manifest);
+          send({
+            type: "registered",
+            leaseExpires: Math.floor(Date.now() / 1000) + registry.leaseSeconds,
+            acceptedServices: accepted,
+          });
+          break;
+        }
+        case "ping": {
+          if (providerId) registry.touchConnection(providerId);
+          send({ type: "pong", timestamp: Math.floor(Date.now() / 1000) });
+          break;
+        }
+      }
+    }
+  });
+}
