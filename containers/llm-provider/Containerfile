@@ -32,6 +32,7 @@ WORKDIR /app/examples/llm-provider
 EXPOSE 43111
 
 ENV LLM_PROVIDER_PORT=43111
+ENV LLM_PROVIDER_HOST=llm-provider
 ENV REGISTRY_URL=ws://agent-server:8081/fhs/v1/ws
 ENV LLAMA_CPP_URL=http://host.containers.internal:43110/v1
 ENV PROVIDER_ID=did:key:macmini-raul

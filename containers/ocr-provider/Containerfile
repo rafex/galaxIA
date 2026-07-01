@@ -32,6 +32,7 @@ WORKDIR /app/examples/ocr-provider
 EXPOSE 43112
 
 ENV OCR_PROVIDER_PORT=43112
+ENV OCR_PROVIDER_HOST=ocr-provider
 ENV REGISTRY_URL=ws://agent-server:8081/fhs/v1/ws
 ENV OCR_SERVICE_URL=http://ocr-mcp:8082
 ENV PROVIDER_ID=did:key:ocr-provider-01

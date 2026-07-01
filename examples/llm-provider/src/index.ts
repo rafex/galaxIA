@@ -11,6 +11,8 @@ import { LlmBridge } from "./llm-bridge.js";
 const REGISTRY_URL =
   process.env.REGISTRY_URL || "ws://localhost:8083/fhs/v1/ws";
 const LLM_PROVIDER_PORT = Number(process.env.LLM_PROVIDER_PORT || 43111);
+const LLM_PROVIDER_HOST =
+  process.env.LLM_PROVIDER_HOST || "localhost";
 const LLAMA_CPP_URL =
   process.env.LLAMA_CPP_URL || "http://localhost:43110/v1";
 const PROVIDER_ID =
@@ -28,7 +30,7 @@ const manifest: LlmProviderManifest = {
   },
   endpoint: {
     protocol: "fhs",
-    url: `ws://localhost:${LLM_PROVIDER_PORT}/fhs/v1/chat`,
+    url: `ws://${LLM_PROVIDER_HOST}:${LLM_PROVIDER_PORT}/fhs/v1/chat`,
   },
   models: [
     {
@@ -115,6 +117,81 @@ function connectToRegistry() {
 
 // ── Servidor FHS de Chat (donde el Agent Server se conecta) ───────────────
 
+async function handleMessage(socket: WebSocket, raw: WebSocket.Data) {
+  try {
+    const msg = JSON.parse(raw.toString());
+
+    if (msg.type !== "chat.request") return;
+
+    const req = msg as ChatRequestMessage;
+    log(
+      `chat.request ${req.requestId}: model=${req.request.model}, stream=${req.request.stream}`
+    );
+    log(
+      `  tools=${req.request.tools ? req.request.tools.length : 0}, messages=${req.request.messages?.length || 0}`
+    );
+
+    try {
+      if (req.request.stream) {
+        log(`  → iniciando stream`);
+        const generator = bridge.stream(req.request);
+        let result = await generator.next();
+
+        while (!result.done) {
+          const deltaMsg: ChatDeltaMessage = {
+            type: "chat.delta",
+            requestId: req.requestId,
+            delta: result.value,
+          };
+          socket.send(JSON.stringify(deltaMsg));
+          result = await generator.next();
+        }
+
+        log(`  → stream completado`);
+        const completed: ChatCompletedMessage = {
+          type: "chat.completed",
+          requestId: req.requestId,
+          response: result.value,
+        };
+        socket.send(JSON.stringify(completed));
+      } else {
+        log(`  → llamando bridge.generate()`);
+        const startedAt = Date.now();
+        const response = await bridge.generate(req.request);
+        log(`  → bridge.generate() completado en ${Date.now() - startedAt}ms`);
+        const completed: ChatCompletedMessage = {
+          type: "chat.completed",
+          requestId: req.requestId,
+          response,
+        };
+        socket.send(JSON.stringify(completed));
+        log(`  → chat.completed enviado`);
+      }
+    } catch (err: any) {
+      log(`  → ERROR: ${err.message}`);
+      console.error(`[fhs-llm] bridge error:`, err);
+      const errorMsg: ChatErrorMessage = {
+        type: "chat.error",
+        requestId: req.requestId,
+        code: "LLM_ERROR",
+        message: err.message,
+      };
+      socket.send(JSON.stringify(errorMsg));
+    }
+  } catch (err: any) {
+    log(`  → PARSE ERROR: ${err.message}`);
+    console.error(`[fhs-llm] parse error:`, err);
+    socket.send(
+      JSON.stringify({
+        type: "chat.error",
+        requestId: "unknown",
+        code: "PARSE_ERROR",
+        message: err.message,
+      })
+    );
+  }
+}
+
 function startChatServer() {
   const wss = new WebSocketServer({ port: LLM_PROVIDER_PORT });
 
@@ -127,70 +204,16 @@ function startChatServer() {
   wss.on("connection", (socket) => {
     log("Agent Server conectado al chat FHS");
 
-    socket.on("message", async (raw) => {
-      try {
-        const msg = JSON.parse(raw.toString());
-
-        if (msg.type !== "chat.request") return;
-
-        const req = msg as ChatRequestMessage;
-        log(
-          `chat.request ${req.requestId}: model=${req.request.model}, stream=${req.request.stream}`
-        );
-
-        try {
-          if (req.request.stream) {
-            const generator = bridge.stream(req.request);
-            let result = await generator.next();
-
-            while (!result.done) {
-              const deltaMsg: ChatDeltaMessage = {
-                type: "chat.delta",
-                requestId: req.requestId,
-                delta: result.value,
-              };
-              socket.send(JSON.stringify(deltaMsg));
-              result = await generator.next();
-            }
-
-            const completed: ChatCompletedMessage = {
-              type: "chat.completed",
-              requestId: req.requestId,
-              response: result.value,
-            };
-            socket.send(JSON.stringify(completed));
-          } else {
-            const response = await bridge.generate(req.request);
-            const completed: ChatCompletedMessage = {
-              type: "chat.completed",
-              requestId: req.requestId,
-              response,
-            };
-            socket.send(JSON.stringify(completed));
-          }
-        } catch (err: any) {
-          const errorMsg: ChatErrorMessage = {
-            type: "chat.error",
-            requestId: req.requestId,
-            code: "LLM_ERROR",
-            message: err.message,
-          };
-          socket.send(JSON.stringify(errorMsg));
-        }
-      } catch (err: any) {
-        socket.send(
-          JSON.stringify({
-            type: "chat.error",
-            requestId: "unknown",
-            code: "PARSE_ERROR",
-            message: err.message,
-          })
-        );
-      }
+    socket.on("message", (raw) => {
+      handleMessage(socket, raw);
     });
 
     socket.on("close", () => {
       log("Agent Server desconectado del chat");
+    });
+
+    socket.on("error", (err) => {
+      log(`Error en socket de chat: ${err.message}`);
     });
   });
 }

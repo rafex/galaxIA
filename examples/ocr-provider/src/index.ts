@@ -12,6 +12,8 @@ import { OcrBridge } from "./ocr-bridge.js";
 const REGISTRY_URL =
   process.env.REGISTRY_URL || "ws://localhost:8083/fhs/v1/ws";
 const OCR_PROVIDER_PORT = Number(process.env.OCR_PROVIDER_PORT || 43112);
+const OCR_PROVIDER_HOST =
+  process.env.OCR_PROVIDER_HOST || "localhost";
 const OCR_SERVICE_URL =
   process.env.OCR_SERVICE_URL || "http://localhost:8082";
 const PROVIDER_ID =
@@ -29,7 +31,7 @@ const manifest: McpProviderManifest = {
   },
   endpoint: {
     protocol: "fhs",
-    url: `ws://localhost:${OCR_PROVIDER_PORT}/fhs/v1/tools`,
+    url: `ws://${OCR_PROVIDER_HOST}:${OCR_PROVIDER_PORT}/fhs/v1/tools`,
   },
   capabilities: [
     {

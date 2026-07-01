@@ -45,6 +45,7 @@ services:
       - "30084:43111"
     environment:
       - LLM_PROVIDER_PORT=43111
+      - LLM_PROVIDER_HOST=llm-provider
       - REGISTRY_URL=ws://agent-server:8081/fhs/v1/ws
       - LLAMA_CPP_URL=http://host.containers.internal:43110/v1
       - PROVIDER_ID=did:key:macmini-raul
@@ -66,6 +67,7 @@ services:
       - "30085:43112"
     environment:
       - OCR_PROVIDER_PORT=43112
+      - OCR_PROVIDER_HOST=ocr-provider
       - REGISTRY_URL=ws://agent-server:8081/fhs/v1/ws
       - OCR_SERVICE_URL=http://ocr-mcp:8082
       - PROVIDER_ID=did:key:ocr-provider-01
