@@ -1,2 +1,39 @@
 # SpecNative — venv is generated; do not commit
 .specnative/.venv/
+
+# Dependencias
+node_modules/
+
+# Artefactos de build
+dist/
+*.tsbuildinfo
+
+# Entorno local (contiene paths, puertos, tokens)
+.env
+.env.local
+.env.*.local
+
+# opencode (local, no versionar)
+.opencode/sessions.db
+.opencode/sessions*db
+.opencode/sessions.db-shm
+.opencode/sessions.db-wal
+.opencode/worktrees/
+.opencode/worktrees.db
+.opencode/worktrees.log
+.opencode/node_modules/
+session-ses_*.md
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+\#*\#
+.idea/
+.vscode/
+
+# Logs
+*.log
+/tmp/

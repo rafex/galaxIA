@@ -1,0 +1,17 @@
+# Ignorar archivos que no necesitan entrar a las imágenes de contenedor
+.git
+.github
+*.md
+!.containerignore
+node_modules
+apps/*/dist
+packages/*/dist
+packages/*/node_modules
+apps/*/node_modules
+spec-native
+scripts
+.opencode
+.claude
+.specnative
+.env
+.env.local

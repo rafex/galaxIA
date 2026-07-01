@@ -1,0 +1,28 @@
+{
+  "name": "galaxia",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FHS — Federation of Sovereign Hosts. Chat comunitario federado con LLM y tools MCP.",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w apps/web",
+    "dev:agent": "npm run dev -w apps/agent-server",
+    "build": "npm run build -w packages/fhs-protocol && npm run build -w apps/agent-server && npm run build -w apps/web",
+    "lint": "npm run lint --workspaces",
+    "typecheck": "npm run typecheck --workspaces"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.15.0",
+    "typescript": "^5.5.0",
+    "ws": "^8.18.0"
+  }
+}
