@@ -16,10 +16,12 @@ Guía para desplegar el stack completo de galaxIA en el bastion (`192.168.3.173`
 |---|---|---|---|
 | **fhs-web** | `3000` | `80` | `fhs` |
 | **fhs-agent-server** | `30083` | `8081` | `fhs` |
-| **fhs-llm-provider** | `30084` | `43111` | `fhs` |
-| **fhs-ocr-provider** | `30085` | `43112` | `fhs` |
+| **fhs-llm-provider** | `43111` | `43111` | `fhs` |
+| **fhs-ocr-provider** | `43112` | `43112` | `fhs` |
 | **llama.cpp** | `8080` | — | host |
 | **ether-ocr-api** | `8001→8000, 9011→9001` | — | `containers_default` |
+
+`llm-provider`/`ocr-provider` ya no remapean puerto (antes `30084`/`30085` → `43111`/`43112`) — el manifiesto que cada provider anuncia usa el mismo puerto en el que escucha internamente, así que host y contenedor deben coincidir para que un despliegue en otra máquina (ver `docs/despliegue-multi-host.md`) no intente conectarse al puerto equivocado.
 
 ## Redes
 
@@ -129,7 +131,13 @@ Los puertos externos deben estar en la whitelist de UFW:
 ```bash
 sudo ufw allow 3000/tcp    # Web frontend
 sudo ufw allow 8080/tcp    # llama.cpp
-# Los puertos 30083-30085 ya están en el rango 30000-30099 (Podman Web)
+# 30083 (agent-server) ya está en el rango 30000-30099 (Podman Web)
+# 43111/43112 (llm-provider/ocr-provider) necesitan regla explícita —
+# ya no van remapeados dentro del rango 30000-30099. Ver docs/despliegue-multi-host.md
+# para el caso de despliegue en dos máquinas, donde esto se confirmó necesario
+# (UFW con policy DROP bloqueaba todo lo que no fuera SSH).
+sudo ufw allow from 192.168.3.0/24 to any port 43111 proto tcp
+sudo ufw allow from 192.168.3.0/24 to any port 43112 proto tcp
 ```
 
 ## Notas

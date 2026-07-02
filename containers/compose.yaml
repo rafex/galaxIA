@@ -49,9 +49,14 @@ services:
       context: ..
       dockerfile: containers/llm-provider/Containerfile
     container_name: fhs-llm-provider
-    # Puerto externo solo para debug; agent-server lo alcanza por Docker DNS
+    # Sin remapeo a propósito: el manifiesto que este provider anuncia usa
+    # LLM_PROVIDER_PORT (43111) tanto para escuchar como para el endpoint
+    # publicado — si el puerto externo fuera distinto (ej. 30084:43111),
+    # un agent-server en otra máquina intentaría conectarse al puerto
+    # equivocado. En un solo host esto no importaba (Docker DNS iba directo
+    # al puerto interno, sin pasar por el mapeo de host); entre dos hosts sí.
     ports:
-      - "30084:43111"
+      - "43111:43111"
     environment:
       - LLM_PROVIDER_PORT=43111
       # Hostname que este provider anuncia en su manifiesto — debe ser
@@ -79,8 +84,9 @@ services:
       context: ..
       dockerfile: containers/ocr-provider/Containerfile
     container_name: fhs-ocr-provider
+    # Sin remapeo — mismo motivo que llm-provider (ver arriba).
     ports:
-      - "30085:43112"
+      - "43112:43112"
     environment:
       - OCR_PROVIDER_PORT=43112
       - OCR_PROVIDER_HOST=${OCR_PROVIDER_HOST:-ocr-provider}
