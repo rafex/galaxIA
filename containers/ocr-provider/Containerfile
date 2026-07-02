@@ -21,6 +21,8 @@ FROM docker.io/library/node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 
+RUN apk add --no-cache curl
+
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/fhs-protocol/package.json ./packages/fhs-protocol/
@@ -34,7 +36,8 @@ EXPOSE 43112
 ENV OCR_PROVIDER_PORT=43112
 ENV OCR_PROVIDER_HOST=ocr-provider
 ENV REGISTRY_URL=ws://agent-server:8081/fhs/v1/ws
-ENV OCR_SERVICE_URL=http://ocr-mcp:8082
+ENV OCR_SERVICE_URL=http://ether-ocr-api:8000
+ENV OCR_API_KEY=dev-key-ether-ocr
 ENV PROVIDER_ID=did:key:ocr-provider-01
 ENV PROVIDER_NAME="OCR FHS Provider"
 

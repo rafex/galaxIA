@@ -22,7 +22,9 @@
 - [x] Probar flujo FHS WebSocket end-to-end (Registry → LlmGateway → llm-provider → LLM)
 - [x] Crear recubrimiento FHS del OCR provider (`examples/ocr-provider/`)
 - [x] Agregar mensajes FHS de tool call al protocolo (`tool.list`, `tool.call`, `tool.result`)
-- [ ] Cambiar al modelo DeepSeek-R1-Distill-Qwen-1.5B en el bastion
+- [x] Cambiar a modelo Qwen 2.5 0.5B (DeepSeek R1 demasiado lento en Mac mini)
+- [x] Probar flujo chat end-to-end con Qwen 0.5B en el bastion
+- [x] Agregar versionado con hash del commit en frontend y backend
 - [ ] Probar flujo WebSocket end-to-end con OCR real
 - [ ] Preparar script de demo de failover OCR para la ponencia
 - [ ] Actualizar TRACEABILITY.md al cerrar la iniciativa
@@ -36,6 +38,6 @@
 - Registry: almacenamiento en memoria para la PoC
 - Demo: usa WebSocket para streaming de eventos del chat
 - IPFS: identificado como mejora futura para privacidad de artefactos
-- LLM: DeepSeek-R1-Distill-Qwen-1.5B en bastion `192.168.3.173:43110`
+- LLM: Qwen 2.5 0.5B en bastion `192.168.3.173:43110` (DeepSeek R1 era demasiado lento en la Mac mini)
 - Protocolo FHS: el Agent Server ya no hace HTTP directo a LLM. El `LlmGateway` habla FHS WebSocket (`chat.request`/`chat.delta`/`chat.completed`). El provider LLM (`examples/llm-provider/`) es el único que traduce FHS → HTTP a llama.cpp.
 - Puertos locales: agent-server en :8083, llm-provider en :43111, mock-llm en :43110, SSH tunnel ocupa :8081

@@ -15,7 +15,9 @@ const OCR_PROVIDER_PORT = Number(process.env.OCR_PROVIDER_PORT || 43112);
 const OCR_PROVIDER_HOST =
   process.env.OCR_PROVIDER_HOST || "localhost";
 const OCR_SERVICE_URL =
-  process.env.OCR_SERVICE_URL || "http://localhost:8082";
+  process.env.OCR_SERVICE_URL || "http://localhost:9011";
+const OCR_API_KEY =
+  process.env.OCR_API_KEY || "";
 const PROVIDER_ID =
   process.env.PROVIDER_ID || "did:key:ocr-provider-01";
 const PROVIDER_NAME =
@@ -46,21 +48,29 @@ const manifest: McpProviderManifest = {
 const tools = [
   {
     name: "ocr_extract",
-    description: "Extrae texto de una imagen en base64 usando OCR.",
+    description: "Extrae texto de una imagen usando OCR.",
     inputSchema: {
       type: "object",
       properties: {
-        image_base64: {
+        file_base64: {
           type: "string",
           description: "Imagen codificada en base64",
         },
+        filename: {
+          type: "string",
+          description: "Nombre del archivo (opcional, default: ocr.png)",
+        },
+        lang: {
+          type: "string",
+          description: "Idiomas OCR separados por + (default: spa+eng)",
+        },
       },
-      required: ["image_base64"],
+      required: ["file_base64"],
     },
   },
 ];
 
-const bridge = new OcrBridge(OCR_SERVICE_URL);
+const bridge = new OcrBridge(OCR_SERVICE_URL, OCR_API_KEY);
 
 // ── Conexión al Registry FHS ──────────────────────────────────────────────
 
@@ -170,7 +180,9 @@ function startToolServer() {
           try {
             if (req.toolName === "ocr_extract") {
               const result = await bridge.extract({
-                imageBase64: req.arguments.image_base64 || "",
+                fileBase64: req.arguments.file_base64 || "",
+                filename: req.arguments.filename || "ocr-image.png",
+                lang: req.arguments.lang || "spa+eng",
               });
 
               const response: ToolCallResultMessage = {

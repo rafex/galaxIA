@@ -69,28 +69,10 @@ services:
       - OCR_PROVIDER_PORT=43112
       - OCR_PROVIDER_HOST=ocr-provider
       - REGISTRY_URL=ws://agent-server:8081/fhs/v1/ws
-      - OCR_SERVICE_URL=http://ocr-mcp:8082
+      - OCR_SERVICE_URL=http://ether-ocr-api:8000
+      - OCR_API_KEY=dev-key-ether-ocr
       - PROVIDER_ID=did:key:ocr-provider-01
       - PROVIDER_NAME=OCR FHS Provider
-    depends_on:
-      - agent-server
-      - ocr-mcp
-    networks:
-      - fhs
-    restart: unless-stopped
-
-  ocr-mcp:
-    build:
-      context: ..
-      dockerfile: containers/ocr-mcp/Containerfile
-    container_name: fhs-ocr-mcp
-    ports:
-      - "30082:8082"
-    environment:
-      - PORT=8082
-      - REGISTRY_URL=ws://agent-server:8081/fhs/v1/ws
-      - PROVIDER_ID=did:key:ocr-container-01
-      - PROVIDER_NAME=OCR Container
     depends_on:
       - agent-server
     networks:
