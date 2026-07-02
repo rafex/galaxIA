@@ -12,11 +12,18 @@ import 'helpers/just/status.just'
 default:
     @just --list
 
+# ── Versión ────────────────────────────────────────────────────────────────
+
+commit-hash := `git rev-parse --short HEAD 2>/dev/null || echo unknown`
+build-date := `date -u +%Y-%m-%dT%H:%M:%SZ`
+
 # ── Contenedores ───────────────────────────────────────────────────────────
 
 container-up:
     @echo "→ Levantando todos los contenedores..."
-    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build
+    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build \
+      --build-arg COMMIT_HASH={{commit-hash}} \
+      --build-arg BUILD_DATE={{build-date}}
 
 container-down:
     @echo "→ Deteniendo todos los contenedores..."
@@ -24,26 +31,34 @@ container-down:
 
 container-build:
     @echo "→ Construyendo imágenes..."
-    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} build
+    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} build \
+      --build-arg COMMIT_HASH={{commit-hash}} \
+      --build-arg BUILD_DATE={{build-date}}
 
 container-restart: container-down container-up
 
 # ── Contenedores individuales ──────────────────────────────────────────────
 
-# Levanta solo agent-server + web (sin providers)
 container-up-core:
     @echo "→ Levantando agent-server + web..."
-    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build agent-server web
+    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build \
+      --build-arg COMMIT_HASH={{commit-hash}} \
+      --build-arg BUILD_DATE={{build-date}} \
+      agent-server web
 
-# Levanta solo el llm-provider (wrapper FHS de llama.cpp)
 container-up-llm:
     @echo "→ Levantando llm-provider (wrapper FHS)..."
-    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build llm-provider
+    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build \
+      --build-arg COMMIT_HASH={{commit-hash}} \
+      --build-arg BUILD_DATE={{build-date}} \
+      llm-provider
 
-# Levanta solo el ocr-provider (wrapper FHS de OCR)
 container-up-ocr:
     @echo "→ Levantando ocr-provider (wrapper FHS)..."
-    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build ocr-provider
+    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build \
+      --build-arg COMMIT_HASH={{commit-hash}} \
+      --build-arg BUILD_DATE={{build-date}} \
+      ocr-provider
 
 # Detiene y elimina un contenedor específico
 container-rm service:

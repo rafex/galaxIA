@@ -6,4 +6,14 @@ if (!app) {
   throw new Error("No #app element found");
 }
 
-createApp(app);
+async function loadVersion(): Promise<string> {
+  try {
+    const res = await fetch("/version.json");
+    const data = await res.json();
+    return data.commit || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+loadVersion().then((version) => createApp(app, version));

@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "build": "tsc",
+    "build": "sh ../../helpers/scripts/shell/gen-version.sh 2>/dev/null || true; tsc",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'No linter configured yet'"
   },

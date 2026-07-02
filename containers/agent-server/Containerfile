@@ -4,6 +4,9 @@
 FROM docker.io/library/node:20-alpine AS builder
 WORKDIR /app
 
+ARG COMMIT_HASH=unknown
+ARG BUILD_DATE=unknown
+
 # Copiar metadatos del workspace
 COPY package*.json ./
 COPY packages/fhs-protocol/package.json ./packages/fhs-protocol/
@@ -16,6 +19,10 @@ RUN npm ci
 # Copiar código fuente y construir
 COPY packages/fhs-protocol ./packages/fhs-protocol
 COPY apps/agent-server ./apps/agent-server
+
+# Generar version.json
+RUN printf '{"commit":"%s","date":"%s"}\n' "$COMMIT_HASH" "$BUILD_DATE" \
+      > apps/agent-server/src/version.json
 
 RUN npm run build -w packages/fhs-protocol && \
     npm run build -w apps/agent-server

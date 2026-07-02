@@ -8,7 +8,7 @@ interface ModelOption {
   providerName: string;
 }
 
-export function createApp(container: HTMLElement) {
+export function createApp(container: HTMLElement, version: string = "unknown") {
   const state: ChatState = {
     messages: [],
     isStreaming: false,
@@ -27,6 +27,7 @@ export function createApp(container: HTMLElement) {
         <div class="network-status">
           <span class="status-dot"></span>
           <span>Red: FARO</span>
+          <span class="version">${version}</span>
         </div>
       </header>
       <aside class="sidebar">

@@ -4,6 +4,9 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+ARG COMMIT_HASH=unknown
+ARG BUILD_DATE=unknown
+
 COPY package*.json ./
 COPY packages/fhs-protocol/package.json ./packages/fhs-protocol/
 COPY apps/agent-server/package.json ./apps/agent-server/
@@ -13,6 +16,10 @@ RUN npm ci
 
 COPY packages/fhs-protocol ./packages/fhs-protocol
 COPY apps/web ./apps/web
+
+# Generar version.json para el frontend
+RUN printf '{"commit":"%s","date":"%s"}\n' "$COMMIT_HASH" "$BUILD_DATE" \
+      > apps/web/public/version.json
 
 RUN npm run build -w packages/fhs-protocol && \
     npm run build -w apps/web

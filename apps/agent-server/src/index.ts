@@ -8,6 +8,7 @@ import { setupProvidersApi } from "./api/providers.js";
 import { setupEventsApi } from "./api/events.js";
 import { setupChatWebSocket } from "./api/chat-ws.js";
 import { EventBus } from "./sse/event-bus.js";
+import versionInfo from "./version.json" with { type: "json" };
 
 const PORT = Number(process.env.PORT || 8081);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -28,7 +29,12 @@ async function main() {
   await setupChatApi(app, registry, eventBus);
   await setupChatWebSocket(app, registry, eventBus);
 
-  app.get("/health", async () => ({ ok: true, fhsVersion: FHS_VERSION }));
+  app.get("/health", async () => ({
+    ok: true,
+    fhsVersion: FHS_VERSION,
+    version: versionInfo.commit,
+    buildDate: versionInfo.date,
+  }));
 
   try {
     await app.listen({ port: PORT, host: HOST });
