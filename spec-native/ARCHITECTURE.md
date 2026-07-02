@@ -67,6 +67,46 @@ Agent Runtime          LlmGateway           LLM Provider (FHS node)      llama.c
 
 El Agent Server no conoce la API de llama.cpp. Solo habla FHS. El provider LLM (`examples/llm-provider/`) es el único que traduce FHS → HTTP internamente.
 
+### Protocolo FHS en la capa de Tools (OCR)
+
+```
+Agent Runtime         MCP Host           OCR Provider (FHS node)    ether-ocr-api
+     │                   │                        │                      │
+     │ resolveTool()     │                        │                      │
+     ├──────────────────►│                        │                      │
+     │                   │ FHS WebSocket          │                      │
+     │                   │ tool.call ────────────►│                      │
+     │                   │                        │ curl -F              │
+     │                   │                        │ POST /api/v1/ocr ───►│
+     │                   │                        │◄── {"status":"ok"} ──┤
+     │                   │◄── tool.result ────────┤                      │
+     │◄──────────────────┤                        │                      │
+```
+
+El OCR Provider (`examples/ocr-provider/`) traduce `tool.call` (FHS WebSocket) → `curl -F` multipart/form-data a ether-ocr-api. El Agent Server no conoce la API REST de ether-ocr.
+
+### Puentes internos (bridges)
+
+Ambos providers usan `curl` vía `child_process.execFile` en vez de `fetch()`/`http.request()` de Node.js. Esto evita un conflicto de event loop entre la librería `ws` y Undici (cliente HTTP nativo de Node.js). El bug se manifiesta como `fetch` colgado indefinidamente cuando se llama desde un handler WebSocket.
+
+- **LlmBridge** (`examples/llm-provider/src/llm-bridge.ts`): `curl -X POST` a llama.cpp OpenAI-compatible API
+- **OcrBridge** (`examples/ocr-provider/src/ocr-bridge.ts`): `curl -F` multipart a ether-ocr-api REST API
+
+### Redes Docker
+
+Los servicios galaxIA usan la red `fhs` (bridge). `ether-ocr-api` está en `containers_default`. Se conecta manualmente a `fhs`:
+
+```bash
+podman network connect fhs ether-ocr-api
+```
+
+| Origen | Destino | Transporte |
+|---|---|---|
+| `agent-server` | `llm-provider:43111` | FHS WebSocket |
+| `agent-server` | `ocr-provider:43112` | FHS WebSocket |
+| `llm-provider` | `host.containers.internal:43110` | curl → llama.cpp |
+| `ocr-provider` | `ether-ocr-api:8000` | curl -F → REST API |
+
 ## Restricciones
 
 - **Dependencias prohibidas:** el frontend no puede llamar directamente a proveedores LLM o MCP; todo debe pasar por `agent-server`.
@@ -77,8 +117,11 @@ El Agent Server no conoce la API de llama.cpp. Solo habla FHS. El provider LLM (
 ## Riesgos
 
 | Riesgo | Impacto | Mitigación |
-|---|---|---|
+|---|---|---|---|
 | Un modelo local no soporta tool calling nativo | Alto | Implementar degradación graceful: prompt-template o ejecución manual |
 | Nodo MCP se desconecta durante una conversación | Medio | Registry detecta la caída por lease y el runtime busca alternativa |
 | El Registry embebido se convierte en cuello de botella | Medio | Documentar separación como tarea pendiente v0.2 |
 | Usuario espera latencia de nube en hardware viejo | Medio | Mostrar tiempos y proveedores; establecer expectativas en la demo |
+| ether-ocr-api no está en la red `fhs` tras reinicio | Bajo | Conectar manualmente: `podman network connect fhs ether-ocr-api`. Automatizar en v0.2 |
+| Modelo LLM demasiado lento en hardware comunitario | Alto | Usar modelos ligeros (Qwen 0.5B). Timeouts configurados a 300s |
+| fetch()/http.request() de Node.js se cuelga con ws | Alto | Usar curl vía child_process en los bridges (LlmBridge, OcrBridge) |

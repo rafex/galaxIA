@@ -21,9 +21,11 @@ El objetivo es demostrar que no hace falta depender de la nube para tener IA út
 | Documento | Contenido |
 |---|---|
 | [`protocolo.md`](./protocolo.md) | Las reglas del protocolo FHS v0.1 |
-| [`agent-server.md`](./agent-server.md) | El orquestador central: Registry, Runtime y Chat API |
-| [`como-usar.md`](./como-usar.md) | Cómo levantar el stack y probarlo |
 | [`arquitectura.md`](./arquitectura.md) | Cómo están organizados los componentes |
+| [`agent-server.md`](./agent-server.md) | El orquestador central: Registry, Runtime y Chat API |
+| [`proveedores.md`](./proveedores.md) | Nodos FHS: LLM Provider + OCR Provider |
+| [`despliegue.md`](./despliegue.md) | Cómo desplegar el stack en el bastion |
+| [`como-usar.md`](./como-usar.md) | Cómo levantar el stack y probarlo |
 | [`contenedores.md`](./contenedores.md) | Cómo desplegar con Podman/Docker |
 | [`manifiesto-llm.md`](./manifiesto-llm.md) | Cómo publicizar un modelo LLM |
 | [`manifiesto-mcp.md`](./manifiesto-mcp.md) | Cómo publicizar un servidor MCP de tools |

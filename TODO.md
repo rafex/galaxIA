@@ -25,7 +25,9 @@
 - [x] Cambiar a modelo Qwen 2.5 0.5B (DeepSeek R1 demasiado lento en Mac mini)
 - [x] Probar flujo chat end-to-end con Qwen 0.5B en el bastion
 - [x] Agregar versionado con hash del commit en frontend y backend
-- [ ] Probar flujo WebSocket end-to-end con OCR real
+- [x] Probar flujo OCR end-to-end via FHS (ocr-provider → ether-ocr-api)
+- [x] Documentar providers FHS en docs/proveedores.md
+- [x] Documentar despliegue en docs/despliegue.md
 - [ ] Preparar script de demo de failover OCR para la ponencia
 - [ ] Actualizar TRACEABILITY.md al cerrar la iniciativa
 

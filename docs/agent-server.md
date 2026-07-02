@@ -147,6 +147,43 @@ El Gateway envía `chat.request` y recibe `chat.delta` / `chat.completed`. El pr
 - Gateway: `apps/agent-server/src/providers/llm-gateway.ts`
 - Ejemplo de provider: `examples/llm-provider/src/index.ts`
 
+## El Gateway de Tools por FHS
+
+Igual que el LLM, las tools (OCR, etc.) se consumen vía FHS WebSocket. El Agent Server no conoce MCP ni REST para tools — solo habla FHS.
+
+```
+Agent Runtime → MCP Host → FHS WS → ocr-provider → curl → ether-ocr
+               tool.list            (registrado       REST API
+               tool.call             en Registry)      /api/v1/ocr
+```
+
+El OCR Provider expone tools con schema tipado:
+
+```json
+{
+  "type": "tool.call",
+  "requestId": "...",
+  "toolName": "ocr_extract",
+  "arguments": { "file_base64": "...", "filename": "captura.png", "lang": "spa+eng" }
+}
+```
+
+Y responde:
+
+```json
+{
+  "type": "tool.result",
+  "requestId": "...",
+  "toolName": "ocr_extract",
+  "content": [{ "type": "text", "text": "Hola mundo extraído de la imagen" }]
+}
+```
+
+**Dónde vive el código:**
+- Tool provider ejemplo: `examples/ocr-provider/src/index.ts`
+- Bridge a ether-ocr: `examples/ocr-provider/src/ocr-bridge.ts`
+- Mensajes FHS de tools: `packages/fhs-protocol/src/messages.ts`
+
 ## Cómo levantar el Agent Server
 
 ```bash

@@ -23,4 +23,4 @@ la relacion antes de continuar.
 
 | Spec | Estado | Tareas | Decisiones | Archivos principales | Validacion | Observaciones |
 | --- | --- | --- | --- | --- | --- | --- |
-| SPEC-0001 | done | TASK-0001, TASK-0002 | DEC-0001 | `src/auth/*` | `npm test` | |
+| fhs-mvp | active | TASK-FHS-0001..0008 | DEC-0001..DEC-0005 | `packages/fhs-protocol/`, `apps/agent-server/`, `apps/web/`, `examples/llm-provider/`, `examples/ocr-provider/` | Chat E2E con Qwen 0.5B, OCR E2E con ether-ocr | Stack desplegado en bastion 192.168.3.173. LLM via FHS WS + curl. OCR via FHS WS + curl -F. Timeouts a 300s para hardware lento. |

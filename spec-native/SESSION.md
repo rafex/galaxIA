@@ -4,31 +4,42 @@ state = "in_progress"
 agent = "unknown"
 initiative = "fhs-mvp"
 task = "TASK-FHS-0008"
-intent = "Crear recubrimiento FHS del LLM provider y documentar Agent Server para humanos y agentes. El LLM ya no recibe HTTP directo desde el agent-server — toda la comunicación pasa por el protocolo FHS WebSocket (chat.request/chat.delta/chat.completed)."
-last_updated = "2026-07-01T15:51:34Z"
+intent = "Integrar OCR provider con ether-ocr-api via FHS WebSocket. Documentar stack completo para humanos (docs/) y agentes (spec-native/). Stack corriendo en bastion con Qwen 0.5B y OCR funcional."
+last_updated = "2026-07-02T04:58:24Z"
 +++
 
 # Active Session
 
 ## Current state
 
-Crear recubrimiento FHS del LLM provider y documentar Agent Server para humanos y agentes. El LLM ya no recibe HTTP directo desde el agent-server — toda la comunicación pasa por el protocolo FHS WebSocket (chat.request/chat.delta/chat.completed).
+Integrar OCR provider con ether-ocr-api via FHS WebSocket. Documentar stack completo para humanos (docs/) y agentes (spec-native/). Stack corriendo en bastion con Qwen 0.5B y OCR funcional.
 
 ## Next steps
 
-1. Probar flujo con llama.cpp real en el bastion (cambiar modelo a DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf)
-2. Conectar el MCP OCR y probar failover end-to-end
-3. Preparar script de demo de failover OCR para la ponencia
-4. Actualizar TRACEABILITY.md al cerrar la iniciativa
+1. Preparar script de demo de failover OCR para la ponencia
+2. Actualizar TRACEABILITY.md al cerrar la iniciativa
+3. Probar failover cuando el OCR no está disponible y el LLM responde sin tools
 
 ## Context for next agent
 
-Cambios realizados:
-- Creado examples/llm-provider/ — nodo FHS completo que registra en Registry, expone chat FHS WebSocket (:43111), y traduce a llama.cpp internamente
-- Actualizado LlmGateway (apps/agent-server/src/providers/llm-gateway.ts) — eliminado fallback HTTP, solo habla FHS WebSocket
-- Extendido fhs-protocol: agregado "fhs" a EndpointInfo.protocol, nuevos tipos ChatRequest/Delta/Completed/Error en messages.ts
-- Creado docs/agent-server.md — documentación humana del Agent Server
-- Actualizado spec-native/ARCHITECTURE.md — flujo FHS documentado con diagrama de secuencia
-- Actualizado docs/README.md con enlace a agent-server.md
-- Corregidos puertos en scripts: registry en :8083 (SSH tunnel ocupa :8081)
-- Prueba end-to-end exitosa con mock-llm-server
+Stack completo desplegado en bastion 192.168.3.173:
+- fhs-web :3000 (frontend con version)
+- fhs-agent-server :30083→8081 (registry + runtime)
+- fhs-llm-provider :30084→43111 (wrapper FHS → curl → llama.cpp Qwen 0.5B)
+- fhs-ocr-provider :30085→43112 (wrapper FHS → curl -F → ether-ocr-api:8000/api/v1/ocr)
+- llama.cpp :43110 (host, Qwen 2.5 0.5B)
+- ether-ocr-api :8001 (container, REST + MCP)
+
+Red: ether-ocr-api conectado a red fhs para Docker DNS.
+Bridges usan curl via child_process (evita bug Undici + ws en Node.js).
+Timeouts: 300s bridge, 310s gateway.
+
+Documentación creada/actualizada:
+- docs/proveedores.md (nuevo)
+- docs/despliegue.md (nuevo)
+- docs/arquitectura.md (actualizado)
+- docs/agent-server.md (sección tools FHS)
+- docs/README.md (índice actualizado)
+- spec-native/ARCHITECTURE.md (OCR, redes, riesgos)
+- spec-native/TRACEABILITY.md (tabla fhs-mvp)
+- TODO.md (marcados items completados)
