@@ -19,7 +19,13 @@ LLAMA_CPP_URL  := env_var_or_default("LLAMA_CPP_URL", "http://localhost:" + MOCK
 OCR_SVC_URL    := env_var_or_default("OCR_SERVICE_URL", "http://localhost:8082")
 
 # ── Contenedores ───────────────────────────────────────────────────────────
-COMPOSE_FILE := "containers/compose.yaml"
+# Ruta absoluta a propósito: algunas versiones de podman-compose (ej. 1.3.0)
+# hacen chdir() al directorio del compose file antes de abrirlo y luego
+# reintentan abrir la ruta original tal cual la recibieron — con una ruta
+# relativa como "containers/compose.yaml" eso termina buscando
+# "containers/containers/compose.yaml" y falla con FileNotFoundError, aunque
+# el archivo exista. Con ruta absoluta no hay ambigüedad en ningún host.
+COMPOSE_FILE := justfile_directory() + "/containers/compose.yaml"
 COMPOSE_CMD  := `command -v podman-compose >/dev/null && echo podman-compose || echo "docker compose"`
 
 # ── Utilidades ─────────────────────────────────────────────────────────────
