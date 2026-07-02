@@ -26,7 +26,8 @@ El objetivo es demostrar que no hace falta depender de la nube para tener IA út
 | [`arquitectura.md`](./arquitectura.md) | Cómo están organizados los componentes |
 | [`agent-server.md`](./agent-server.md) | El orquestador central: Registry, Runtime y Chat API |
 | [`proveedores.md`](./proveedores.md) | Nodos FHS: LLM Provider + OCR Provider |
-| [`despliegue.md`](./despliegue.md) | Cómo desplegar el stack en el bastion |
+| [`despliegue.md`](./despliegue.md) | Cómo desplegar el stack en un solo host (bastion) |
+| [`despliegue-multi-host.md`](./despliegue-multi-host.md) | Cómo desplegar el core en una laptop y los providers pesados (LLM/OCR) en el bastion, dos máquinas reales en la misma LAN |
 | [`como-usar.md`](./como-usar.md) | Cómo levantar el stack y probarlo |
 | [`contenedores.md`](./contenedores.md) | Cómo desplegar con Podman/Docker |
 | [`manifiesto-llm.md`](./manifiesto-llm.md) | Cómo publicizar un modelo LLM |

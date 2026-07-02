@@ -10,6 +10,7 @@
 - **Bloqueos actuales:** ninguno. El pipeline de OCR está verificado end-to-end con modelo real y ejecución determinística (DEC-0014, DEC-0015, DEC-0016, DEC-0017, DEC-0020 — ya no depende de que el LLM decida invocar la tool), y el aislamiento de eventos entre conversaciones concurrentes también está verificado (DEC-0018, probado con dos inferencias reales en paralelo). Se pausa temporalmente `SPEC-AUTH-0001` para enfocar recursos en el MVP.
 - **Iniciativa en spec, sin iniciar:** `rag-provider` — indexado y recuperación de documentos (SPEC-RAG-0001 en `spec-native/specs/rag-provider/SPEC.md`). Extiende el patrón determinístico de DEC-0020 a la recuperación de contexto. No se inicia hasta decisión explícita.
 - **Completado:** `ocr-confirmacion` — confirmación explícita (burbuja colapsada + botones) antes de que el LLM use el texto OCR (SPEC-OCRCONFIRM-0001, `spec-native/specs/ocr-confirmacion/SPEC.md`). Verificado end-to-end contra el bastion real. Sienta la base de estado por conversación que `rag-provider` también necesita (TASK-RAG-0001).
+- **Diseñado, pendiente de ejecutar:** topología multi-host — core (`web`+`agent-server`) en laptop, providers pesados (LLM/OCR) en bastion (DEC-0022, `docs/despliegue-multi-host.md`). El cambio de código en `containers/compose.yaml` ya está hecho y validado con `podman-compose config`; falta el despliegue real en las dos máquinas y correr el checklist de verificación end-to-end del documento.
 
 ## Después
 
