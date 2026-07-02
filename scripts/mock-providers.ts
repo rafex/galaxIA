@@ -69,11 +69,11 @@ const llmManifest = {
   },
   models: [
     {
-      id: "deepseek-r1-distill-qwen-1.5b",
-      displayName: "DeepSeek R1 Distill Qwen 1.5B",
-      capabilities: ["chat", "tool.calling"],
-      contextWindow: 4096,
-      toolCalling: { supported: true, mode: "native", formats: ["openai"] },
+      id: "qwen2.5-0.5b-instruct",
+      displayName: "Qwen 2.5 0.5B Instruct",
+      capabilities: ["chat"],
+      contextWindow: 2048,
+      toolCalling: { supported: false },
     },
   ],
 };
