@@ -3,7 +3,7 @@ import type { AgentSSEEvent } from "@galaxia/fhs-protocol";
 export * from "@galaxia/fhs-protocol";
 
 export type ChatMessage =
-  | { role: "user"; content: string }
+  | { role: "user"; content: string; attachmentName?: string; attachmentIsPdf?: boolean }
   | { role: "assistant"; content: string; provenance?: any };
 
 export interface ChatState {

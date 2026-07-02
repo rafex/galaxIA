@@ -47,9 +47,13 @@ services:
       - LLM_PROVIDER_PORT=43111
       - LLM_PROVIDER_HOST=llm-provider
       - REGISTRY_URL=ws://agent-server:8081/fhs/v1/ws
-      - LLAMA_CPP_URL=http://host.containers.internal:43110/v1
+      - LLAMA_CPP_URL=http://host.containers.internal:8080/v1
       - PROVIDER_ID=did:key:macmini-raul
       - PROVIDER_NAME=Mac mini de Raul
+      - MODEL_ID=qwen2.5-coder-3b-instruct
+      - MODEL_DISPLAY_NAME=Qwen 2.5 Coder 3B Instruct
+      - MODEL_CONTEXT_WINDOW=4096
+      - MODEL_TOOL_CALLING_SUPPORTED=true
     extra_hosts:
       - "host.containers.internal:host-gateway"
     depends_on:

@@ -56,19 +56,29 @@ Ejemplo de tool:
 ```json
 {
   "name": "ocr_extract",
-  "description": "Extrae texto de una imagen",
+  "description": "Extrae texto de una imagen o PDF",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "image_base64": {
+      "file_base64": {
         "type": "string",
-        "description": "Imagen codificada en base64"
+        "description": "Archivo codificado en base64 (imagen o PDF)"
+      },
+      "filename": {
+        "type": "string",
+        "description": "Nombre del archivo, opcional (determina la extensión/tipo)"
+      },
+      "lang": {
+        "type": "string",
+        "description": "Idiomas OCR separados por + (default: spa+eng)"
       }
     },
-    "required": ["image_base64"]
+    "required": ["file_base64"]
   }
 }
 ```
+
+> El nombre del parámetro es `file_base64`, no `image_base64` — la tool acepta tanto imágenes (`image/png`, `image/jpeg`) como PDF (`application/pdf`), ver `inputMediaTypes` del manifiesto arriba.
 
 ## Cómo enviar el manifiesto
 
@@ -83,4 +93,4 @@ Ejemplo de tool:
 
 ## Implementación de referencia
 
-Revisa `containers/ocr-mcp/ocr_server.py` para ver un servidor MCP mínimo en Python con OCR basado en Tesseract.
+Revisa `examples/ocr-provider/` para ver la implementación de referencia en TypeScript — es un wrapper FHS, no un servidor MCP nativo (ver `docs/protocolo-provider.md`). Traduce `tool.call` (FHS WebSocket) a una petición REST contra `ether-ocr-api` (Tesseract por debajo), no implementa OCR propio.

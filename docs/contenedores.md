@@ -1,85 +1,58 @@
 # Despliegue con contenedores
 
-galaxIA se puede desplegar con Podman o Docker. Cada componente tiene su propio contenedor.
+galaxIA se despliega con Podman o Docker. Cada componente tiene su propio contenedor. Para el despliegue real usado durante el desarrollo (bastion remoto), ver [`despliegue.md`](./despliegue.md) — este documento cubre la estructura general de contenedores.
 
 ## Estructura de contenedores
 
 ```
 containers/
-├── agent-server/      # Backend Fastify
-├── web/              # Frontend con Nginx
-├── ocr-mcp/          # Servidor OCR en Python
-├── llama-provider/   # Instrucciones para llama.cpp
-└── compose.yaml      # Orquestación
+├── agent-server/     # Backend Fastify (Registry + Runtime + Chat API)
+├── web/               # Frontend con Nginx
+├── llm-provider/       # Wrapper FHS hacia llama.cpp
+├── ocr-provider/       # Wrapper FHS hacia ether-ocr-api
+└── compose.yaml       # Orquestación
 ```
+
+`ether-ocr-api` (el servicio REST de OCR real) y `llama-server` (el motor de inferencia) **no** tienen contenedor propio en este repositorio — corren por separado. Ver `docs/despliegue.md` para el detalle.
 
 ## Levantar todo
 
 ```bash
 cd containers
 podman-compose up --build
+# o: docker compose up --build
 ```
 
-Para Docker:
+Con `just` (recomendado, gestiona el hash del commit para el versionado):
 
 ```bash
-cd containers
-docker compose up --build
+just container-up
 ```
 
-## Servicios expuestos
+## Servicios expuestos (desarrollo local)
 
 | Servicio | Puerto | Descripción |
 |---|---|---|
-| Web | 3000 | Chat web |
-| Agent Backend | 8081 | API REST + WebSocket + Registry |
-| OCR MCP | 8082 | Servidor MCP OCR |
+| `fhs-web` | 3000 | Chat web |
+| `fhs-agent-server` | 8081 | API REST + WebSocket + Registry |
+| `fhs-llm-provider` | 43111 | Wrapper FHS de chat |
+| `fhs-ocr-provider` | 43112 | Wrapper FHS de tools |
+
+En el bastion los puertos externos son distintos — ver la tabla de mapeo en `docs/despliegue.md`.
 
 ## Red entre contenedores
 
-Los contenedores se comunican a través de la red `fhs`. Los nombres de servicio se resuelven por DNS:
-
-- `agent-server`
-- `fhs-web`
-- `ocr-mcp`
-
-## Conectar llama.cpp externo
-
-Si tienes `llama-server` en otra máquina, edita `scripts/mock-providers.ts` y apunta el endpoint a tu servidor:
-
-```typescript
-endpoint: {
-  protocol: "openai-compatible",
-  url: "http://192.168.3.173:43110/v1"
-}
-```
-
-Luego ejecútalo:
-
-```bash
-npx tsx scripts/mock-providers.ts
-```
+Los contenedores se comunican a través de la red `fhs` (Docker DNS): `agent-server`, `fhs-web`, `llm-provider`, `ocr-provider`.
 
 ## Construir imágenes individualmente
 
 ```bash
 podman build -t fhs-agent-server -f containers/agent-server/Containerfile .
 podman build -t fhs-web -f containers/web/Containerfile .
-podman build -t fhs-ocr-mcp -f containers/ocr-mcp/Containerfile .
+podman build -t fhs-llm-provider -f containers/llm-provider/Containerfile .
+podman build -t fhs-ocr-provider -f containers/ocr-provider/Containerfile .
 ```
 
-## Despliegue en producción (para la ponencia)
+## Modelo LLM y variables de entorno
 
-Para el host `192.168.3.173`:
-
-```bash
-# Desde tu máquina local
-rsync -avz --exclude node_modules --exclude .git . rafex@192.168.3.173:~/galaxIA
-
-# En el host remoto
-ssh rafex@192.168.3.173
-cd ~/galaxIA/containers
-podman-compose up --build -d
-```
-
-Asegúrate de que los puertos 3000, 8081 y 8082 estén abiertos en el firewall.
+El modelo publicado por `llm-provider` (id, nombre, soporte de tool calling) se configura por variables de entorno en `compose.yaml` — no está hardcodeado en el código. Ver `docs/proveedores.md` y `spec-native/DECISIONS.md` DEC-0019.

@@ -19,6 +19,17 @@ const PROVIDER_ID =
   process.env.PROVIDER_ID || "did:key:macmini-raul";
 const PROVIDER_NAME =
   process.env.PROVIDER_NAME || "Mac mini de Ra\u00FAl";
+const MODEL_ID =
+  process.env.MODEL_ID || "qwen2.5-coder-3b-instruct";
+const MODEL_DISPLAY_NAME =
+  process.env.MODEL_DISPLAY_NAME || "Qwen 2.5 Coder 3B Instruct";
+const MODEL_CONTEXT_WINDOW = Number(process.env.MODEL_CONTEXT_WINDOW || 4096);
+// El modelo actual (Qwen2.5 v\u00EDa --jinja en llama-server) no siempre llena el
+// campo tool_calls nativo \u2014 LlmBridge tiene un fallback que parsea la llamada
+// desde `content` cuando esto pasa. Ver examples/llm-provider/src/llm-bridge.ts
+// y spec-native/DECISIONS.md DEC-0016/DEC-0017.
+const MODEL_TOOL_CALLING_SUPPORTED =
+  (process.env.MODEL_TOOL_CALLING_SUPPORTED ?? "true") !== "false";
 
 const manifest: LlmProviderManifest = {
   fhsVersion: "0.1",
@@ -34,11 +45,13 @@ const manifest: LlmProviderManifest = {
   },
   models: [
     {
-      id: "qwen2.5-0.5b-instruct",
-      displayName: "Qwen 2.5 0.5B Instruct",
-      capabilities: ["chat"],
-      contextWindow: 2048,
-      toolCalling: { supported: false },
+      id: MODEL_ID,
+      displayName: MODEL_DISPLAY_NAME,
+      capabilities: MODEL_TOOL_CALLING_SUPPORTED ? ["chat", "tool.calling"] : ["chat"],
+      contextWindow: MODEL_CONTEXT_WINDOW,
+      toolCalling: MODEL_TOOL_CALLING_SUPPORTED
+        ? { supported: true, mode: "native", formats: ["openai"] }
+        : { supported: false },
     },
   ],
 };

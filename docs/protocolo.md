@@ -17,6 +17,22 @@ Cada una de esas computadoras es un **nodo**. El protocolo FHS permite que esos 
 3. **Sean descubiertos** por el chat.
 4. **Sean usados** cuando el agente lo necesite.
 
+```mermaid
+flowchart LR
+    subgraph Comunidad
+        N1[Mac mini<br/>llama.cpp]
+        N2[Laptop<br/>OCR]
+        N3[Raspberry Pi<br/>otra tool]
+    end
+    N1 -- "hello / register" --> R[(Registry<br/>Agent Backend)]
+    N2 -- "hello / register" --> R
+    N3 -- "hello / register" --> R
+    U[Usuario] -- "chat" --> W[Web]
+    W --> R
+    R -- "resuelve provider" --> N1
+    R -- "resuelve provider" --> N2
+```
+
 ## Las 10 reglas de FHS v0.1
 
 ### 1. Identidad verificable
@@ -28,7 +44,7 @@ did:key:macmini-raul
 did:key:raspi-ocr-01
 ```
 
-Para la prueba de concepto usamos nombres simples. En producción se usaría criptografía Ed25519.
+Para la prueba de concepto usamos nombres simples. En producción se usaría criptografía Ed25519 (ver `spec-native/DECISIONS.md` DEC-0004).
 
 ### 2. Registro por arrendamiento (lease)
 
@@ -36,7 +52,7 @@ Un nodo no se registra una sola vez y se va. Debe renovar su registro periódica
 
 ### 3. Heartbeat obligatorio
 
-Mientras está vivo, el nodo envía un `ping` cada 10 segundos.
+Mientras está vivo, el nodo envía un `ping` cada 10 segundos. El provider es responsable de emitirlo incluso si está ocupado procesando otra petición — ver el requisito de dispatcher concurrente en [`protocolo-provider.md`](./protocolo-provider.md).
 
 ### 4. Servicios declarados
 
@@ -55,9 +71,11 @@ Cada petición lleva un ámbito de privacidad:
 - `community` — mi comunidad de confianza
 - `external` — cualquier proveedor autorizado
 
+Detalle completo en la sección [Privacidad](#privacidad).
+
 ### 7. Transparencia obligatoria
 
-Cada respuesta del agente incluye su procedencia: qué modelo razonó, qué tool usó, qué datos viajaron y dónde.
+Cada respuesta del agente incluye su procedencia: qué modelo razonó, qué tool usó, qué datos viajaron y dónde. Detalle en [Privacidad y trazabilidad](#privacidad).
 
 ### 8. Proveedor rechazable
 
@@ -80,9 +98,35 @@ En v0.1 hay dos tipos:
 
 En el futuro se planean `embedding`, `storage`, `resource` y `agent`.
 
-## Mensajes WebSocket
+Todo provider, sin importar el tipo, debe seguir el mismo contrato de ciclo de vida. Ver [`protocolo-provider.md`](./protocolo-provider.md) — es lo que hace posible que un provider nuevo sea **plug and play**: el Registry y el Agent Runtime no necesitan código especial por proveedor, solo por tipo (`llm`/`mcp`).
 
-### Registro de nodo
+## Ciclo de vida de un nodo (registro + heartbeat)
+
+```mermaid
+sequenceDiagram
+    participant P as Provider
+    participant R as Registry (Agent Backend)
+
+    P->>R: hello { providerId, timestamp }
+    R-->>P: welcome { registryId, leaseSeconds: 30 }
+    P->>R: register { providerId, manifest }
+    R-->>P: registered { leaseExpires, acceptedServices }
+    R->>R: broadcast node.online a runtimes activos
+
+    loop cada 10s mientras el provider esté vivo
+        P->>R: ping
+        R-->>P: pong { timestamp }
+        R->>R: touchConnection(providerId) — renueva el lease
+    end
+
+    Note over R: Si no llega ping en 30s (lease vencido)
+    R->>R: markLost(providerId)
+    R->>R: broadcast node.lost a runtimes activos
+```
+
+### Mensajes de registro
+
+**Registro de nodo**
 
 ```json
 {
@@ -102,7 +146,7 @@ Respuesta:
 }
 ```
 
-### Publicar servicios
+**Publicar servicios**
 
 ```json
 {
@@ -123,7 +167,7 @@ Respuesta:
 }
 ```
 
-### Heartbeat
+**Heartbeat**
 
 ```json
 { "type": "ping" }
@@ -135,7 +179,7 @@ Respuesta:
 { "type": "pong", "timestamp": 1719700005 }
 ```
 
-### Notificaciones del Registry
+**Notificaciones del Registry**
 
 Cuando un nodo se conecta o se cae, el Registry notifica a los agentes:
 
@@ -161,7 +205,7 @@ Cuando un nodo se conecta o se cae, el Registry notifica a los agentes:
 }
 ```
 
-## Chat por WebSocket
+## Chat por WebSocket (frontend ↔ Agent Backend)
 
 El frontend se conecta a:
 
@@ -193,3 +237,155 @@ Recibe eventos en tiempo real:
 { "type": "assistant.delta", "data": { "text": "El texto extraído es..." } }
 { "type": "assistant.completed", "data": { "provenance": { ... } } }
 ```
+
+## Flujo completo de un mensaje (chat + tool call)
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario (Web)
+    participant AS as Agent Server
+    participant REG as Registry
+    participant LLM as LLM Provider (FHS)
+    participant OCR as OCR Provider (FHS)
+
+    U->>AS: start { message, artifacts, preferences.scope }
+    AS->>REG: resolver LLM y tools candidatas (scope)
+    REG-->>AS: providers disponibles dentro del scope
+    AS-->>U: agent.status "resolving-model"
+    AS-->>U: llm.selected { providerId, modelId }
+
+    AS->>LLM: chat.request { requestId, messages, tools }
+    LLM-->>AS: chat.completed { requestId, toolCalls }
+
+    alt el LLM pide una tool
+        AS-->>U: tool.selected { capability: "document.ocr" }
+        AS->>OCR: tool.call { requestId, toolName, arguments: { file_base64 } }
+        OCR-->>AS: tool.result { requestId, content }
+        AS-->>U: tool.completed { name, duration }
+        AS->>LLM: chat.request { requestId nuevo, messages + tool result }
+        LLM-->>AS: chat.completed { requestId, response final }
+    end
+
+    AS-->>U: assistant.delta { text }
+    AS-->>U: assistant.completed { provenance }
+```
+
+### Mensajes entre Agent Server y Providers
+
+**Chat (LLM)**
+
+```
+Agent Server → Provider:  chat.request   { requestId, request: GenerateRequest }
+Provider → Agent Server:  chat.delta     { requestId, delta: string }
+Provider → Agent Server:  chat.completed { requestId, response: GenerateResponse }
+Provider → Agent Server:  chat.error     { requestId, code, message }
+```
+
+**Tools (OCR, MCP)**
+
+```
+Agent Server → Provider:  tool.list         { requestId }
+Provider → Agent Server:  tool.list.response  { requestId, tools: [...] }
+Agent Server → Provider:  tool.call         { requestId, toolName, arguments }
+Provider → Agent Server:  tool.result       { requestId, toolName, content: [...] }
+Provider → Agent Server:  tool.error        { requestId, toolName, code, message }
+```
+
+`requestId` es obligatorio y debe repetirse igual en la respuesta — es la base de la trazabilidad operacional (ver más abajo).
+
+## Resolución por ámbito (scope) — cómo decide el Registry
+
+```mermaid
+flowchart TD
+    Start[Petición con scope] --> Check{scope?}
+    Check -->|local| Local[Solo providers en localhost]
+    Check -->|network| Network[+ providers en LAN/VPN local]
+    Check -->|community| Community["+ providers con visibility: community"]
+    Check -->|external| External{allowExternalProviders?}
+    External -->|true| ExternalYes[+ providers públicos autorizados]
+    External -->|false/ausente| ExternalNo[Se ignoran providers externos]
+    Local --> Resolve[Registry filtra candidatos]
+    Network --> Resolve
+    Community --> Resolve
+    ExternalYes --> Resolve
+    ExternalNo --> Resolve
+    Resolve --> Prefer["Entre candidatos válidos,<br/>preferir retention: none"]
+```
+
+## Privacidad
+
+FHS existe para que una comunidad tenga IA útil **sin ceder control de sus datos**. Cualquier implementación del protocolo — sin importar el lenguaje — debe respetar estas garantías. No son opcionales ni "buenas prácticas": son requisito para que un provider sea considerado FHS-compatible.
+
+### Ámbito (`scope`) — quién puede ver la petición
+
+El `scope` no es metadata decorativa: **condiciona qué proveedores puede resolver el Registry** para una petición dada.
+
+| Scope | Significado | Efecto en la resolución |
+|---|---|---|
+| `local` | Solo el equipo del usuario | Solo se consideran proveedores corriendo en `localhost`/mismo host |
+| `network` | Red local del usuario | Se agregan proveedores visibles en la LAN/VPN local |
+| `community` | Comunidad de confianza declarada | Se agregan proveedores con `visibility: "community"` en su manifiesto |
+| `external` | Cualquier proveedor autorizado | Se agregan proveedores públicos, solo si el usuario lo habilita explícitamente (`allowExternalProviders: true`) |
+
+Una petición con `scope: "local"` **nunca** debe resolver a un proveedor `external`, sin importar si ese proveedor es "mejor" (más rápido, más capaz). El scope es un techo, no una preferencia.
+
+### Retención (`privacy.retention` en el manifiesto)
+
+Todo proveedor declara qué hace con los datos que recibe:
+
+- `"none"` — no persiste nada, procesa y descarta.
+- `"session"` — conserva mientras dura la conversación, luego borra.
+- Cualquier otro valor debe documentarse explícitamente en el manifiesto del proveedor (no asumir significado implícito).
+
+El agente **debe preferir proveedores con `retention: "none"`** cuando hay más de un candidato para la misma capacidad, salvo que el usuario indique lo contrario.
+
+### Uso para entrenamiento (`privacy.trainingUse`)
+
+Booleano obligatorio en el manifiesto de todo proveedor `llm`. Si `trainingUse: true`, el Registry debe exponerlo de forma visible al usuario antes de resolver ese proveedor — nunca en silencio.
+
+### Procedencia (`provenance`) — trazabilidad orientada al usuario
+
+Cada respuesta del agente (`assistant.completed`) incluye:
+
+```json
+{
+  "llm": { "providerId": "...", "providerName": "...", "model": "..." },
+  "tools": [{ "capability": "document.ocr", "providerId": "...", "providerName": "..." }],
+  "dataExported": "Datos enviados a tools federadas",
+  "jurisdiction": "red local comunitaria"
+}
+```
+
+Esto no es telemetría opcional: es la forma en que el usuario puede auditar, después de cada respuesta, exactamente qué modelo razonó, qué herramienta se ejecutó y a dónde viajaron sus datos. Cualquier SDK o implementación del protocolo, en cualquier lenguaje, debe propagar este objeto sin omitir campos.
+
+### Trazabilidad operacional — privacidad no significa "sin rastro"
+
+**"No retener contenido" y "no poder diagnosticar errores" no son la misma cosa.** Privacidad restringe qué se guarda; trazabilidad exige que lo que sí se guarda alcance para resolver un incidente ("mi OCR falló ayer a las 15:03", "el chat respondió con datos de otro proveedor").
+
+Regla: **todo mensaje FHS con `requestId` debe poder correlacionarse extremo a extremo — como metadata, nunca como contenido.**
+
+Se distinguen dos capas:
+
+| Capa | Qué incluye | Se retiene según `privacy.retention` |
+|---|---|---|
+| **Contenido** | Texto del mensaje, imagen/PDF adjunto, respuesta del modelo | Sí — sujeto a la política declarada por cada provider |
+| **Metadata de trazabilidad** | `conversationId`, `requestId`, `providerId`, `capability`/`modelId`, `timestamp`, `duration`, `success`/`error.code` | Siempre — no es negociable, no es "dato del usuario" |
+
+Un provider FHS-compatible debe loggear la capa de metadata (mínimo: `requestId`, resultado, duración) en cada `chat.request`/`tool.call` que procesa, **sin loggear el contenido** salvo que su `retention` declarada lo permita explícitamente. Esto permite reconstruir la cadena `conversationId → requestId → providerId → resultado` para depurar un fallo, sin violar la promesa de privacidad.
+
+Ver [`spec-native/DECISIONS.md`](../spec-native/DECISIONS.md) DEC-0012 para el estado de esta garantía en la implementación actual (hoy es un gap: el `requestId` se genera pero no se loggea ni se correlaciona con `conversationId`).
+
+### Checklist de privacidad y trazabilidad para implementar un provider FHS
+
+Antes de considerar un provider "listo", verifica que:
+
+- [ ] Declara `privacy.retention` en su manifiesto (nunca lo omite).
+- [ ] Si es tipo `llm`, declara `privacy.trainingUse`.
+- [ ] Respeta el `scope` recibido en cada petición — nunca procesa datos fuera del ámbito autorizado.
+- [ ] No registra ni loggea el **contenido** de las peticiones más allá de lo declarado en `retention`.
+- [ ] Sí registra la **metadata de trazabilidad** (`requestId`, éxito/error, duración) de cada petición procesada, para poder diagnosticar fallos sin exponer contenido.
+- [ ] Responde con suficiente información para que el agente construya `provenance` correctamente.
+
+## Implementaciones en otros lenguajes
+
+FHS es JSON sobre WebSocket — no depende de TypeScript ni de Node.js. Cualquier lenguaje con soporte de WebSocket y JSON puede implementar un provider o un cliente FHS. Ver [`implementacion-multilenguaje.md`](./implementacion-multilenguaje.md) para la guía de soporte en **Python, Rust, Java y TypeScript/JavaScript** (los primeros lenguajes soportados oficialmente) y [`protocolo-provider.md`](./protocolo-provider.md) para el contrato exacto que cualquier provider, en cualquier lenguaje, debe cumplir para ser plug-and-play.

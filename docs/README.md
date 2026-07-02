@@ -20,7 +20,9 @@ El objetivo es demostrar que no hace falta depender de la nube para tener IA út
 
 | Documento | Contenido |
 |---|---|
-| [`protocolo.md`](./protocolo.md) | Las reglas del protocolo FHS v0.1 |
+| [`protocolo.md`](./protocolo.md) | Las reglas del protocolo FHS v0.1, con diagramas y privacidad/trazabilidad |
+| [`protocolo-provider.md`](./protocolo-provider.md) | Contrato plug-and-play que todo provider debe cumplir |
+| [`implementacion-multilenguaje.md`](./implementacion-multilenguaje.md) | Cómo implementar FHS en Python, Rust, Java y TypeScript |
 | [`arquitectura.md`](./arquitectura.md) | Cómo están organizados los componentes |
 | [`agent-server.md`](./agent-server.md) | El orquestador central: Registry, Runtime y Chat API |
 | [`proveedores.md`](./proveedores.md) | Nodos FHS: LLM Provider + OCR Provider |

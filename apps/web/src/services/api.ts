@@ -4,6 +4,7 @@ export interface ApiOptions {
   conversationId?: string;
   message: string;
   artifacts?: string[];
+  attachmentName?: string;
   preferences?: {
     model?: "auto" | string;
     scope?: "local" | "network" | "community" | "external";
@@ -13,6 +14,7 @@ export interface ApiOptions {
 
 export interface ChatConnection {
   send(options: ApiOptions): void;
+  sendDecision(conversationId: string, use: boolean): void;
   close(): void;
 }
 
@@ -59,6 +61,7 @@ export function connectToChat(
       conversationId: options.conversationId,
       message: { role: "user", content: options.message } as UserMessage,
       artifacts: options.artifacts || [],
+      attachmentName: options.attachmentName,
       preferences: options.preferences || {},
     };
 
@@ -69,8 +72,15 @@ export function connectToChat(
     }
   }
 
+  function sendDecision(conversationId: string, use: boolean) {
+    if (ready) {
+      socket.send(JSON.stringify({ type: "attachment.decision", conversationId, use }));
+    }
+  }
+
   return {
     send,
+    sendDecision,
     close: () => socket.close(),
   };
 }

@@ -39,6 +39,7 @@ interface ResolvedToolProvider {
 export class AgentRuntime {
   private llmGateway = new LlmGateway();
   private mcpHost = new McpHost();
+  private artifacts: string[] = [];
   private usedTools: Array<{
     capability: string;
     providerId: string;
@@ -52,10 +53,24 @@ export class AgentRuntime {
     private conversationId: string
   ) {}
 
-  async run(message: UserMessage, preferences: ModelPreferences) {
+  async run(
+    message: UserMessage,
+    preferences: ModelPreferences,
+    artifacts?: string[],
+    preExtractedText?: string
+  ) {
+    this.artifacts = preExtractedText ? [] : artifacts || [];
     this.emitStatus("classifying", "Analizando tu petición...");
 
     const capabilities = classifyIntent(message.content);
+    // Adjuntar un archivo ya expresa la intención de OCR sin ambigüedad —
+    // no depender de que el texto del mensaje también contenga palabras
+    // clave como "ocr"/"texto"/"imagen" (ver DEC-0020). Si el texto ya viene
+    // pre-extraído (flujo de confirmación, ver SPEC-OCRCONFIRM-0001), no hace
+    // falta resolver el provider de OCR de nuevo.
+    if (this.artifacts.length > 0 && !capabilities.includes("document.ocr")) {
+      capabilities.push("document.ocr");
+    }
     this.emitStatus("resolving-model", "Buscando modelo disponible...");
 
     const llm = this.resolveLlm(preferences);
@@ -84,6 +99,29 @@ export class AgentRuntime {
       }))
     );
 
+    // Ejecución determinística: si hay un archivo adjunto y existe un provider
+    // para document.ocr, se ejecuta el OCR directamente, sin esperar a que el
+    // LLM "decida" invocarlo vía tool calling. Modelos pequeños/locales no son
+    // confiables tomando esa decisión (ver spec-native/DECISIONS.md DEC-0020) —
+    // cuando el usuario adjunta un archivo, la intención ya es inequívoca.
+    let userContent = message.content;
+    if (preExtractedText) {
+      userContent = `[Texto extraído automáticamente del archivo adjunto mediante OCR]\n${preExtractedText}\n\n[Pregunta del usuario]\n${message.content}`;
+    } else {
+      const ocrToolIndex = this.artifacts.length > 0
+        ? loadedTools.findIndex((t) => t.capabilityId === "document.ocr")
+        : -1;
+
+      if (ocrToolIndex >= 0) {
+        const ocrTool = loadedTools[ocrToolIndex];
+        const ocrText = await this.runOcrDeterministically(ocrTool);
+        loadedTools.splice(ocrToolIndex, 1); // ya se ejecutó; no ofrecerla también al LLM
+        userContent = ocrText
+          ? `[Texto extraído automáticamente del archivo adjunto mediante OCR]\n${ocrText}\n\n[Pregunta del usuario]\n${message.content}`
+          : `${message.content}\n\n(No se pudo extraer texto del archivo adjunto.)`;
+      }
+    }
+
     const toolDefinitions: ToolDefinition[] = this.llmGateway.toToolDefinitions(loadedTools);
 
     // Preparar mensajes
@@ -96,7 +134,7 @@ export class AgentRuntime {
           "Si necesitas usar una herramienta, hazlo UNA SOLA VEZ y luego responde con la información obtenida. " +
           "No repitas llamadas a herramientas.",
       },
-      { role: "user", content: message.content },
+      { role: "user", content: userContent },
     ];
 
     // Primera llamada: permite que el LLM solicite tools
@@ -200,6 +238,72 @@ export class AgentRuntime {
     return result;
   }
 
+  /**
+   * Ejecuta OCR sobre el artifact adjunto y emite `ocr.extracted`, sin llamar
+   * al LLM — usado por el flujo de confirmación (SPEC-OCRCONFIRM-0001): el
+   * usuario ve el texto extraído antes de decidir si el LLM lo usa o no.
+   */
+  async extractOcrText(
+    artifacts: string[],
+    filename: string,
+    preferences: ModelPreferences
+  ): Promise<string | null> {
+    this.artifacts = artifacts;
+    const toolProviders = this.resolveToolProviders(["document.ocr"], preferences.scope);
+    const loadedTools = await this.mcpHost.loadToolsForCapabilities(
+      toolProviders.map((t) => ({ providerId: t.providerId, providerName: t.providerName, service: t.service }))
+    );
+    const ocrTool = loadedTools.find((t) => t.capabilityId === "document.ocr");
+    if (!ocrTool) {
+      this.emitError("NO_OCR_PROVIDER", "No hay proveedores de OCR disponibles en tu scope");
+      return null;
+    }
+
+    const text = await this.runOcrDeterministically(ocrTool);
+    if (text) {
+      this.emit({ type: "ocr.extracted", data: { filename, text } });
+    }
+    return text;
+  }
+
+  /**
+   * Ejecuta document.ocr directamente contra el provider, sin pasar por una
+   * decisión del LLM. Emite los mismos eventos que executeToolCall para que
+   * el frontend muestre la misma actividad (tool.selected/running/completed).
+   * Devuelve el texto extraído, o null si falla (degradación graceful).
+   */
+  private async runOcrDeterministically(tool: LoadedTool): Promise<string | null> {
+    const artifact = this.artifacts[0];
+    if (!artifact) return null;
+
+    this.emit({
+      type: "tool.selected",
+      data: { capability: tool.capabilityId, providerId: tool.providerId, providerName: tool.providerName },
+    });
+    this.emit({ type: "tool.running", data: { name: tool.name, providerId: tool.providerId } });
+    const startTime = Date.now();
+
+    try {
+      const parsed = parseDataUrl(artifact);
+      const args = { file_base64: parsed.base64, filename: `upload-${Date.now()}.${parsed.extension}` };
+      const result = await this.mcpHost.callTool(tool.providerId, tool.name, args);
+      const duration = Date.now() - startTime;
+      const textResult = extractText(result);
+
+      this.emit({ type: "tool.completed", data: { name: tool.name, duration, success: true } });
+      this.usedTools.push({
+        capability: tool.capabilityId,
+        providerId: tool.providerId,
+        providerName: tool.providerName,
+        toolName: tool.name,
+      });
+      return textResult;
+    } catch (err: any) {
+      this.emit({ type: "tool.error", data: { name: tool.name, error: err.message } });
+      return null;
+    }
+  }
+
   private async executeToolCall(
     toolCall: ToolCall,
     loadedTools: LoadedTool[],
@@ -238,6 +342,19 @@ export class AgentRuntime {
 
     try {
       const args = JSON.parse(toolCall.function.arguments || "{}") as Record<string, any>;
+
+      if (tool.capabilityId === "document.ocr" && !args.file_base64) {
+        const artifact = this.artifacts[0];
+        if (!artifact) {
+          this.emit({ type: "tool.error", data: { name: toolName, error: "No hay archivo adjunto para OCR" } });
+          messages?.push({ role: "tool", content: "Error: no hay archivo adjunto", tool_call_id: toolCall.id });
+          return;
+        }
+        const parsed = parseDataUrl(artifact);
+        args.file_base64 = parsed.base64;
+        args.filename = args.filename || `upload-${Date.now()}.${parsed.extension}`;
+      }
+
       const result = await this.mcpHost.callTool(tool.providerId, toolName, args);
       const duration = Date.now() - startTime;
       const textResult = extractText(result);
@@ -301,16 +418,21 @@ export class AgentRuntime {
     };
   }
 
+  // Todo evento conversation-scoped pasa por aquí para que conversationId se
+  // adjunte siempre — así ningún call site puede olvidarlo (ver DEC-0018).
   private emit(event: any) {
-    this.eventBus.emit(event);
+    this.eventBus.emit({
+      ...event,
+      data: { ...event.data, conversationId: this.conversationId },
+    });
   }
 
   private emitStatus(status: string, message: string) {
-    this.eventBus.emit({ type: "agent.status", data: { status, message } });
+    this.emit({ type: "agent.status", data: { status, message } });
   }
 
   private emitError(code: string, message: string) {
-    this.eventBus.emit({ type: "error", data: { code, message } });
+    this.emit({ type: "error", data: { code, message } });
   }
 }
 
@@ -337,6 +459,24 @@ function matchesScope(service: PublishedService, scope: PrivacyScope): boolean {
 function authorize(_providerId: string, _scope?: PrivacyScope): boolean {
   // Para la PoC, autorizamos siempre. En producción, verificar vetos y políticas.
   return true;
+}
+
+const EXTENSION_BY_MIME: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/webp": "webp",
+  "application/pdf": "pdf",
+};
+
+function parseDataUrl(dataUrl: string): { base64: string; mimeType: string; extension: string } {
+  const match = /^data:([^;]+);base64,(.*)$/s.exec(dataUrl);
+  if (!match) {
+    // No es un data URL; se asume base64 crudo de una imagen.
+    return { base64: dataUrl, mimeType: "image/png", extension: "png" };
+  }
+  const [, mimeType, base64] = match;
+  return { base64, mimeType, extension: EXTENSION_BY_MIME[mimeType] || "bin" };
 }
 
 function extractText(result: any): string {

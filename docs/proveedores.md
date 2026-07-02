@@ -30,7 +30,8 @@ Un nodo FHS que envuelve un motor de inferencia (llama.cpp). Corre en Node.js, s
    - Recibe `chat.request` con el `GenerateRequest` (modelo, mensajes, tools)
    - Llama a llama.cpp vía `curl` (child_process, evita bug de Undici + ws en Node.js)
    - Responde con `chat.delta` (streaming) o `chat.completed` (respuesta final)
-3. **Modelo actual**: Qwen 2.5 0.5B Instruct (Q4_K_M, ~0.4GB, <1s en hardware moderno, ~7s en Mac mini vieja)
+   - Si `llama-server` decide usar una tool pero no llena el campo `tool_calls` nativo, `LlmBridge` tiene un fallback que parsea la llamada desde el texto de respuesta (ver `spec-native/DECISIONS.md` DEC-0017)
+3. **Modelo actual**: Qwen 2.5 Coder 3B Instruct (Q4_K_M, con tool calling habilitado — ver DEC-0016). El modelo, su tool calling y su ventana de contexto **ya no están hardcodeados**: se configuran por variables de entorno (ver tabla abajo, DEC-0019). En el bastion, `llama-server` corre por separado (fuera de este repo, ver `docs/despliegue.md`) en el puerto `8080` con `--jinja`.
 
 ### Manifiesto
 
@@ -39,7 +40,7 @@ Un nodo FHS que envuelve un motor de inferencia (llama.cpp). Corre en Node.js, s
   "fhsVersion": "0.1",
   "provider": { "id": "did:key:macmini-raul", "type": "llm", "visibility": "community" },
   "endpoint": { "protocol": "fhs", "url": "ws://llm-provider:43111/fhs/v1/chat" },
-  "models": [{ "id": "qwen2.5-0.5b-instruct", "capabilities": ["chat"], "contextWindow": 2048 }]
+  "models": [{ "id": "qwen2.5-coder-3b-instruct", "capabilities": ["chat", "tool.calling"], "contextWindow": 4096, "toolCalling": { "supported": true } }]
 }
 ```
 
@@ -59,8 +60,12 @@ const stdout = await this.curlPost("http://llama:43110/v1/chat/completions", bod
 | `LLM_PROVIDER_PORT` | `43111` | Puerto del WebSocket FHS de chat |
 | `LLM_PROVIDER_HOST` | `localhost` | Hostname para el manifiesto (en contenedores: `llm-provider`) |
 | `REGISTRY_URL` | `ws://localhost:8083/fhs/v1/ws` | URL del Registry |
-| `LLAMA_CPP_URL` | `http://localhost:43110/v1` | URL del servidor llama.cpp |
+| `LLAMA_CPP_URL` | `http://localhost:43110/v1` | URL del servidor llama.cpp (en el bastion: `:8080`, ver `docs/despliegue.md`) |
 | `PROVIDER_ID` | `did:key:macmini-raul` | Identidad del proveedor |
+| `MODEL_ID` | `qwen2.5-coder-3b-instruct` | ID del modelo publicado en el manifiesto (DEC-0019) |
+| `MODEL_DISPLAY_NAME` | `Qwen 2.5 Coder 3B Instruct` | Nombre legible del modelo |
+| `MODEL_CONTEXT_WINDOW` | `4096` | Ventana de contexto declarada |
+| `MODEL_TOOL_CALLING_SUPPORTED` | `true` | Si el modelo declara soporte de tool calling. Verificar con `curl` antes de cambiarlo (ver `docs/protocolo-provider.md`, "Lecciones de integración") — declarar `true` para un modelo que no lo soporta de forma confiable no lo hace confiable |
 
 ---
 
@@ -99,7 +104,13 @@ Cliente              OCR Provider FHS        ether-ocr-api          Tesseract
 
 | Tool | Parámetros | Descripción |
 |---|---|---|
-| `ocr_extract` | `file_base64` (str), `filename` (str, opcional), `lang` (str, default: `spa+eng`) | Extrae texto de una imagen |
+| `ocr_extract` | `file_base64` (str), `filename` (str, opcional), `lang` (str, default: `spa+eng`) | Extrae texto de una imagen o PDF |
+
+### Ejecución determinística, no vía tool calling del LLM
+
+El Agent Runtime (`apps/agent-server/src/agent/runtime.ts`) **no espera a que el LLM decida invocar `ocr_extract`**. Cuando el usuario adjunta un archivo, la intención ya es inequívoca — el runtime llama a la tool directamente antes de involucrar al LLM. Esto se adoptó porque modelos pequeños/locales no son confiables tomando esa decisión (ver `spec-native/DECISIONS.md` DEC-0016, DEC-0017, DEC-0020).
+
+Además, el frontend muestra el texto extraído en una burbuja colapsada con botones "Usar documento"/"Descartar" **antes** de llamar al LLM — el usuario confirma explícitamente si quiere gastar una llamada (lenta en hardware comunitario) con ese contexto. Ver `spec-native/specs/ocr-confirmacion/SPEC.md`.
 
 ### Puente interno (OcrBridge)
 

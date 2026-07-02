@@ -140,10 +140,105 @@ body,
   background: var(--surface);
 }
 
+.message.thinking {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.thinking-label {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.thinking-dots {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.thinking-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  display: inline-block;
+  animation: thinking-bounce 1.2s infinite ease-in-out both;
+}
+
+.thinking-dots i:nth-child(1) { animation-delay: -0.32s; }
+.thinking-dots i:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes thinking-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
 .message .meta {
   margin-top: 0.5rem;
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.message-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: calc(var(--radius) - 4px);
+  background: rgba(0, 0, 0, 0.15);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.message.ocr-preview summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.ocr-preview-text {
+  margin-top: 0.5rem;
+  padding: 0.625rem;
+  border-radius: calc(var(--radius) - 4px);
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 0.8125rem;
+  max-height: 240px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.ocr-preview-question {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+}
+
+.ocr-preview-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.625rem;
+}
+
+.ocr-preview-actions button {
+  border: none;
+  border-radius: calc(var(--radius) - 4px);
+  padding: 0.5rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.ocr-preview-actions button.secondary {
+  background: var(--surface-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.ocr-preview-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .composer {

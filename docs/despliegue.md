@@ -18,7 +18,7 @@ Guía para desplegar el stack completo de galaxIA en el bastion (`192.168.3.173`
 | **fhs-agent-server** | `30083` | `8081` | `fhs` |
 | **fhs-llm-provider** | `30084` | `43111` | `fhs` |
 | **fhs-ocr-provider** | `30085` | `43112` | `fhs` |
-| **llama.cpp** | `43110` | — | host |
+| **llama.cpp** | `8080` | — | host |
 | **ether-ocr-api** | `8001→8000, 9011→9001` | — | `containers_default` |
 
 ## Redes
@@ -109,10 +109,16 @@ LLM_PROVIDER_PORT=43111
 OCR_PROVIDER_PORT=43112
 MOCK_LLM_PORT=43110
 REGISTRY_URL=ws://localhost:8083/fhs/v1/ws
-LLAMA_CPP_URL=http://localhost:43110/v1
+LLAMA_CPP_URL=http://localhost:8080/v1
 OCR_SERVICE_URL=http://ether-ocr-api:8000
 OCR_API_KEY=dev-key-ether-ocr
+MODEL_ID=qwen2.5-coder-3b-instruct
+MODEL_DISPLAY_NAME="Qwen 2.5 Coder 3B Instruct"
+MODEL_CONTEXT_WINDOW=4096
+MODEL_TOOL_CALLING_SUPPORTED=true
 ```
+
+`MODEL_*` controla qué modelo se publica en el manifiesto del `llm-provider` (DEC-0019) — cambiar de modelo ya no requiere editar código ni reconstruir la imagen, solo estas variables. `LLAMA_CPP_URL` debe apuntar al puerto real donde corre `llama-server` en el bastion (gestionado fuera de este repo, en `/opt/llama.cpp/current/scripts/start-server.sh` con `--jinja` — ver `docs/manifiesto-llm.md`).
 
 Para desarrollo local, cambiar los hostnames a `localhost`. Para contenedores, usar Docker DNS (`agent-server`, `llm-provider`, `ether-ocr-api`).
 
@@ -122,13 +128,15 @@ Los puertos externos deben estar en la whitelist de UFW:
 
 ```bash
 sudo ufw allow 3000/tcp    # Web frontend
-sudo ufw allow 43110/tcp   # llama.cpp
+sudo ufw allow 8080/tcp    # llama.cpp
 # Los puertos 30083-30085 ya están en el rango 30000-30099 (Podman Web)
 ```
 
 ## Notas
 
 - **Red `fhs`**: el `ether-ocr-api` debe conectarse manualmente tras cada reinicio del container OCR: `podman network connect fhs ether-ocr-api`
-- **Modelo LLM**: Qwen 2.5 0.5B en `/srv/models/gguf/qwen2.5-0.5b-instruct-q4_k_m.gguf`
+- **Modelo LLM**: Qwen 2.5 Coder 3B en `/srv/models/gguf/qwen2.5-coder-3b-instruct-q4_k_m.gguf`, configurado por env vars (ver arriba, DEC-0019) — no hardcodeado
+- **`llama-server`**: se gestiona fuera de este repo, en el proyecto `PoC-Llama.cpp` del bastion (`/opt/llama.cpp/current/scripts/start-server.sh`, con `--jinja`). Tras cambiar de modelo ahí, verificar con `curl` que el tool calling funciona antes de actualizar `MODEL_TOOL_CALLING_SUPPORTED` en `containers/compose.yaml` (ver `docs/protocolo-provider.md`, "Lecciones de integración")
+- **`llama-server` puede quedar en estado degradado** tras varias corridas seguidas (un slot queda `is_processing: false` con tokens ya decodificados pero sin devolver respuesta — observado en sesiones de prueba largas). Si una petición se cuelga más de ~5 minutos, verificar `curl http://<bastion>:8080/slots` y reiniciar el servidor con el mismo script de arranque si hace falta
 - **Timeout**: 300s en el bridge y 310s en el gateway para tolerar hardware lento
 - **Versión**: el hash del commit se muestra en el header del frontend y en `/health`

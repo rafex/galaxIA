@@ -19,6 +19,8 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
   let conversationId: string | null = null;
   let chatConnection: ChatConnection | null = null;
   let pendingAttachment: string | null = null;
+  let pendingAttachmentIsPdf = false;
+  let pendingAttachmentName: string | null = null;
 
   container.innerHTML = `
     <div class="app">
@@ -39,7 +41,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
       <main class="chat-area">
         <div class="messages"></div>
         <div class="composer">
-          <input type="file" class="file-input" accept="image/*" hidden />
+          <input type="file" class="file-input" accept="image/*,application/pdf" hidden />
           <button class="attach-btn" type="button">Adjuntar</button>
           <textarea placeholder="Escribe un mensaje..." rows="1"></textarea>
           <button class="send-btn" type="button">Enviar</button>
@@ -107,8 +109,16 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
   fileInput.addEventListener("change", async () => {
     const file = fileInput.files?.[0];
     if (!file) return;
+    const isPdf = file.type === "application/pdf";
+    if (!file.type.startsWith("image/") && !isPdf) {
+      addActivityItem("error", `Tipo de archivo no soportado: ${file.type || file.name}`);
+      fileInput.value = "";
+      return;
+    }
     pendingAttachment = await fileToBase64(file);
-    attachBtn.textContent = `📎 ${file.name}`;
+    pendingAttachmentIsPdf = isPdf;
+    pendingAttachmentName = file.name;
+    attachBtn.textContent = `${isPdf ? "📄" : "📎"} ${file.name}`;
     attachBtn.classList.add("attached");
   });
 
@@ -131,11 +141,19 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     const text = textareaEl.value.trim();
     if ((!text && !pendingAttachment) || state.isStreaming) return;
 
-    const userContent = text || (pendingAttachment ? "[imagen adjunta]" : "");
-    addMessage({ role: "user", content: userContent });
+    const userContent = text || (pendingAttachment ? (pendingAttachmentIsPdf ? "[PDF adjunto]" : "[imagen adjunta]") : "");
+    addMessage({
+      role: "user",
+      content: userContent,
+      attachmentName: pendingAttachment ? pendingAttachmentName || undefined : undefined,
+      attachmentIsPdf: pendingAttachmentIsPdf,
+    });
 
     const artifacts = pendingAttachment ? [pendingAttachment] : undefined;
+    const attachmentName = pendingAttachmentName;
     pendingAttachment = null;
+    pendingAttachmentIsPdf = false;
+    pendingAttachmentName = null;
     attachBtn.textContent = "Adjuntar";
     attachBtn.classList.remove("attached");
     textareaEl.value = "";
@@ -143,31 +161,24 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     state.isStreaming = true;
     sendBtn.disabled = true;
     activityLogEl.innerHTML = "";
+    hideThinking();
+
+    const sendOptions = {
+      conversationId: conversationId || undefined,
+      message: text,
+      artifacts,
+      attachmentName: attachmentName || undefined,
+      preferences: {
+        model: state.selectedModel,
+        scope: state.privacyScope,
+        allowExternalProviders: state.privacyScope === "external",
+      },
+    };
 
     if (!chatConnection) {
-      chatConnection = connectToChat(handleEvent, () => {
-        chatConnection?.send({
-          conversationId: conversationId || undefined,
-          message: text,
-          artifacts,
-          preferences: {
-            model: state.selectedModel,
-            scope: state.privacyScope,
-            allowExternalProviders: state.privacyScope === "external",
-          },
-        });
-      });
+      chatConnection = connectToChat(handleEvent, () => chatConnection?.send(sendOptions));
     } else {
-      chatConnection.send({
-        conversationId: conversationId || undefined,
-        message: text,
-        artifacts,
-        preferences: {
-          model: state.selectedModel,
-          scope: state.privacyScope,
-          allowExternalProviders: state.privacyScope === "external",
-        },
-      });
+      chatConnection.send(sendOptions);
     }
   }
 
@@ -178,6 +189,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
         break;
       case "agent.status":
         addActivityItem("info", event.data.message);
+        showThinking(event.data.message);
         break;
       case "llm.selected":
         addActivityItem("success", `Modelo: ${event.data.modelId} @ ${event.data.providerName}`);
@@ -195,10 +207,18 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
         addActivityItem("error", `${event.data.name}: ${event.data.error}`);
         break;
       case "assistant.delta":
+        hideThinking();
         appendAssistantText(event.data.text);
         break;
       case "assistant.completed":
+        hideThinking();
         renderProvenance(event.data.provenance);
+        state.isStreaming = false;
+        sendBtn.disabled = false;
+        break;
+      case "ocr.extracted":
+        hideThinking();
+        addOcrExtractedMessage(event.data.filename, event.data.text);
         state.isStreaming = false;
         sendBtn.disabled = false;
         break;
@@ -209,6 +229,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
         addActivityItem("success", `Nodo disponible: ${event.data.providerName}`);
         break;
       case "error":
+        hideThinking();
         addActivityItem("error", `[${event.data.code}] ${event.data.message}`);
         state.isStreaming = false;
         sendBtn.disabled = false;
@@ -220,7 +241,94 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     state.messages.push(message);
     const div = document.createElement("div");
     div.className = `message ${message.role}`;
-    div.textContent = message.content;
+
+    if (message.role === "user" && message.attachmentName) {
+      const badge = document.createElement("div");
+      badge.className = "message-attachment";
+      badge.textContent = `${message.attachmentIsPdf ? "📄" : "📎"} ${message.attachmentName} — cargado`;
+      div.appendChild(badge);
+    }
+
+    const textEl = document.createElement("div");
+    textEl.textContent = message.content;
+    div.appendChild(textEl);
+
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  let thinkingEl: HTMLElement | null = null;
+
+  function showThinking(statusText: string) {
+    if (!thinkingEl) {
+      thinkingEl = document.createElement("div");
+      thinkingEl.className = "message assistant thinking";
+      const dots = document.createElement("span");
+      dots.className = "thinking-dots";
+      dots.innerHTML = "<i></i><i></i><i></i>";
+      const label = document.createElement("span");
+      label.className = "thinking-label";
+      thinkingEl.appendChild(dots);
+      thinkingEl.appendChild(label);
+      messagesEl.appendChild(thinkingEl);
+    }
+    const label = thinkingEl.querySelector(".thinking-label");
+    if (label) label.textContent = statusText;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function hideThinking() {
+    thinkingEl?.remove();
+    thinkingEl = null;
+  }
+
+  function addOcrExtractedMessage(filename: string, text: string) {
+    const div = document.createElement("div");
+    div.className = "message assistant ocr-preview";
+
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = `📄 ${filename} — texto extraído (clic para ver)`;
+    details.appendChild(summary);
+
+    const textEl = document.createElement("div");
+    textEl.className = "ocr-preview-text";
+    textEl.textContent = text;
+    details.appendChild(textEl);
+    div.appendChild(details);
+
+    const question = document.createElement("p");
+    question.className = "ocr-preview-question";
+    question.textContent = "¿Uso este documento para responder tu pregunta?";
+    div.appendChild(question);
+
+    const actions = document.createElement("div");
+    actions.className = "ocr-preview-actions";
+
+    const useBtn = document.createElement("button");
+    useBtn.type = "button";
+    useBtn.textContent = "Usar documento";
+    const discardBtn = document.createElement("button");
+    discardBtn.type = "button";
+    discardBtn.className = "secondary";
+    discardBtn.textContent = "Descartar";
+
+    const decide = (use: boolean) => {
+      useBtn.disabled = true;
+      discardBtn.disabled = true;
+      actions.remove();
+      question.textContent = use
+        ? "✓ Usando este documento — si aún no habías escrito tu pregunta, escríbela ahora."
+        : "Documento descartado.";
+      if (conversationId) chatConnection?.sendDecision(conversationId, use);
+    };
+
+    useBtn.addEventListener("click", () => decide(true));
+    discardBtn.addEventListener("click", () => decide(false));
+    actions.appendChild(useBtn);
+    actions.appendChild(discardBtn);
+    div.appendChild(actions);
+
     messagesEl.appendChild(div);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }

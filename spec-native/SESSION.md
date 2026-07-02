@@ -1,45 +1,48 @@
 +++
 [session]
-state = "in_progress"
-agent = "unknown"
+state = "idle"
+agent = "claude"
 initiative = "fhs-mvp"
-task = "TASK-FHS-0008"
-intent = "Integrar OCR provider con ether-ocr-api via FHS WebSocket. Documentar stack completo para humanos (docs/) y agentes (spec-native/). Stack corriendo en bastion con Qwen 0.5B y OCR funcional."
-last_updated = "2026-07-02T04:58:24Z"
+task = "none"
+intent = "PoC funcional end-to-end: chat + OCR determinístico + confirmación de usuario, verificado contra el bastion real."
+last_updated = "2026-07-02T15:35:00Z"
 +++
 
 # Active Session
 
 ## Current state
 
-Integrar OCR provider con ether-ocr-api via FHS WebSocket. Documentar stack completo para humanos (docs/) y agentes (spec-native/). Stack corriendo en bastion con Qwen 0.5B y OCR funcional.
+`idle` — no hay trabajo en curso. La PoC está funcional: subir un documento (imagen o PDF), ver el texto OCR extraído, confirmar su uso, y recibir una respuesta del LLM basada en ese texto, todo verificado end-to-end contra el bastion (192.168.3.173).
 
-## Next steps
+## Qué se completó en esta sesión (2026-07-02)
 
-1. Preparar script de demo de failover OCR para la ponencia
-2. Actualizar TRACEABILITY.md al cerrar la iniciativa
-3. Probar failover cuando el OCR no está disponible y el LLM responde sin tools
+- Soporte de PDF en el frontend (antes solo imágenes).
+- Reescritura de `McpHost` para hablar FHS WebSocket real (antes usaba el SDK MCP-HTTP y nunca conectaba) — DEC-0014.
+- Corrección del matching de capability por tokens compartidos (antes comparaba substrings completos y nunca coincidía) — DEC-0015.
+- Cambio de modelo a Qwen 2.5 Coder 3B con tool calling, con fallback de parseo en `llm-bridge.ts` para cuando `llama-server` no llena `tool_calls` nativo — DEC-0016, DEC-0017.
+- Configuración de modelo movida de hardcodeado a variables de entorno (`MODEL_ID`, `MODEL_TOOL_CALLING_SUPPORTED`, etc.) — DEC-0019.
+- Aislamiento de eventos por `conversationId` en el EventBus (antes se mezclaban entre conversaciones concurrentes) — DEC-0018, verificado con dos inferencias reales en paralelo.
+- **Ejecución determinística de OCR**: ya no depende de que el LLM decida invocar la tool — se ejecuta directo al adjuntar un archivo — DEC-0020.
+- **Flujo de confirmación de OCR** (SPEC-OCRCONFIRM-0001): burbuja colapsada con el texto extraído + botones "Usar documento"/"Descartar", sin gastar una llamada al LLM hasta que el usuario decide. Sienta el precedente de estado por conversación en `chat-ws.ts`.
+- Indicador visual de "pensando" (dots animados) mientras se espera la respuesta del LLM.
+- Documentación extensa: `docs/protocolo.md` con diagramas Mermaid, `docs/protocolo-provider.md` (contrato plug-and-play para providers nuevos), `docs/implementacion-multilenguaje.md` (Python/Rust/Java/TS).
+- Spec de `rag-provider` documentada (SPEC-RAG-0001), sin implementar — próxima iniciativa candidata.
+- Pase de actualización de toda la documentación en `docs/` y `spec-native/` para eliminar referencias obsoletas (Qwen 0.5B, puerto 43110, `containers/ocr-mcp` en Python, SDK MCP).
+
+## Next steps (candidatos, sin iniciativa activa)
+
+1. `rag-provider` (SPEC-RAG-0001) — indexado y recuperación de documentos largos, reutilizando el estado por conversación que ya existe en `chat-ws.ts`.
+2. Propagar `conversationId` → `requestId` y loggear metadata de trazabilidad (DEC-0012, sigue `proposed`).
+3. Validar manifiesto contra campos obligatorios del contrato de provider en el Registry (DEC-0013, sigue `proposed`).
+4. Evaluar un modelo de chat general (no-Coder) con tool calling para el caso de uso de chat genérico, distinto de OCR.
+5. Script de demo de failover OCR para la ponencia (pendiente desde antes de esta sesión).
 
 ## Context for next agent
 
-Stack completo desplegado en bastion 192.168.3.173:
-- fhs-web :3000 (frontend con version)
-- fhs-agent-server :30083→8081 (registry + runtime)
-- fhs-llm-provider :30084→43111 (wrapper FHS → curl → llama.cpp Qwen 0.5B)
-- fhs-ocr-provider :30085→43112 (wrapper FHS → curl -F → ether-ocr-api:8000/api/v1/ocr)
-- llama.cpp :43110 (host, Qwen 2.5 0.5B)
-- ether-ocr-api :8001 (container, REST + MCP)
+Stack desplegado en bastion 192.168.3.173:
+- `fhs-web` :3000
+- `fhs-agent-server` :30083→8081
+- `fhs-llm-provider` :30084→43111 → `llama-server` :8080 (Qwen2.5-Coder-3B, `--jinja`, gestionado fuera de este repo en `PoC-Llama.cpp`)
+- `fhs-ocr-provider` :30085→43112 → `ether-ocr-api` :8000
 
-Red: ether-ocr-api conectado a red fhs para Docker DNS.
-Bridges usan curl via child_process (evita bug Undici + ws en Node.js).
-Timeouts: 300s bridge, 310s gateway.
-
-Documentación creada/actualizada:
-- docs/proveedores.md (nuevo)
-- docs/despliegue.md (nuevo)
-- docs/arquitectura.md (actualizado)
-- docs/agent-server.md (sección tools FHS)
-- docs/README.md (índice actualizado)
-- spec-native/ARCHITECTURE.md (OCR, redes, riesgos)
-- spec-native/TRACEABILITY.md (tabla fhs-mvp)
-- TODO.md (marcados items completados)
+Antes de dar por hecho que algo "funciona": ver `docs/protocolo-provider.md` sección "Lecciones de integración" y `spec-native/TRACEABILITY.md` sección "registrado no es probado" — varios bugs de esta sesión eran invisibles hasta correr una prueba end-to-end real contra el bastion.

@@ -1,57 +1,48 @@
 # Cómo usar galaxIA
 
-Esta guía explica cómo levantar el stack completo de galaxIA en tu máquina local.
+Esta guía explica cómo levantar el stack completo de galaxIA.
 
 ## Requisitos
 
 - Node.js >= 20
 - npm >= 10
 - Podman o Docker (para contenedores)
-- Un modelo GGUF si quieres probar LLM real
+- Un servidor `llama-server` (llama.cpp) corriendo con un modelo GGUF que soporte tool calling, si quieres probar OCR de verdad. Ver `docs/manifiesto-llm.md`.
 
-## Opción rápida: con contenedores
+## Opción rápida: contenedores contra un bastion remoto
 
-### 1. Clonar y entrar
-
-```bash
-git clone <repo>
-cd galaxIA
-```
-
-### 2. Levantar el stack
+Este es el flujo real usado durante el desarrollo (ver `docs/despliegue.md` para el detalle completo).
 
 ```bash
-cd containers
-podman-compose up --build
+# Con una conexión podman remota ya configurada (podman system connection list)
+just container-up           # stack completo
+# o por partes:
+just container-up-core      # web + agent-server
+just container-up-llm       # wrapper FHS de llama.cpp
+just container-up-ocr       # wrapper FHS de ether-ocr
 ```
 
-Esto levanta:
+Esto levanta (puertos del bastion, ver `docs/despliegue.md` para el mapeo completo):
 
-- `fhs-agent-server` en http://localhost:8081
-- `fhs-web` en http://localhost:3000
-- `fhs-ocr-mcp` en http://localhost:8082
+- `fhs-web` — frontend del chat
+- `fhs-agent-server` — Registry + Runtime + Chat API
+- `fhs-llm-provider` — wrapper FHS hacia `llama-server`
+- `fhs-ocr-provider` — wrapper FHS hacia `ether-ocr-api`
 
-### 3. Abrir el chat
+`ether-ocr-api` y `llama-server` **no** están en `containers/compose.yaml` — corren por separado (ether-ocr-api como su propio contenedor, llama-server como proceso nativo en el host). Ver `docs/despliegue.md`.
 
-Ve a http://localhost:3000.
+## Abrir el chat
 
-### 4. Conectar un modelo LLM
+Ve a la URL del frontend (`http://<host>:3000`). El header muestra el hash del commit desplegado.
 
-Para que el chat funcione, necesitas al menos un proveedor LLM. Si tienes `llama-server` en otra máquina, regístralo con el script mock:
+## Probar OCR
 
-```bash
-npx tsx scripts/mock-providers.ts
-```
+1. Adjunta una imagen o PDF con el botón "Adjuntar".
+2. El sistema extrae el texto automáticamente y lo muestra en una burbuja colapsada — expándela para ver el resultado.
+3. Haz clic en **"Usar documento"** para que el LLM responda usando ese texto, o **"Descartar"** si no lo necesitas (no gasta ninguna llamada al LLM).
+4. Si ya habías escrito una pregunta junto con el archivo, se usa automáticamente al confirmar. Si no, escribe tu pregunta después de confirmar.
 
-Edita el script para apuntar a tu endpoint real.
-
-### 5. Probar OCR
-
-Escribe en el chat:
-
-> "Extrae el texto de esta imagen"
-
-Y adjunta una imagen. El agente usará el OCR del contenedor `fhs-ocr-mcp`.
+Ver `spec-native/specs/ocr-confirmacion/SPEC.md` para el diseño completo de este flujo.
 
 ## Opción de desarrollo: sin contenedores
 
@@ -59,48 +50,44 @@ Y adjunta una imagen. El agente usará el OCR del contenedor `fhs-ocr-mcp`.
 
 ```bash
 npm install
-npm run dev -w apps/agent-server
+just dev-agent
 ```
 
 ### Terminal 2 — Frontend
 
 ```bash
-npm run dev -w apps/web
+just dev-web
 ```
 
-### Terminal 3 — OCR MCP
+### Terminal 3 — LLM Provider (o mock)
 
 ```bash
-cd containers/ocr-mcp
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-PORT=8082 REGISTRY_URL=ws://localhost:8081/fhs/v1/ws python ocr_server.py
+# Con llama.cpp real corriendo en LLAMA_CPP_URL
+just dev-llm-provider
+
+# O con un mock determinístico (sin GPU/modelo real, útil para probar el pipeline)
+just dev-mock-llm
 ```
 
-### Registrar LLM mock (para pruebas sin GPU)
+### Terminal 4 — OCR Provider
 
 ```bash
-npx tsx scripts/mock-providers.ts
+# Requiere OCR_SERVICE_URL apuntando a un servicio real compatible con ether-ocr-api
+just dev-ocr-provider
 ```
+
+Ver `just --list` para todas las recetas disponibles (`helpers/just/dev.just`).
 
 ## Variables de entorno importantes
 
-### agent-server
+Ver `docs/proveedores.md` y `docs/despliegue.md` para la tabla completa por servicio. Las más relevantes:
 
-| Variable | Default | Descripción |
+| Variable | Servicio | Descripción |
 |---|---|---|
-| `PORT` | `8081` | Puerto HTTP/WebSocket |
-| `HOST` | `127.0.0.1` | Interfaz de escucha |
-
-### ocr-mcp
-
-| Variable | Default | Descripción |
-|---|---|---|
-| `PORT` | `8082` | Puerto del servidor MCP |
-| `REGISTRY_URL` | `ws://agent-server:8081/fhs/v1/ws` | WebSocket del Registry |
-| `PROVIDER_ID` | `did:key:ocr-container-01` | DID del proveedor |
-| `PROVIDER_NAME` | `OCR Container` | Nombre legible |
+| `MODEL_ID` / `MODEL_TOOL_CALLING_SUPPORTED` | llm-provider | Qué modelo se publica y si soporta tool calling (DEC-0019) — verificar con `curl` antes de cambiar |
+| `LLAMA_CPP_URL` | llm-provider | URL del `llama-server` real |
+| `OCR_SERVICE_URL` | ocr-provider | URL del servicio OCR compatible con ether-ocr-api |
+| `AGENT_SERVER_PORT` | agent-server | Puerto HTTP/WebSocket |
 
 ## Comandos útiles
 
@@ -109,11 +96,10 @@ npx tsx scripts/mock-providers.ts
 podman ps
 
 # Ver logs
-podman logs -f fhs-agent-server
-podman logs -f fhs-web
-podman logs -f fhs-ocr-mcp
+just container-logs agent-server
+just container-logs llm-provider
+just container-logs ocr-provider
 
 # Detener todo
-cd containers
-podman-compose down
+just container-down
 ```

@@ -23,7 +23,7 @@ FHS es un protocolo para descubrir, autenticar, seleccionar y consumir capacidad
 - **`registry/`**: mantiene el catálogo de nodos y servicios en memoria (MemoryRegistryStore), gestiona leases (30s) y heartbeats (10s) por WebSocket en `/fhs/v1/ws`. Expone `getProviders(type)` para que el runtime resuelva LLM y tools.
 - **`agent/`**: ejecuta el ciclo del agente: clasificar intención, resolver LLM desde Registry, resolver tools MCP desde Registry, generar vía LlmGateway, ejecutar tools vía McpHost, responder con procedencia.
 - **`providers/llm-gateway.ts`**: **habla exclusivamente el protocolo FHS.** Abre un WebSocket al LLM provider y envía `chat.request` con el `GenerateRequest`. Recibe `chat.delta` (streaming) y `chat.completed` (respuesta final). No conoce OpenAI API. El provider LLM es un nodo FHS completo (`examples/llm-provider/`) que traduce `chat.request` → llama.cpp internamente. Esto permite demostrar el protocolo end-to-end.
-- **`providers/mcp-host.ts`**: mantiene clientes MCP contra servidores de tools. Carga tools por capability, ejecuta y extrae resultados.
+- **`providers/mcp-host.ts`**: pese al nombre, **no usa el SDK oficial de MCP** — habla FHS WebSocket (`tool.list`/`tool.call`/`tool.result`) directamente con el provider, igual que `llm-gateway.ts`. Corregido en DEC-0014: la implementación original sí usaba `StreamableHTTPClientTransport` del SDK MCP-HTTP contra un endpoint `ws://`, por lo que nunca lograba conectar con los providers reales de este repo.
 - **`api/`**: endpoints REST (`/api/fhs/providers`, `/api/fhs/models`) y WebSocket (`/api/chat/ws` para chat, `/fhs/v1/ws` para Registry).
 - **`sse/`**: bus de eventos (`EventBus`) que distribuye eventos tipados FHS a los runtimes y al frontend.
 
@@ -104,7 +104,7 @@ podman network connect fhs ether-ocr-api
 |---|---|---|
 | `agent-server` | `llm-provider:43111` | FHS WebSocket |
 | `agent-server` | `ocr-provider:43112` | FHS WebSocket |
-| `llm-provider` | `host.containers.internal:43110` | curl → llama.cpp |
+| `llm-provider` | `host.containers.internal:8080` | curl → llama.cpp |
 | `ocr-provider` | `ether-ocr-api:8000` | curl -F → REST API |
 
 ## Restricciones
@@ -123,5 +123,6 @@ podman network connect fhs ether-ocr-api
 | El Registry embebido se convierte en cuello de botella | Medio | Documentar separación como tarea pendiente v0.2 |
 | Usuario espera latencia de nube en hardware viejo | Medio | Mostrar tiempos y proveedores; establecer expectativas en la demo |
 | ether-ocr-api no está en la red `fhs` tras reinicio | Bajo | Conectar manualmente: `podman network connect fhs ether-ocr-api`. Automatizar en v0.2 |
-| Modelo LLM demasiado lento en hardware comunitario | Alto | Usar modelos ligeros (Qwen 0.5B). Timeouts configurados a 300s |
+| Modelo LLM demasiado lento en hardware comunitario | Alto | Modelo configurable por env vars (DEC-0019), no hardcodeado. Timeouts a 300s. `llama-server` puede quedar en estado degradado tras varias corridas seguidas — verificar `/slots` y reiniciar si hace falta (ver `docs/despliegue.md`) |
 | fetch()/http.request() de Node.js se cuelga con ws | Alto | Usar curl vía child_process en los bridges (LlmBridge, OcrBridge) |
+| Modelos pequeños no invocan tool calling de forma confiable | Alto | Ejecución determinística de OCR sin depender de la decisión del LLM (DEC-0020); confirmación explícita del usuario antes de gastar una llamada al LLM (SPEC-OCRCONFIRM-0001) |

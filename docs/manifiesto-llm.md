@@ -16,7 +16,7 @@ Un proveedor LLM se publica en el Registry enviando un manifiesto JSON por WebSo
   },
   "endpoint": {
     "protocol": "openai-compatible",
-    "url": "http://192.168.3.173:43110/v1"
+    "url": "http://192.168.3.173:8080/v1"
   },
   "models": [
     {
@@ -66,15 +66,20 @@ Conecta al Registry por WebSocket y envía:
 
 ```bash
 ./llama-server \
-  -m models/qwen2.5-coder-3b-instruct-q4_0.gguf \
-  --port 43110 \
+  -m models/qwen2.5-coder-3b-instruct-q4_k_m.gguf \
+  --port 8080 \
   --host 0.0.0.0 \
-  -n 4096 \
+  --jinja \
+  -n 1024 \
   --ctx-size 4096
 ```
+
+El flag `--jinja` activa el parseo del chat template real del modelo (incluye el formato de tool calls) — sin él, `llama-server` no expone `tool_calls` correctamente en la respuesta OpenAI-compatible. Aun con `--jinja`, algunos modelos/versiones no llenan ese campo de forma confiable — `examples/llm-provider/src/llm-bridge.ts` tiene un fallback que parsea la llamada desde el texto de respuesta cuando esto pasa (ver `spec-native/DECISIONS.md` DEC-0017).
 
 La API OpenAI-compatible estará en:
 
 ```
-http://<ip>:43110/v1/chat/completions
+http://<ip>:8080/v1/chat/completions
 ```
+
+El puerto y el modelo son configurables — no hardcodear el modelo en el manifiesto del provider. `examples/llm-provider` lee `MODEL_ID`, `MODEL_DISPLAY_NAME`, `MODEL_CONTEXT_WINDOW` y `MODEL_TOOL_CALLING_SUPPORTED` de variables de entorno (DEC-0019). Antes de declarar `MODEL_TOOL_CALLING_SUPPORTED=true`, verificar con una llamada `curl` real que el modelo efectivamente invoca tools — ver `docs/protocolo-provider.md`, sección "Lecciones de integración".

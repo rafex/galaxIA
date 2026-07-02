@@ -45,11 +45,16 @@ Si un proveedor deja de hacer ping, el Registry lo marca como `lost` y notifica 
 El Runtime recibe un mensaje del usuario y ejecuta este ciclo:
 
 ```
-Mensaje del usuario
+Mensaje del usuario (¿trae artifacts adjuntos?)
     │
-    ▼
+    ├── SÍ ──▶ extractOcrText() — OCR determinístico, SIN llamar al LLM
+    │          Emite `ocr.extracted`. El frontend pide confirmación
+    │          ("Usar documento" / "Descartar") antes de continuar.
+    │          Ver spec-native/specs/ocr-confirmacion/SPEC.md
+    │
+    ▼ (si no hay adjunto, o el usuario ya confirmó "usar")
 ┌─────────────┐
-│  clasificar  │  ¿Qué necesita? ¿OCR? ¿Resumen? ¿Chat simple?
+│  clasificar  │  ¿Qué necesita? ¿Resumen? ¿Chat simple?
 └──────┬──────┘
        ▼
 ┌─────────────┐
@@ -58,12 +63,12 @@ Mensaje del usuario
        ▼
 ┌─────────────┐
 │ resolver     │  Pregunta al Registry: ¿hay tools MCP para
-│ tools        │  las capacidades detectadas?
+│ tools        │  las capacidades restantes (no incluye OCR, ya resuelto)
 └──────┬──────┘
        ▼
 ┌─────────────┐
-│ llamar LLM   │  Envía el historial + tools disponibles al modelo
-└──────┬──────┘  vía FHS WebSocket (protocolo interno de chat).
+│ llamar LLM   │  Envía el historial (con texto OCR ya antepuesto, si aplica)
+└──────┬──────┘  + tools disponibles vía FHS WebSocket.
        ▼
   ¿El LLM pidió ejecutar una tool?
        │
@@ -88,6 +93,8 @@ Mensaje del usuario
 └─────────────┘
 ```
 
+**Por qué OCR ya no depende de tool calling:** modelos pequeños/locales resultaron poco confiables decidiendo cuándo invocar `ocr_extract` (a veces sí, a veces no, sin cambiar la petición — ver `spec-native/DECISIONS.md` DEC-0016/DEC-0017). Cuando el usuario adjunta un archivo, la intención ya es inequívoca, así que el runtime ejecuta el OCR directamente (DEC-0020) en vez de ofrecerlo como tool al LLM.
+
 **Dónde vive el código:** `apps/agent-server/src/agent/runtime.ts`
 
 ### 3. Chat API — la cara al usuario
@@ -98,9 +105,19 @@ El frontend se conecta a `/api/chat/ws` y envía:
 {
   "type": "start",
   "message": { "role": "user", "content": "Hola, ¿qué puedes hacer?" },
+  "artifacts": ["data:application/pdf;base64,..."],
+  "attachmentName": "documento.pdf",
   "preferences": { "model": "auto", "scope": "community" }
 }
 ```
+
+Si `artifacts` trae un archivo, el runtime **no llama al LLM en ese turno** — solo extrae el texto (OCR) y responde con `ocr.extracted`. El usuario decide con un segundo mensaje:
+
+```json
+{ "type": "attachment.decision", "conversationId": "...", "use": true }
+```
+
+Ver `spec-native/specs/ocr-confirmacion/SPEC.md` para el flujo completo.
 
 Recibe eventos en tiempo real:
 
@@ -114,7 +131,10 @@ Recibe eventos en tiempo real:
 | `tool.completed` | La tool terminó (con duración) |
 | `assistant.delta` | Fragmento de texto de la respuesta |
 | `assistant.completed` | Respuesta final + procedencia |
+| `ocr.extracted` | Texto extraído de un archivo adjunto — antes de llamar al LLM, espera confirmación del usuario (`attachment.decision`) |
 | `error` | Algo falló |
+
+Todo evento conversation-scoped (todos excepto `node.online`/`node.lost`) lleva `conversationId` — el `chat-ws.ts` solo reenvía a la conexión dueña de esa conversación, nunca a otros clientes conectados (ver `spec-native/DECISIONS.md` DEC-0018).
 
 **Dónde vive el código:** `apps/agent-server/src/api/chat-ws.ts`
 
@@ -221,7 +241,7 @@ PORT=8083 npx tsx src/index.ts
 | `registry/` | Catálogo de nodos y servicios en memoria, leases, heartbeats |
 | `agent/` | Ciclo del agente: clasificar, resolver, ejecutar, responder |
 | `providers/llm-gateway.ts` | Comunicación FHS WebSocket con proveedores LLM |
-| `providers/mcp-host.ts` | Cliente MCP contra servidores de tools |
+| `providers/mcp-host.ts` | Cliente FHS WebSocket contra providers de tools (no usa el SDK MCP nativo — ver DEC-0014) |
 | `api/` | Endpoints REST + WebSocket para chat, providers y eventos |
 | `sse/` | Bus de eventos que alimenta el streaming al frontend |
 
