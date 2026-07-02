@@ -9,12 +9,13 @@ export interface SessionEvent {
 
 export interface AgentStatusEvent {
   type: "agent.status";
-  data: { status: string; message: string };
+  data: { conversationId: string; status: string; message: string };
 }
 
 export interface LlmSelectedEvent {
   type: "llm.selected";
   data: {
+    conversationId: string;
     providerId: string;
     providerName: string;
     modelId: string;
@@ -24,12 +25,13 @@ export interface LlmSelectedEvent {
 
 export interface LlmStreamingEvent {
   type: "llm.streaming";
-  data: { delta: string };
+  data: { conversationId: string; delta: string };
 }
 
 export interface ToolSelectedEvent {
   type: "tool.selected";
   data: {
+    conversationId: string;
     capability: string;
     providerId: string;
     providerName: string;
@@ -38,22 +40,27 @@ export interface ToolSelectedEvent {
 
 export interface ToolRunningEvent {
   type: "tool.running";
-  data: { name: string; providerId: string };
+  data: { conversationId: string; name: string; providerId: string };
 }
 
 export interface ToolCompletedEvent {
   type: "tool.completed";
-  data: { name: string; duration: number; success: boolean };
+  data: { conversationId: string; name: string; duration: number; success: boolean };
 }
 
 export interface ToolErrorEvent {
   type: "tool.error";
-  data: { name: string; error: string };
+  data: { conversationId: string; name: string; error: string };
 }
 
 export interface AssistantDeltaEvent {
   type: "assistant.delta";
-  data: { text: string };
+  data: { conversationId: string; text: string };
+}
+
+export interface OcrExtractedEvent {
+  type: "ocr.extracted";
+  data: { conversationId: string; filename: string; text: string };
 }
 
 export interface ProvenanceInfo {
@@ -74,7 +81,7 @@ export interface ProvenanceInfo {
 
 export interface AssistantCompletedEvent {
   type: "assistant.completed";
-  data: { provenance: ProvenanceInfo };
+  data: { conversationId: string; provenance: ProvenanceInfo };
 }
 
 export interface NodeLostEvent {
@@ -97,7 +104,9 @@ export interface NodeOnlineEvent {
 
 export interface ErrorEvent {
   type: "error";
-  data: { code: string; message: string };
+  // conversationId ausente = error de conexión antes de establecer una conversación
+  // (ej. PARSE_ERROR); se difunde a ese socket únicamente, nunca a otros clientes.
+  data: { conversationId?: string; code: string; message: string };
 }
 
 export type AgentSSEEvent =
@@ -111,6 +120,7 @@ export type AgentSSEEvent =
   | ToolErrorEvent
   | AssistantDeltaEvent
   | AssistantCompletedEvent
+  | OcrExtractedEvent
   | NodeLostEvent
   | NodeOnlineEvent
   | ErrorEvent;
