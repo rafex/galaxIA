@@ -110,19 +110,19 @@ export class LlmBridge {
   private curlPost(url: string, body: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = execFile(
-        "curl",
-        [
-          "-sfS",
-          "--max-time", "55",
-          "-X", "POST",
-          url,
-          "-H", "Content-Type: application/json",
-          "-d", body,
-        ],
-        {
-          timeout: 58_000,
-          maxBuffer: 16 * 1024 * 1024,
-        },
+      "curl",
+      [
+        "-sfS",
+        "--max-time", "300",
+        "-X", "POST",
+        url,
+        "-H", "Content-Type: application/json",
+        "-d", body,
+      ],
+      {
+        timeout: 310_000,
+        maxBuffer: 16 * 1024 * 1024,
+      },
         (err, stdout, stderr) => {
           if (err) {
             reject(

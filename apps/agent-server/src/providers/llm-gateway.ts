@@ -45,7 +45,7 @@ export class LlmGateway {
       const timeout = setTimeout(() => {
         ws.close();
         reject(new Error("Timeout esperando respuesta del LLM vía FHS"));
-      }, 60_000);
+      }, 310_000);
 
       ws.on("open", () => {
         const msg: ChatRequestMessage = {
@@ -160,7 +160,7 @@ export class LlmGateway {
     const timeout = setTimeout(() => {
       enqueue({ kind: "error", message: "Timeout esperando stream FHS" });
       ws.close();
-    }, 120_000);
+    }, 310_000);
 
     try {
       while (true) {
