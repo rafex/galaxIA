@@ -19,6 +19,13 @@ export interface ModelPreferences {
   model?: "auto" | string;
   scope?: PrivacyScope;
   allowExternalProviders?: boolean;
+  /**
+   * "confirm" (default): al adjuntar un archivo, se muestra el texto OCR y
+   * se espera confirmación del usuario antes de llamar al LLM (SPEC-OCRCONFIRM-0001).
+   * "auto": comportamiento original de DEC-0020 — OCR + respuesta del LLM en
+   * una sola llamada, sin pedir confirmación. Más rápido, menos control.
+   */
+  ocrMode?: "confirm" | "auto";
 }
 
 interface ResolvedLlm {

@@ -25,6 +25,8 @@ Desde DEC-0020, al adjuntar un archivo el OCR se ejecuta de forma determinístic
 - Si no escribió nada, tras confirmar "Usar documento" el usuario escribe su pregunta normalmente y el texto OCR se antepone a esa siguiente pregunta.
 - "Descartar" limpia el estado pendiente sin llamar al LLM en absoluto.
 
+- **Adenda (implementada el mismo día):** el modo de confirmación es **configurable**, no obligatorio. `preferences.ocrMode` acepta `"confirm"` (default, este flujo) o `"auto"` (comportamiento original de DEC-0020 — OCR + respuesta del LLM en una sola llamada, sin pedir confirmación). Selector visible en la barra de configuración del chat web (`apps/web/src/components/chat-view.ts`). Verificado end-to-end: en modo `auto`, `tool.completed` y `assistant.delta` llegan en la misma respuesta, sin evento `ocr.extracted` ni pausa.
+
 ### Fuera del alcance (para esta iteración)
 
 - Reutilizar el mismo documento confirmado para **múltiples** preguntas de seguimiento (uso único: una vez usado en una respuesta, el estado pendiente se limpia). Reutilización multi-turno es exactamente lo que resuelve `rag-provider` (SPEC-RAG-0001) — este spec sienta las bases de estado por conversación que RAG también necesita, pero no implementa recuperación por similitud.

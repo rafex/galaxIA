@@ -14,6 +14,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     isStreaming: false,
     selectedModel: "auto",
     privacyScope: "community",
+    ocrMode: "confirm",
   };
 
   let conversationId: string | null = null;
@@ -71,6 +72,13 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
             <option value="external">Proveedores externos autorizados</option>
           </select>
         </label>
+        <label>
+          Documentos adjuntos:
+          <select class="ocr-mode-selector">
+            <option value="confirm" selected>Confirmar antes de usar</option>
+            <option value="auto">Automático (más rápido, sin confirmar)</option>
+          </select>
+        </label>
       </footer>
     </div>
   `;
@@ -83,6 +91,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
   const activityLogEl = container.querySelector(".activity-log") as HTMLElement;
   const modelSelector = container.querySelector(".model-selector") as HTMLSelectElement;
   const scopeSelector = container.querySelector(".scope-selector") as HTMLSelectElement;
+  const ocrModeSelector = container.querySelector(".ocr-mode-selector") as HTMLSelectElement;
   const provenancePlaceholder = container.querySelector(".provenance-placeholder") as HTMLElement;
 
   loadModels();
@@ -93,6 +102,10 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
 
   scopeSelector.addEventListener("change", () => {
     state.privacyScope = scopeSelector.value as ChatState["privacyScope"];
+  });
+
+  ocrModeSelector.addEventListener("change", () => {
+    state.ocrMode = ocrModeSelector.value as ChatState["ocrMode"];
   });
 
   textareaEl.addEventListener("keydown", (event) => {
@@ -172,6 +185,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
         model: state.selectedModel,
         scope: state.privacyScope,
         allowExternalProviders: state.privacyScope === "external",
+        ocrMode: state.ocrMode,
       },
     };
 

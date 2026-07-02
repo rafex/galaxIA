@@ -9,6 +9,7 @@ export interface ApiOptions {
     model?: "auto" | string;
     scope?: "local" | "network" | "community" | "external";
     allowExternalProviders?: boolean;
+    ocrMode?: "confirm" | "auto";
   };
 }
 

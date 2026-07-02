@@ -11,6 +11,7 @@ export interface ChatState {
   isStreaming: boolean;
   selectedModel: "auto" | string;
   privacyScope: "local" | "network" | "community" | "external";
+  ocrMode: "confirm" | "auto";
 }
 
 export type { AgentSSEEvent };

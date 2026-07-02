@@ -64,12 +64,18 @@ export async function setupChatWebSocket(
       }
     });
 
-    function runChat(id: string, message: UserMessage, preferences: ModelPreferences, preExtractedText?: string) {
+    function runChat(
+      id: string,
+      message: UserMessage,
+      preferences: ModelPreferences,
+      preExtractedText?: string,
+      artifacts?: string[]
+    ) {
       const runtime = new AgentRuntime(registry, eventBus, id);
       runtimes.set(id, runtime);
 
       runtime
-        .run(message, preferences, undefined, preExtractedText)
+        .run(message, preferences, artifacts, preExtractedText)
         .catch((err: any) => {
           console.error("Agent runtime error:", err);
           send({ type: "error", data: { conversationId: id, code: "RUNTIME_ERROR", message: err.message } });
@@ -95,8 +101,16 @@ export async function setupChatWebSocket(
         const preferences = body.preferences || {};
 
         if (body.artifacts && body.artifacts.length > 0) {
-          // Flujo de confirmación (SPEC-OCRCONFIRM-0001): se extrae el texto
-          // y se muestra al usuario, pero NO se llama al LLM todavía.
+          if (preferences.ocrMode === "auto") {
+            // Modo "automático": OCR determinístico + respuesta del LLM en una
+            // sola llamada, sin pedir confirmación (comportamiento original
+            // de DEC-0020). El usuario eligió priorizar velocidad sobre control.
+            runChat(id, body.message, preferences, undefined, body.artifacts);
+            return;
+          }
+
+          // Modo "confirmar" (default, SPEC-OCRCONFIRM-0001): se extrae el
+          // texto y se muestra al usuario, pero NO se llama al LLM todavía.
           const runtime = new AgentRuntime(registry, eventBus, id);
           runtime
             .extractOcrText(body.artifacts, body.attachmentName || "archivo adjunto", preferences)
