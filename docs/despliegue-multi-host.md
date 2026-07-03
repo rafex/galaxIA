@@ -166,6 +166,36 @@ curl http://<ip-laptop>:8081/api/fhs/providers
 
 Debe listar `did:key:macmini-raul` (llm) y `did:key:ocr-provider-01` (mcp) con sus endpoints apuntando al bastion.
 
+## Ver logs de cada máquina en vivo (lnav)
+
+Cada máquina de la topología corre el mismo checkout del repo pero levanta
+contenedores distintos según su rol. `helpers/just/status.just` trae una
+receta de logs por rol, pensada para pararse en esa máquina y correrla ahí
+mismo — combinan los logs de sus contenedores en una sola vista de
+[`lnav`](https://lnav.org) (colores por nivel, filtro en vivo con `/`, salto
+entre errores con `e`/`E`), sin importar si el contenedor se levantó con
+`podman-compose` o con `podman run` suelto (como los providers de bastion y
+raspi4b en este despliegue):
+
+```bash
+# En la laptop (core): agent-server + web
+just logs-core
+
+# En el bastion (llm): llm-provider
+just logs-llm
+
+# En raspi4b (ocr): ocr-provider + ether-ocr-api
+just logs-ocr
+
+# Cualquier otro contenedor, en cualquier máquina
+just logs-lnav <contenedor> [contenedor2 ...]
+```
+
+`lnav` requiere una terminal interactiva real (no funciona bien sobre un
+`ssh host "comando"` no interactivo) — conéctate primero (`ssh laptop`,
+`ssh bastion-alqrab`, `ssh raspi4b`, según corresponda) y corre la receta
+ya dentro de esa sesión.
+
 ## Riesgos y mitigaciones
 
 | Riesgo | Impacto | Mitigación |
