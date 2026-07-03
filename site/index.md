@@ -4,11 +4,13 @@ title: galaxIA — IA federada y soberana
 ---
 
 <section class="hero">
-  <h1>galaxIA</h1>
+  <span class="eyebrow">● PoC activa — protocolo FHS v0.1</span>
+  <h1>Inteligencia artificial federada y soberana</h1>
   <p class="tagline">
-    Inteligencia artificial federada y soberana. Conecta equipos reutilizados
-    donde cada nodo aporta capacidades: LLMs locales con <code>llama.cpp</code>
-    u herramientas como OCR vía MCP. Sin nube, suscripciones ni dueño.
+    galaxIA conecta el hardware que tu comunidad ya tiene — una Mac mini con
+    un LLM local, una laptop con OCR, una Raspberry Pi con otra herramienta —
+    en una sola red de IA. Sin nube, sin suscripciones, sin un dueño único
+    que decida qué pasa con tus datos.
   </p>
   <div class="cta">
     <a class="btn btn-primary" href="{{ '/protocolo/' | relative_url }}">Cómo funciona el protocolo</a>
@@ -16,16 +18,90 @@ title: galaxIA — IA federada y soberana
   </div>
 </section>
 
+<div class="stats">
+  <div class="stat"><strong>10</strong><span>reglas del protocolo FHS</span></div>
+  <div class="stat"><strong>2</strong><span>tipos de provider: llm / mcp</span></div>
+  <div class="stat"><strong>0</strong><span>servidores centrales de terceros</span></div>
+  <div class="stat"><strong>MIT</strong><span>licencia abierta</span></div>
+</div>
+
 <section>
-  <h2>¿Qué es FHS?</h2>
+  <h2>Por qué existe galaxIA</h2>
   <p>
-    <strong>FHS (Federation of Sovereign Hosts)</strong> es el protocolo que
-    conecta esta red: un Registry lleva el descubrimiento de nodos, cada
-    provider (LLM, OCR, y los que la comunidad quiera sumar) se conecta por
-    WebSocket y anuncia sus capacidades, y el chat web combina razonamiento y
-    acción respetando reglas de privacidad explícitas por nodo. Detalle
-    completo en <a href="{{ '/protocolo/' | relative_url }}">Cómo funciona el protocolo</a>.
+    La mayoría de asistentes de IA hoy dependen de mandar tus datos a la nube
+    de un proveedor, pagar una suscripción, y confiar ciegamente en que ese
+    proveedor respeta lo que promete. Eso concentra el poder de la IA en
+    unas pocas empresas y deja a cada comunidad — un equipo, un vecindario,
+    un grupo de investigación, una escuela — sin control real sobre su
+    propia infraestructura de inteligencia.
   </p>
+  <p>
+    <strong>El objetivo de galaxIA es demostrar que existe otro camino:</strong>
+    una red donde cualquiera con una computadora capaz de correr un modelo o
+    una herramienta puede sumarla, donde el chat descubre qué hay disponible
+    sin depender de una máquina específica, donde cada nodo puede irse o
+    fallar sin tumbar el resto, y donde la privacidad — quién ve qué, qué se
+    retiene, a dónde viajan los datos — es parte del protocolo desde el
+    diseño, no un aviso legal que se agrega después.
+  </p>
+</section>
+
+<section markdown="1">
+  <h2>Cómo se arma la red</h2>
+  <p>Cada nodo se registra, anuncia lo que ofrece, y queda disponible para que el chat lo use cuando corresponda:</p>
+
+  ```mermaid
+  flowchart LR
+      subgraph Comunidad["Tu comunidad"]
+          N1["🖥️ Nodo A<br/>LLM local (llama.cpp)"]
+          N2["💻 Nodo B<br/>OCR / documentos"]
+          N3["🍓 Nodo C<br/>tu próxima herramienta"]
+      end
+      N1 -- "hello / register" --> R[("Registry<br/>Agent Backend")]
+      N2 -- "hello / register" --> R
+      N3 -- "hello / register" --> R
+      U["👤 Usuario"] -- "chat" --> W["Web"]
+      W --> R
+      R -- "resuelve provider<br/>según scope y privacidad" --> N1
+      R -- "resuelve provider" --> N2
+  ```
+
+  <p>
+    El Registry solo sabe <em>quién existe</em> y <em>qué ofrece</em> — no
+    ejecuta tools, no ve el contenido de las conversaciones, no decide por el
+    agente. Cada petición declara un ámbito de privacidad (<code>scope</code>)
+    que acota qué proveedores pueden resolverla, y cada respuesta trae su
+    propia procedencia auditable: qué modelo razonó, qué herramienta se usó,
+    a dónde viajaron los datos. Detalle completo en
+    <a href="{{ '/protocolo/' | relative_url }}">Cómo funciona el protocolo</a>.
+  </p>
+</section>
+
+<section>
+  <h2>Súmate</h2>
+  <p>
+    galaxIA crece con cada nodo, cada tool y cada persona que se suma. Si
+    tienes una computadora con capacidad de cómputo, un servicio interno que
+    quieras exponer como herramienta federada, o simplemente ganas de ayudar
+    a construir esto, hay un lugar para ti:
+  </p>
+  <div class="grid">
+    <div class="card">
+      <span class="tag">Aportar hardware</span>
+      <h3><a href="{{ '/integrar/' | relative_url }}">Sé un LLM provider</a></h3>
+      <p>Conecta tu modelo local (llama.cpp, Ollama, vLLM) y ponlo a disposición de la comunidad.</p>
+    </div>
+    <div class="card">
+      <span class="tag">Aportar capacidades</span>
+      <h3><a href="{{ '/integrar/' | relative_url }}">Integra tu tool o servicio</a></h3>
+      <p>OCR, búsqueda, un servicio interno — expón cualquier capacidad como provider federado.</p>
+    </div>
+    <div class="card">
+      <span class="tag">Aportar código</span>
+      <h3><a href="{{ '/contribuir/' | relative_url }}">Contribuye al protocolo</a></h3>
+      <p>Hay SDKs por escribir en Python, Rust y Java, y features abiertas en el roadmap.</p>
+    </div>
+  </div>
 </section>
 
 <section>

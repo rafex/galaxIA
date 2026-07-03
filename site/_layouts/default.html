@@ -5,19 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ page.title | default: site.title }}</title>
   <meta name="description" content="{{ page.description | default: site.description }}">
+  <meta property="og:title" content="{{ page.title | default: site.title }}">
+  <meta property="og:description" content="{{ page.description | default: site.description }}">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
 </head>
 <body>
   <header class="site-header">
     <div class="wrap">
-      <a class="brand" href="{{ '/' | relative_url }}">galaxIA</a>
+      <a class="brand" href="{{ '/' | relative_url }}">
+        <span class="brand-mark">◈</span> galaxIA
+      </a>
       <nav>
-        <a href="{{ '/' | relative_url }}">Inicio</a>
-        <a href="{{ '/protocolo/' | relative_url }}">Protocolo</a>
-        <a href="{{ '/integrar/' | relative_url }}">Integrar</a>
-        <a href="{{ '/docs/' | relative_url }}">Documentación</a>
-        <a href="{{ '/pendientes/' | relative_url }}">Pendientes</a>
-        <a href="https://github.com/{{ site.repository }}">GitHub</a>
+        <a href="{{ '/' | relative_url }}"{% if page.url == '/' %} class="active"{% endif %}>Inicio</a>
+        <a href="{{ '/protocolo/' | relative_url }}"{% if page.url contains '/protocolo/' %} class="active"{% endif %}>Protocolo</a>
+        <a href="{{ '/integrar/' | relative_url }}"{% if page.url contains '/integrar/' %} class="active"{% endif %}>Integrar</a>
+        <a href="{{ '/docs/' | relative_url }}"{% if page.url contains '/docs/' %} class="active"{% endif %}>Documentación</a>
+        <a href="{{ '/pendientes/' | relative_url }}"{% if page.url contains '/pendientes/' %} class="active"{% endif %}>Pendientes</a>
+        <a class="nav-cta" href="https://github.com/{{ site.repository }}">GitHub ↗</a>
       </nav>
     </div>
   </header>
@@ -27,8 +36,23 @@
   </main>
 
   <footer class="site-footer">
-    <div class="wrap">
-      <p>galaxIA — Sin nube, suscripciones ni dueño. Licencia MIT.</p>
+    <div class="wrap footer-grid">
+      <div>
+        <p class="footer-brand">◈ galaxIA</p>
+        <p>Sin nube, suscripciones ni dueño. Licencia MIT.</p>
+      </div>
+      <div>
+        <p class="footer-heading">Proyecto</p>
+        <a href="{{ '/protocolo/' | relative_url }}">Protocolo</a>
+        <a href="{{ '/integrar/' | relative_url }}">Integrar</a>
+        <a href="{{ '/pendientes/' | relative_url }}">Pendientes</a>
+      </div>
+      <div>
+        <p class="footer-heading">Comunidad</p>
+        <a href="https://github.com/{{ site.repository }}">Repositorio</a>
+        <a href="https://github.com/{{ site.repository }}/issues">Issues</a>
+        <a href="{{ '/contribuir/' | relative_url }}">Contribuir</a>
+      </div>
     </div>
   </footer>
 
@@ -40,7 +64,20 @@
       container.textContent = block.textContent;
       block.parentElement.replaceWith(container);
     });
-    mermaid.initialize({ startOnLoad: true, theme: "dark" });
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      themeVariables: {
+        background: "#12151c",
+        primaryColor: "#1b2030",
+        primaryTextColor: "#e7e9ee",
+        primaryBorderColor: "#7c9cff",
+        lineColor: "#5b6474",
+        secondaryColor: "#1b2030",
+        tertiaryColor: "#181c26",
+        fontFamily: "Inter, sans-serif"
+      }
+    });
   </script>
 </body>
 </html>

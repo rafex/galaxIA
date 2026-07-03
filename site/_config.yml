@@ -3,8 +3,8 @@ description: >-
   PoC de inteligencia artificial federada y soberana. Conecta equipos
   reutilizados donde cada nodo aporta capacidades: LLM locales con
   llama.cpp o herramientas como OCR vía MCP.
-baseurl: "/galaxIA"
-url: "https://rafex.github.io"
+baseurl: ""
+url: "https://galax-ia.rafex.io"
 repository: rafex/galaxIA
 
 markdown: kramdown
