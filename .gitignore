@@ -13,6 +13,11 @@ dist/
 .env.local
 .env.*.local
 
+# Certificados TLS autofirmados de la PoC (ver docs/tls-autofirmado.md) —
+# se generan por máquina con helpers/scripts/shell/generate-dev-cert.sh,
+# nunca se versionan (contienen la clave privada).
+/certs/
+
 # opencode (local, no versionar)
 .opencode/sessions.db
 .opencode/sessions*db

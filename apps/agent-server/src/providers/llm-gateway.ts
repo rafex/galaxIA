@@ -12,6 +12,13 @@ import type {
   ChatErrorMessage,
 } from "@galaxia/fhs-protocol";
 
+// PoC: certificados autofirmados en wss:// — no hay CA de confianza que
+// verificar. Ver docs/tls-autofirmado.md. No usar rejectUnauthorized:false
+// contra un endpoint real fuera de esta PoC.
+function wsOptions(url: string) {
+  return url.startsWith("wss://") ? { rejectUnauthorized: false } : undefined;
+}
+
 export interface LlmProviderSelection {
   nodeId: string;
   providerName: string;
@@ -39,7 +46,7 @@ export class LlmGateway {
     request: GenerateRequest
   ): Promise<GenerateResponse> {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(url);
+      const ws = new WebSocket(url, wsOptions(url));
       const requestId = randomUUID();
 
       const timeout = setTimeout(() => {
@@ -94,7 +101,7 @@ export class LlmGateway {
     url: string,
     request: GenerateRequest
   ): AsyncGenerator<string, GenerateResponse, unknown> {
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(url, wsOptions(url));
     const requestId = randomUUID();
 
     type QueueItem =

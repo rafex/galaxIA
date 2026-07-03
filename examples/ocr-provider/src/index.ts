@@ -1,4 +1,6 @@
 import WebSocket, { WebSocketServer } from "ws";
+import { createServer as createHttpsServer } from "node:https";
+import { readFileSync } from "node:fs";
 import type {
   McpProviderManifest,
   ToolCallRequestMessage,
@@ -14,6 +16,15 @@ const REGISTRY_URL =
 const OCR_PROVIDER_PORT = Number(process.env.OCR_PROVIDER_PORT || 43112);
 const OCR_PROVIDER_HOST =
   process.env.OCR_PROVIDER_HOST || "localhost";
+// TLS opt-in (PoC, certificado autofirmado — ver docs/tls-autofirmado.md).
+const TLS_CERT_PATH = process.env.TLS_CERT_PATH;
+const TLS_KEY_PATH = process.env.TLS_KEY_PATH;
+const TLS_ENABLED = !!(TLS_CERT_PATH && TLS_KEY_PATH);
+const WS_SCHEME = TLS_ENABLED ? "wss" : "ws";
+
+function wsOptions(url: string) {
+  return url.startsWith("wss://") ? { rejectUnauthorized: false } : undefined;
+}
 const OCR_SERVICE_URL =
   process.env.OCR_SERVICE_URL || "http://localhost:9011";
 const OCR_API_KEY =
@@ -33,7 +44,7 @@ const manifest: McpProviderManifest = {
   },
   endpoint: {
     protocol: "fhs",
-    url: `ws://${OCR_PROVIDER_HOST}:${OCR_PROVIDER_PORT}/fhs/v1/tools`,
+    url: `${WS_SCHEME}://${OCR_PROVIDER_HOST}:${OCR_PROVIDER_PORT}/fhs/v1/tools`,
   },
   capabilities: [
     {
@@ -75,7 +86,7 @@ const bridge = new OcrBridge(OCR_SERVICE_URL, OCR_API_KEY);
 // ── Conexión al Registry FHS ──────────────────────────────────────────────
 
 function connectToRegistry() {
-  const ws = new WebSocket(REGISTRY_URL);
+  const ws = new WebSocket(REGISTRY_URL, wsOptions(REGISTRY_URL));
 
   ws.on("open", () => {
     log("Conectado al Registry, enviando hello...");
@@ -145,13 +156,23 @@ function connectToRegistry() {
 // ── Servidor FHS de Tools (donde el Agent Server se conecta) ──────────────
 
 function startToolServer() {
-  const wss = new WebSocketServer({ port: OCR_PROVIDER_PORT });
+  let wss: WebSocketServer;
 
-  wss.on("listening", () => {
-    log(
-      `Tool server FHS escuchando en ws://localhost:${OCR_PROVIDER_PORT}`
-    );
-  });
+  if (TLS_ENABLED) {
+    const httpsServer = createHttpsServer({
+      cert: readFileSync(TLS_CERT_PATH!),
+      key: readFileSync(TLS_KEY_PATH!),
+    });
+    wss = new WebSocketServer({ server: httpsServer });
+    httpsServer.listen(OCR_PROVIDER_PORT, () => {
+      log(`Tool server FHS escuchando en wss://localhost:${OCR_PROVIDER_PORT}`);
+    });
+  } else {
+    wss = new WebSocketServer({ port: OCR_PROVIDER_PORT });
+    wss.on("listening", () => {
+      log(`Tool server FHS escuchando en ws://localhost:${OCR_PROVIDER_PORT}`);
+    });
+  }
 
   wss.on("connection", (socket) => {
     log("Agent Server conectado al tool server FHS");
@@ -243,7 +264,7 @@ log(`Iniciando OCR Provider FHS v${manifest.fhsVersion}`);
 log(`  Provider : ${PROVIDER_NAME} (${PROVIDER_ID})`);
 log(`  Registry : ${REGISTRY_URL}`);
 log(`  OCR Svc  : ${OCR_SERVICE_URL}`);
-log(`  Tools FHS: ws://localhost:${OCR_PROVIDER_PORT}`);
+log(`  Tools FHS: ${WS_SCHEME}://localhost:${OCR_PROVIDER_PORT}`);
 log(`  Tools    : ${tools.map((t) => t.name).join(", ")}`);
 
 connectToRegistry();

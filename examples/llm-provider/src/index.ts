@@ -1,4 +1,6 @@
 import WebSocket, { WebSocketServer } from "ws";
+import { createServer as createHttpsServer } from "node:https";
+import { readFileSync } from "node:fs";
 import type {
   LlmProviderManifest,
   ChatRequestMessage,
@@ -13,6 +15,17 @@ const REGISTRY_URL =
 const LLM_PROVIDER_PORT = Number(process.env.LLM_PROVIDER_PORT || 43111);
 const LLM_PROVIDER_HOST =
   process.env.LLM_PROVIDER_HOST || "localhost";
+// TLS opt-in (PoC, certificado autofirmado — ver docs/tls-autofirmado.md):
+// si están seteados, el provider expone wss:// para su servidor de chat y
+// se anuncia como tal en el manifiesto.
+const TLS_CERT_PATH = process.env.TLS_CERT_PATH;
+const TLS_KEY_PATH = process.env.TLS_KEY_PATH;
+const TLS_ENABLED = !!(TLS_CERT_PATH && TLS_KEY_PATH);
+const WS_SCHEME = TLS_ENABLED ? "wss" : "ws";
+
+function wsOptions(url: string) {
+  return url.startsWith("wss://") ? { rejectUnauthorized: false } : undefined;
+}
 const LLAMA_CPP_URL =
   process.env.LLAMA_CPP_URL || "http://localhost:43110/v1";
 const PROVIDER_ID =
@@ -41,7 +54,7 @@ const manifest: LlmProviderManifest = {
   },
   endpoint: {
     protocol: "fhs",
-    url: `ws://${LLM_PROVIDER_HOST}:${LLM_PROVIDER_PORT}/fhs/v1/chat`,
+    url: `${WS_SCHEME}://${LLM_PROVIDER_HOST}:${LLM_PROVIDER_PORT}/fhs/v1/chat`,
   },
   models: [
     {
@@ -61,7 +74,7 @@ const bridge = new LlmBridge(LLAMA_CPP_URL);
 // ── Conexión al Registry FHS ──────────────────────────────────────────────
 
 function connectToRegistry() {
-  const ws = new WebSocket(REGISTRY_URL);
+  const ws = new WebSocket(REGISTRY_URL, wsOptions(REGISTRY_URL));
 
   ws.on("open", () => {
     log("Conectado al Registry, enviando hello...");
@@ -206,13 +219,23 @@ async function handleMessage(socket: WebSocket, raw: WebSocket.Data) {
 }
 
 function startChatServer() {
-  const wss = new WebSocketServer({ port: LLM_PROVIDER_PORT });
+  let wss: WebSocketServer;
 
-  wss.on("listening", () => {
-    log(
-      `Chat server FHS escuchando en ws://localhost:${LLM_PROVIDER_PORT}`
-    );
-  });
+  if (TLS_ENABLED) {
+    const httpsServer = createHttpsServer({
+      cert: readFileSync(TLS_CERT_PATH!),
+      key: readFileSync(TLS_KEY_PATH!),
+    });
+    wss = new WebSocketServer({ server: httpsServer });
+    httpsServer.listen(LLM_PROVIDER_PORT, () => {
+      log(`Chat server FHS escuchando en wss://localhost:${LLM_PROVIDER_PORT}`);
+    });
+  } else {
+    wss = new WebSocketServer({ port: LLM_PROVIDER_PORT });
+    wss.on("listening", () => {
+      log(`Chat server FHS escuchando en ws://localhost:${LLM_PROVIDER_PORT}`);
+    });
+  }
 
   wss.on("connection", (socket) => {
     log("Agent Server conectado al chat FHS");
@@ -242,7 +265,7 @@ log(`Iniciando LLM Provider FHS v${manifest.fhsVersion}`);
 log(`  Provider : ${PROVIDER_NAME} (${PROVIDER_ID})`);
 log(`  Registry : ${REGISTRY_URL}`);
 log(`  llama.cpp: ${LLAMA_CPP_URL}`);
-log(`  Chat FHS : ws://localhost:${LLM_PROVIDER_PORT}`);
+log(`  Chat FHS : ${WS_SCHEME}://localhost:${LLM_PROVIDER_PORT}`);
 
 connectToRegistry();
 startChatServer();

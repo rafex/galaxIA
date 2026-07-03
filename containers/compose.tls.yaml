@@ -1,0 +1,42 @@
+# Overlay opcional para activar TLS/HTTPS con certificado autofirmado en
+# toda la comunicación FHS (navegador↔web, web↔agent-server, agent-server↔
+# providers). No modifica containers/compose.yaml — se usa junto a él.
+#
+# Requiere generar el certificado antes (una vez por máquina, o copiar el
+# mismo par a laptop y bastion):
+#   helpers/scripts/shell/generate-dev-cert.sh <ip-laptop> <ip-bastion>
+#
+# Uso:
+#   podman-compose -f containers/compose.yaml -f containers/compose.tls.yaml up -d --build
+#
+# Ver docs/tls-autofirmado.md para el detalle completo, incluyendo qué
+# variables ajustar en cada máquina de la topología multi-host.
+
+services:
+  agent-server:
+    environment:
+      - TLS_CERT_PATH=/certs/dev.crt
+      - TLS_KEY_PATH=/certs/dev.key
+    volumes:
+      - ../certs:/certs:ro
+
+  web:
+    ports:
+      - "443:443"
+    volumes:
+      - ../certs:/etc/nginx/certs:ro
+      - ./web/nginx-tls.conf:/etc/nginx/conf.d/default.conf:ro
+
+  llm-provider:
+    environment:
+      - TLS_CERT_PATH=/certs/dev.crt
+      - TLS_KEY_PATH=/certs/dev.key
+    volumes:
+      - ../certs:/certs:ro
+
+  ocr-provider:
+    environment:
+      - TLS_CERT_PATH=/certs/dev.crt
+      - TLS_KEY_PATH=/certs/dev.key
+    volumes:
+      - ../certs:/certs:ro

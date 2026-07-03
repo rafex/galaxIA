@@ -34,6 +34,11 @@ const CONNECT_TIMEOUT_MS = 10_000;
 // Alineado con los timeouts de 300s del resto del stack para hardware comunitario lento.
 const CALL_TIMEOUT_MS = 300_000;
 
+// PoC: certificados autofirmados en wss:// — ver docs/tls-autofirmado.md.
+function wsOptions(url: string) {
+  return url.startsWith("wss://") ? { rejectUnauthorized: false } : undefined;
+}
+
 /**
  * Cliente del protocolo FHS de tools (tool.list / tool.call / tool.result / tool.error)
  * sobre WebSocket — NO es el SDK de MCP nativo. Los providers FHS (ej. examples/ocr-provider)
@@ -51,7 +56,7 @@ export class McpHost {
     const existing = this.clients.get(providerId);
     if (existing && existing.ws.readyState === WebSocket.OPEN) return existing;
 
-    const ws = new WebSocket(service.endpoint.url);
+    const ws = new WebSocket(service.endpoint.url, wsOptions(service.endpoint.url));
     const pending = new Map<string, PendingCall>();
 
     await new Promise<void>((resolve, reject) => {

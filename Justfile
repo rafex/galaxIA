@@ -68,3 +68,36 @@ container-rm service:
 # Logs de un contenedor específico
 container-logs service="":
     {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} logs -f {{service}} --tail=50
+
+# ── TLS (certificado autofirmado, ver docs/tls-autofirmado.md) ─────────────
+
+TLS_COMPOSE_FILE := justfile_directory() + "/containers/compose.tls.yaml"
+
+# Genera el certificado autofirmado (una vez por máquina, o copiar el mismo
+# par a laptop y bastion). Ejemplo: just tls-gen-cert 192.168.3.137 192.168.3.173
+tls-gen-cert ip_laptop="127.0.0.1" ip_bastion="127.0.0.1":
+    helpers/scripts/shell/generate-dev-cert.sh {{ip_laptop}} {{ip_bastion}}
+
+# Levanta agent-server + web con TLS (requiere tls-gen-cert antes)
+container-up-core-tls:
+    @echo "→ Levantando agent-server + web (TLS)..."
+    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} -f {{TLS_COMPOSE_FILE}} up -d --build \
+      --build-arg COMMIT_HASH={{commit-hash}} \
+      --build-arg BUILD_DATE={{build-date}} \
+      agent-server web
+
+# Levanta llm-provider con TLS
+container-up-llm-tls:
+    @echo "→ Levantando llm-provider con TLS..."
+    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} -f {{TLS_COMPOSE_FILE}} up -d --build \
+      --build-arg COMMIT_HASH={{commit-hash}} \
+      --build-arg BUILD_DATE={{build-date}} \
+      llm-provider
+
+# Levanta ocr-provider con TLS
+container-up-ocr-tls:
+    @echo "→ Levantando ocr-provider con TLS..."
+    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} -f {{TLS_COMPOSE_FILE}} up -d --build \
+      --build-arg COMMIT_HASH={{commit-hash}} \
+      --build-arg BUILD_DATE={{build-date}} \
+      ocr-provider

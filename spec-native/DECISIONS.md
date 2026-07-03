@@ -283,3 +283,20 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
      ```
   - Tras ambos fixes: providers registrados correctamente (`/api/fhs/providers` desde la laptop muestra ambos con sus endpoints reales del bastion), chat simple funcionando cross-host, y flujo completo de OCR (adjuntar → `ocr.extracted` → confirmar → respuesta del LLM usando el texto) verificado con un PDF real, cruzando ambas máquinas de punta a punta.
   - **Lección**: "el Registry ve el provider como código = 200 en `/health`" no es la misma verificación que "dos máquinas distintas realmente pueden hablarse" — el firewall de host es una capa completamente aparte del protocolo FHS y hay que probarla explícitamente, no asumir que basta con que los servicios estén arriba (mismo principio de `docs/protocolo-provider.md`, "Lecciones de integración", aplicado ahora a la capa de red en vez de a la capa de aplicación).
+
+## DEC-0023 — TLS con certificado autofirmado en todo el protocolo FHS
+
+- **Fecha:** 2026-07-02
+- **Estado:** `accepted`
+- **Contexto:** Con la topología multi-host (DEC-0022) validada, todo el tráfico FHS entre `agent-server` (laptop) y los providers (bastion) viajaba en texto plano por la LAN real — antes, en un solo host, esto era tráfico interno de Docker sin exposición a la red. Último ajuste de la PoC: cifrar ese tráfico con TLS/WSS, usando un certificado autofirmado (sin CA — el objetivo es cifrar el canal, no probar identidad ante terceros; eso ya lo cubre el DID del protocolo).
+- **Decisión:** Habilitar TLS de forma **opt-in** (no rompe el despliegue actual sin TLS):
+  - `apps/agent-server`: `TLS_CERT_PATH`/`TLS_KEY_PATH` activan `https` en Fastify — cubre Registry y Chat API con el mismo servidor.
+  - `examples/llm-provider`, `examples/ocr-provider`: mismas variables activan un `https.createServer` para su propio servidor (chat/tools) y cambian el esquema anunciado en el manifiesto a `wss://`.
+  - Clientes WebSocket (`llm-gateway.ts`, `mcp-host.ts`, clientes de Registry en ambos providers): `{ rejectUnauthorized: false }` cuando la URL es `wss://` — necesario porque no hay CA que Node reconozca para un cert autofirmado.
+  - `apps/web`: `containers/web/nginx-tls.conf` (archivo separado, no reemplaza `nginx.conf`) termina TLS para el navegador y reenvía a `agent-server` por HTTPS con `proxy_ssl_verify off`.
+  - Despliegue vía overlay `containers/compose.tls.yaml`, sumado a `compose.yaml` (no lo modifica) — `podman-compose -f compose.yaml -f compose.tls.yaml up`. Certificado generado con `helpers/scripts/shell/generate-dev-cert.sh <ip-laptop> <ip-bastion>` (SAN cubre ambas IPs + localhost), gitignored.
+- **Consecuencias:**
+  - Cero riesgo para el despliegue existente: sin las variables `TLS_CERT_PATH`/`TLS_KEY_PATH` ni el overlay de compose, todo se comporta exactamente igual que antes (`ws://`/`http://`).
+  - `rejectUnauthorized: false` acepta cualquier certificado autofirmado, no solo el propio — aceptable para una PoC en LAN de confianza, pero es una debilidad real si se usara fuera de ese contexto (documentado explícitamente en `docs/tls-autofirmado.md`, no se disimula).
+  - Verificado en local (no en el despliegue real multi-host de esta sesión, por tiempo): `agent-server` sirve `https://` y `/api/fhs/providers` responde correctamente vía TLS; `llm-provider` y `ocr-provider` se registran contra un Registry `wss://` y publican su propio endpoint como `wss://`; ambos verificados de forma aislada (arranque + registro), no con el pipeline completo de OCR sobre TLS.
+  - Pendiente: aplicar el overlay TLS en el despliegue real (laptop + bastion) y repetir el checklist de verificación end-to-end de `docs/despliegue-multi-host.md` sobre el canal cifrado.
