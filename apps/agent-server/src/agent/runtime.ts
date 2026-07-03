@@ -114,6 +114,12 @@ export class AgentRuntime {
     let userContent = message.content;
     if (preExtractedText) {
       userContent = `[Texto extraído automáticamente del archivo adjunto mediante OCR]\n${preExtractedText}\n\n[Pregunta del usuario]\n${message.content}`;
+      // No hay archivo real en este turno (ya se extrajo antes) — si se deja
+      // la tool disponible, el LLM puede igual decidir invocarla sin adjunto
+      // y fallar (ver bug encontrado en la demo multi-host: el modelo llamaba
+      // ocr_extract sobre un /tmp/ocr.png inexistente tras confirmar el uso).
+      const ocrToolIndex = loadedTools.findIndex((t) => t.capabilityId === "document.ocr");
+      if (ocrToolIndex >= 0) loadedTools.splice(ocrToolIndex, 1);
     } else {
       const ocrToolIndex = this.artifacts.length > 0
         ? loadedTools.findIndex((t) => t.capabilityId === "document.ocr")
