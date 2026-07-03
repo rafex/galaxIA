@@ -1,0 +1,27 @@
+title: galaxIA
+description: >-
+  PoC de inteligencia artificial federada y soberana. Conecta equipos
+  reutilizados donde cada nodo aporta capacidades: LLM locales con
+  llama.cpp o herramientas como OCR vía MCP.
+baseurl: "/galaxIA"
+url: "https://rafex.github.io"
+repository: rafex/galaxIA
+
+markdown: kramdown
+theme: null
+
+collections:
+  docs:
+    output: true
+    permalink: /docs/:path/
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
