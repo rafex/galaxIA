@@ -46,7 +46,7 @@
 - Owner: rafex
 - Dependencies: TASK-SATRATING-0001
 - Expected files: `apps/agent-server/src/providers/mcp-host.ts`, `apps/agent-server/src/providers/llm-gateway.ts`
-- Close criteria: ambos clientes reconocen `dispatch.ack` entrante, marcan el timestamp de recepción (`queuedAt` propio, no confiar ciegamente en el del satélite para el cálculo de latencia — usar el reloj del Agent Server en ambos extremos), y lo dejan disponible para quien calcule las muestras (TASK-SATRATING-0005). No debe romper el flujo si el ack nunca llega (ver SPEC, "Qué pasa si el satélite nunca manda dispatch.ack").
+- Close criteria: ambos clientes reconocen `dispatch.ack` entrante, marcan el timestamp de recepción (`queuedAt` propio, no confiar ciegamente en el del nodo para el cálculo de latencia — usar el reloj del Agent Server en ambos extremos), y lo dejan disponible para quien calcule las muestras (TASK-SATRATING-0005). No debe romper el flujo si el ack nunca llega (ver SPEC, "Qué pasa si el nodo nunca manda dispatch.ack").
 - Validation: `npm run typecheck -w apps/agent-server`
 
 ### TASK-SATRATING-0005 - Store de métricas en el Registry
@@ -86,5 +86,5 @@
 - Owner: rafex
 - Dependencies: TASK-SATRATING-0002, TASK-SATRATING-0003, TASK-SATRATING-0006, TASK-SATRATING-0007
 - Expected files: ninguno (verificación, no código)
-- Close criteria: los 6 criterios de aceptación de la SPEC confirmados contra la topología real (laptop + bastion + Raspberry Pi) — varias peticiones de chat y de OCR, confirmando que las latencias reportadas por `/api/fhs/providers` coinciden con lo observado en los logs de cada satélite.
+- Close criteria: los 6 criterios de aceptación de la SPEC confirmados contra la topología real (laptop + bastion + Raspberry Pi) — varias peticiones de chat y de OCR, confirmando que las latencias reportadas por `/api/fhs/providers` coinciden con lo observado en los logs de cada nodo.
 - Validation: script de prueba WebSocket (mismo patrón usado en sesiones anteriores) + logs de `agent-server`/`llm-provider`/`ocr-provider` + `curl` a `/api/fhs/providers`.

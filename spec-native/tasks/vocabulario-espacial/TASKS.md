@@ -5,19 +5,19 @@
 - Iniciativa: vocabulario-espacial
 - Spec relacionada: `spec-native/specs/vocabulario-espacial/SPEC.md` (SPEC-VOCAB-0001)
 - Owner: Raúl Fletes (rafex)
-- Estado general: `pending` (spec en `draft`, bloqueada en la decisión Star vs. Satélite)
+- Estado general: `in_progress` (decisión tomada — Opción B — specs dependientes ya alineadas; falta el documento canónico y la frase de posicionamiento en el portal)
 
 ## Tareas
 
 ### TASK-VOCAB-0001 - Decidir Opción A vs. Opción B (Star vs. Satélite general)
 
 - ID: TASK-VOCAB-0001
-- State: `pending`
+- State: `done`
 - Owner: rafex (decisión del owner, no de un agente)
-- Dependencies: ninguna — **bloquea todas las demás tareas de esta iniciativa**
+- Dependencies: ninguna — **bloqueaba todas las demás tareas de esta iniciativa**
 - Expected files: `spec-native/DECISIONS.md` (nueva entrada documentando la decisión)
 - Close criteria: entrada nueva en `DECISIONS.md` con la opción elegida (A o B) y su justificación.
-- Validation: no aplica (decisión, no código)
+- Validation: Opción B elegida (2026-07-05) — "Star" para LLM, "Satellite" para tools, "nodo" como término neutro. Registrado en `spec-native/DECISIONS.md`.
 
 ### TASK-VOCAB-0002 - Documento canónico de vocabulario
 
@@ -26,18 +26,18 @@
 - Owner: rafex
 - Dependencies: TASK-VOCAB-0001
 - Expected files: `docs/vocabulario.md` (nuevo, nombre tentativo)
-- Close criteria: tabla de vocabulario de la SPEC trasladada a este documento, ajustada según la decisión de TASK-VOCAB-0001 (con o sin "Star" como término separado).
+- Close criteria: tabla de vocabulario de la SPEC trasladada a este documento, ya resuelta a la Opción B (nodo/estrella/satélite).
 - Validation: revisión manual — la tabla no debe contradecir la decisión tomada.
 
 ### TASK-VOCAB-0003 - Alinear specs existentes con la decisión
 
 - ID: TASK-VOCAB-0003
-- State: `pending`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-VOCAB-0001
-- Expected files: `spec-native/specs/satelite-rating/SPEC.md`, `spec-native/specs/p2p-discovery/SPEC.md`
-- Close criteria: si se eligió Opción B, ambas secciones "Vocabulario" se actualizan para distinguir "Star" (LLM) de "Satellite" (tools). Si se eligió Opción A, se agrega una nota confirmando que no hay cambios.
-- Validation: revisión manual de ambos documentos.
+- Expected files: `spec-native/specs/satelite-rating/SPEC.md`, `spec-native/specs/p2p-discovery/SPEC.md`, sus respectivos `TASKS.md`
+- Close criteria: ambas secciones "Vocabulario" actualizadas a la Opción B — "satélite" genérico reemplazado por "nodo" en todo el cuerpo de ambas specs (incluidos diagramas de secuencia), reservando "estrella"/"satélite" para cuando la distinción LLM/tool importa.
+- Validation: `grep -n "satélite" spec-native/specs/satelite-rating/SPEC.md spec-native/specs/p2p-discovery/SPEC.md` — 2026-07-05, solo quedan menciones dentro de sus propias secciones "Vocabulario" (intencional).
 
 ### TASK-VOCAB-0004b - Reformular la expansión de las siglas FHS
 
@@ -46,8 +46,8 @@
 - Owner: rafex
 - Dependencies: ninguna — no depende de TASK-VOCAB-0001 (no toca la decisión Star/Satélite)
 - Expected files: `docs/README.md`, `docs/protocolo.md`, `site/protocolo.md`, `package.json`
-- Close criteria: `Federation of Sovereign Hosts` / `Federación de Nodos Soberanos` reemplazado por `Federation of Sovereign Horizons` / `Federación de Horizontes Soberanos` en los archivos del repo. La sigla `FHS` no cambia. La presentación `red-soberana-de-ia` (repo `presentaciones-cursos-talleres`, aparte) queda pendiente como tarea de seguimiento separada (otro repo, fuera del alcance de este commit).
-- Validation: `grep -rn "Sovereign Hosts\|Nodos Soberanos"` en el repo — 2026-07-05, confirmado sin resultados fuera de esta misma spec/tarea (que documentan la frase vieja intencionalmente). También se encontró y corrigió `package.json` (no estaba en el plan original de 3 archivos).
+- Close criteria: `Federation of Sovereign Hosts` / `Federación de Nodos Soberanos` reemplazado por `Federation of Sovereign Horizons` / `Federación de Horizontes Soberanos` en los archivos del repo. La sigla `FHS` no cambia.
+- Validation: `grep -rn "Sovereign Hosts\|Nodos Soberanos"` en el repo y en `presentaciones-cursos-talleres` — 2026-07-05, confirmado sin resultados fuera de esta misma spec/tarea (que documentan la frase vieja intencionalmente). También se corrigió `package.json` (no estaba en el plan original de 3 archivos) y la presentación `red-soberana-de-ia` en el repo aparte (commit `b716dfb`).
 
 ### TASK-VOCAB-0004 - Frase de posicionamiento en el portal web
 

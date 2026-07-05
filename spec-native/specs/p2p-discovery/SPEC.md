@@ -8,6 +8,14 @@
 
 Raúl Fletes (rafex)
 
+## Vocabulario
+
+Esta spec usa **"nodo"** como término neutro (no "satélite"), porque el
+descubrimiento por mDNS aplica igual a nodos de razonamiento ("estrella"/
+Star, LLM) y nodos de herramientas ("satélite"/Satellite, OCR y similares)
+— distinción tomada en `spec-native/specs/vocabulario-espacial/SPEC.md`
+(TASK-VOCAB-0001, Opción B). Sin cambios de campo en el protocolo FHS.
+
 ## Problema
 
 DEC-0001 evaluó y descartó deliberadamente un Registry por DHT + mDNS
@@ -19,21 +27,21 @@ para lo que existe hoy. Pero dos cosas cambiaron desde entonces:
    Raspberry Pi, cada uno en su propia máquina física, con IPs que ya
    hemos tenido que actualizar a mano varias veces en esta misma sesión
    (cambios de red, cambios de bastion, redes de sitio distintas). Cada
-   satélite necesita saber la IP:puerto exacta del Registry vía
+   nodo necesita saber la IP:puerto exacta del Registry vía
    `PROVIDER_REGISTRY_URL`/`REGISTRY_URL` — configuración manual, frágil,
    y el primer punto de fricción real que hemos tropezado repetidas veces
    en despliegues reales (no en teoría).
 2. **El pitch central de galaxIA es "cualquiera suma un nodo sin pedir
    permiso a un operador central"** (`ROADMAP.md`, portal web). Hoy eso es
-   parcialmente cierto: un satélite nuevo no requiere cambios de código en
+   parcialmente cierto: un nodo nuevo no requiere cambios de código en
    el Agent Server, pero **sí requiere que alguien le diga a mano la
    dirección exacta del Registry**. Eso es fricción de operador central
    disfrazada de configuración.
 
 El Registry centralizado (DEC-0001, DEC-0005) resuelve bien el *catálogo*
 de capacidades — quién existe, qué ofrece, si sigue vivo. Lo que falta es
-resolver *cómo un satélite encuentra la dirección del Registry* (y,
-opcionalmente, cómo dos satélites en la misma LAN se enteran de que el
+resolver *cómo un nodo encuentra la dirección del Registry* (y,
+opcionalmente, cómo dos nodos en la misma LAN se enteran de que el
 otro existe) sin tener que escribir una IP a mano cada vez que cambia la
 red — que es exactamente lo que nos pasó esta semana tres veces distintas.
 
@@ -58,7 +66,7 @@ resolver aquí.
   `_fhs-registry._tcp.local` (puerto, versión FHS, si usa TLS) en la LAN
   vía mDNS (biblioteca candidata: `bonjour-service` o `multicast-dns` en
   Node — decisión de implementación, no de esta spec).
-- **Descubrimiento mDNS en satélites**: `examples/llm-provider` y
+- **Descubrimiento mDNS en nodos**: `examples/llm-provider` y
   `examples/ocr-provider` ganan un modo `REGISTRY_URL=auto` (o variable
   nueva, ej. `REGISTRY_DISCOVERY=mdns`) que busca el servicio anunciado en
   la LAN y arma `wss://<ip-encontrada>:<puerto>/fhs/v1/ws` automáticamente,
@@ -87,7 +95,7 @@ resolver aquí.
   única fuente de verdad de qué nodos están `online`/`lost` — mDNS solo
   ayuda a *encontrar su dirección*, no reemplaza `hello`/`register`/
   heartbeat ni el estado que ya mantiene `apps/agent-server/src/registry/registry.ts`.
-- **Descubrimiento satélite-a-satélite sin Registry** (ej. que
+- **Descubrimiento nodo-a-nodo sin Registry** (ej. que
   `llm-provider` y `ocr-provider` se hablen directo sin pasar por
   `agent-server`). El protocolo FHS asume que el Agent Runtime media toda
   interacción (`spec-native/ARCHITECTURE.md`, "Restricciones") — esta spec
@@ -101,7 +109,7 @@ resolver aquí.
 - **UI/CLI para elegir entre varios Registries anunciados** si hubiera más
   de uno en la misma LAN (ej. dos comunidades distintas compartiendo wifi
   de un evento). Para esta fase, si mDNS encuentra más de un anuncio, el
-  satélite debe fallar con un error claro pidiendo `REGISTRY_URL` manual,
+  nodo debe fallar con un error claro pidiendo `REGISTRY_URL` manual,
   no elegir uno arbitrariamente.
 
 ## Diseño
@@ -125,7 +133,7 @@ fase acotada del problema.
 sequenceDiagram
     participant AS as Agent Server (Registry)
     participant MDNS as mDNS (multicast LAN)
-    participant SAT as Satélite (llm-provider / ocr-provider)
+    participant SAT as Nodo (llm-provider / ocr-provider)
 
     AS->>MDNS: anuncia _fhs-registry._tcp.local { port, fhsVersion, tls }
     Note over AS: se re-anuncia periódicamente (TTL mDNS estándar)
@@ -144,7 +152,7 @@ sequenceDiagram
 
 ### Qué NO cambia
 
-El protocolo FHS después de que el satélite arma la URL es **exactamente
+El protocolo FHS después de que el nodo arma la URL es **exactamente
 el mismo** de siempre: `hello` → `welcome` → `register` → `registered` →
 heartbeat (`docs/protocolo.md`). mDNS solo reemplaza el paso "¿cómo sé la
 IP:puerto?" — todo lo demás (lease de 30s, heartbeat de 10s, manifiesto,
@@ -155,7 +163,7 @@ scope, retention, provenance) sigue idéntico. Ningún archivo de
 
 | Riesgo | Impacto | Mitigación |
 |---|---|---|
-| Cualquier equipo en la misma LAN puede anunciarse como `_fhs-registry._tcp.local` falso y atraer satélites (sin identidad criptográfica real, DEC-0004 sigue simplificada) | Alto en redes no confiables, bajo en la LAN doméstica/comunidad actual | Documentar explícitamente que mDNS asume la misma "LAN de confianza" que ya declara `spec-native/ARCHITECTURE.md` — no usar en redes compartidas con desconocidos (ej. wifi pública de un evento) hasta que exista identidad Ed25519 real |
+| Cualquier equipo en la misma LAN puede anunciarse como `_fhs-registry._tcp.local` falso y atraer nodos (sin identidad criptográfica real, DEC-0004 sigue simplificada) | Alto en redes no confiables, bajo en la LAN doméstica/comunidad actual | Documentar explícitamente que mDNS asume la misma "LAN de confianza" que ya declara `spec-native/ARCHITECTURE.md` — no usar en redes compartidas con desconocidos (ej. wifi pública de un evento) hasta que exista identidad Ed25519 real |
 | Redes de eventos/hoteles bloquean tráfico multicast (mDNS no llega) | Medio — justo el escenario de "dispositivo con red remota en sitio" de esta semana | mDNS es fallback, nunca obligatorio — `REGISTRY_URL` manual sigue siendo el camino garantizado, documentado como primera opción para sitio con red desconocida |
 | Más de un Registry anunciado en la misma LAN (dos comunidades, mismo evento) causa ambigüedad | Medio | Fase 1 falla explícito en vez de adivinar (ver "Fuera de alcance") — resolver selección multi-Registry es una iteración futura, no de esta spec |
 | Nueva dependencia de librería mDNS en Node introduce superficie de mantenimiento | Bajo | Elegir una librería madura y ampliamente usada (evaluar `bonjour-service` vs `multicast-dns` en la fase de implementación); el fallback a configuración manual limita el radio de daño si la librería falla |
@@ -173,10 +181,10 @@ scope, retention, provenance) sigue idéntico. Ningún archivo de
       compatibilidad total con los tres despliegues ya verificados esta
       semana (multi-host, TLS, topología de 3 equipos).
 - [ ] Si mDNS no encuentra nada o encuentra más de un Registry, el
-      satélite falla con un mensaje claro (no un timeout silencioso ni una
+      nodo falla con un mensaje claro (no un timeout silencioso ni una
       conexión a un Registry arbitrario).
 - [ ] Verificado con una prueba real: apagar el `REGISTRY_URL` explícito en
-      uno de los tres satélites de la demo (laptop/bastion/raspi4b) y
+      uno de los tres nodos de la demo (laptop/bastion/raspi4b) y
       confirmar que igual se registra correctamente vía mDNS en esa misma
       LAN.
 - [ ] Documentado en `docs/despliegue-multi-host.md` y/o un documento

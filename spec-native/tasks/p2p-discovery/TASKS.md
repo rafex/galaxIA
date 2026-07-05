@@ -66,5 +66,5 @@
 - Owner: rafex
 - Dependencies: TASK-P2P-0002, TASK-P2P-0003, TASK-P2P-0004
 - Expected files: ninguno (verificación, no código)
-- Close criteria: en la misma LAN de la demo (laptop + bastion + Raspberry Pi), quitar `REGISTRY_URL` explícito de al menos un satélite y confirmar que se registra igual vía mDNS. Confirmar también que los otros dos, con `REGISTRY_URL` explícito, siguen funcionando sin tocar mDNS.
-- Validation: logs de cada satélite mostrando "Conectado al Registry" + `curl /api/fhs/providers` confirmando el registro.
+- Close criteria: en la misma LAN de la demo (laptop + bastion + Raspberry Pi), quitar `REGISTRY_URL` explícito de al menos un nodo y confirmar que se registra igual vía mDNS. Confirmar también que los otros dos, con `REGISTRY_URL` explícito, siguen funcionando sin tocar mDNS.
+- Validation: logs de cada nodo mostrando "Conectado al Registry" + `curl /api/fhs/providers` confirmando el registro.

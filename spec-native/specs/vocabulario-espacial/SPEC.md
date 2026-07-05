@@ -93,62 +93,48 @@ resolver antes de aplicar cualquier tabla de nombres.
   original). Se documentan como nombres reservados para cuando esas
   capacidades existan — no se crea código ni tipos nuevos ahora.
 
-## Decisión pendiente: ¿"satélite" es el término general, o se reserva para tools?
+## Decisión: Opción B — "Star" para LLM, "Satellite" para tools
 
-Esto es lo primero que hay que resolver, porque cambia el significado de
-un término que ya se usó en dos specs en `draft`
-(`satelite-rating`, `p2p-discovery`) y en `ROADMAP.md`/`TRACEABILITY.md`.
+**Resuelto (2026-07-05):** se elige la **Opción B**. "Estrella" (Star)
+nombra un nodo de razonamiento/generación (LLM); "satélite" (Satellite)
+nombra un nodo de herramientas (OCR, búsqueda, etc.) — no son sinónimos.
+Cuando algo aplica a cualquier tipo de nodo por igual, se usa **"nodo"**
+como término neutro, no "satélite" como paraguas (ese uso quedó
+descartado). Ver entrada nueva en `spec-native/DECISIONS.md` para el
+registro formal de esta decisión.
 
-**Opción A — "Satélite" como paraguas (lo ya decidido, sin cambios)**
+Motivo: metáfora más precisa — en una galaxia, las estrellas son fuente
+de energía/razonamiento; los satélites orbitan y aportan una función
+específica. `spec-native/specs/satelite-rating/SPEC.md` y
+`spec-native/specs/p2p-discovery/SPEC.md` ya se actualizaron para
+reflejar esto (ambas seguían en `draft`, sin código implementado, así
+que el costo de cambiarlas fue bajo — se decidió antes de empezar a
+programar, no después).
 
-- Satélite = cualquier nodo de la red, sin distinción de tipo.
-- Subtipos con adjetivo cuando hace falta precisión: "satélite de
-  razonamiento" (LLM), "satélite de herramienta" (tool) — en vez de una
-  palabra completamente distinta.
-- Ventaja: cero retrabajo en `satelite-rating`/`p2p-discovery`, que ya
-  usan "satélite" en ese sentido general.
-
-**Opción B — "Star" para LLM, "Satellite" solo para tools (propuesta nueva)**
-
-- Metáfora más precisa: en una galaxia, las estrellas son fuente de
-  energía/razonamiento; los satélites orbitan y aportan una función
-  específica. Encaja mejor con la explicación que da la propuesta.
-- Requiere actualizar la sección "Vocabulario" de
-  `spec-native/specs/satelite-rating/SPEC.md` y
-  `spec-native/specs/p2p-discovery/SPEC.md` — ambas siguen en `draft`,
-  sin código implementado todavía, así que el costo de cambiarlas ahora
-  es bajo. Sería mucho más caro decidir esto después de implementar
-  `satelite-rating` (habría que renombrar el rating, las métricas, y
-  toda mención ya hecha).
-
-**Recomendación:** decidirlo ahora, no después de implementar
-`satelite-rating` — es el momento más barato para cambiar de opinión si
-se va a cambiar. No se asume ninguna de las dos opciones en el resto de
-esta spec hasta que el owner decida.
-
-## Vocabulario propuesto (tabla de referencia)
+## Vocabulario (tabla canónica)
 
 | Concepto técnico | Nombre GalaxIA | Motivo |
 |---|---|---|
 | Red completa | Galaxy / GalaxIA Network | La federación completa de nodos |
-| Nodo proveedor (genérico) | Satellite *(o Star si se elige Opción B para LLM)* | Cada equipo orbita y aporta algo |
+| Nodo proveedor (genérico, cualquier tipo) | Node / Nodo | Término neutro cuando no importa si es Star o Satellite |
+| LLM provider | Star | Fuente de razonamiento/generación — central, como una estrella |
+| Tool provider | Satellite | Capacidad específica que orbita y aporta una función (OCR, búsqueda, etc.) |
 | Registro (Registry) | Atlas | Mapa de nodos y capacidades |
-| Manifiesto (manifest) | Beacon | Lo que anuncia un satélite al conectarse |
+| Manifiesto (manifest) | Beacon | Lo que anuncia un nodo al conectarse |
 | Chat web | Portal | Entrada humana a la red |
-| Orquestador / Agent Runtime | Navigator | Decide rutas entre razonamiento (LLM) y herramientas |
-| LLM provider | Star *(si Opción B)* | Fuente de razonamiento/generación |
-| Tool provider | Satellite / Module | Capacidad específica (OCR, búsqueda, etc.) |
-| Ejecución de una tool (`tool.call`) | Mission | Una tarea enviada a un nodo |
+| Orquestador / Agent Runtime | Navigator | Decide rutas entre razonamiento (Star) y herramientas (Satellite) |
+| Ejecución de una tool (`tool.call`) | Mission | Una tarea enviada a un satélite |
 | Auditoría/procedencia (`provenance`) | Flight Log | Registro de qué pasó, qué nodo, qué datos |
 | Heartbeat (`ping`/`pong`) | Pulse | Señal periódica de vida |
 | Conexión activa con la red | Orbit | Estado de "conectado y registrado" |
-| Capacidad (`capability`) | Signal | Lo que un satélite anuncia que puede hacer |
+| Capacidad (`capability`) | Signal | Lo que un nodo anuncia que puede hacer |
 
 Subtipos de satélite reservados para cuando existan (sin implementar
-hoy): *Reasoning Satellite* (LLM, si se elige Opción A), *Tool Satellite*,
+hoy): *Tool Satellite* (genérico, ya cubierto por "Satellite" a secas),
 *Memory Satellite* (búsqueda/vector store), *Storage Satellite*
 (archivos/documentos), *Bridge Satellite* (conecta con otro protocolo o
-red).
+red). No hay subtipos de Star reservados todavía — un solo tipo de
+razonamiento por ahora.
 
 ## Diseño
 
@@ -168,53 +154,49 @@ decisión de ingeniería separada, con su propio análisis de costo/riesgo.
 **Español** (para el portal web y presentaciones):
 
 > GalaxIA es una galaxia soberana de IA donde equipos reutilizados se
-> convierten en satélites. Cada satélite aporta una capacidad:
-> razonamiento, OCR, búsqueda, memoria o automatización. El Portal los
-> descubre mediante Atlas y el Navegador los combina en un agente
-> comunitario.
+> convierten en estrellas y satélites. Cada estrella aporta razonamiento;
+> cada satélite aporta una capacidad — OCR, búsqueda, memoria o
+> automatización. El Portal los descubre mediante Atlas y el Navegador
+> los combina en un agente comunitario.
 
 **Inglés** (para documentación en inglés, si se necesita):
 
-> GalaxIA is a sovereign AI galaxy where old computers become satellites.
-> Each satellite contributes a capability: reasoning, OCR, search, memory
-> or automation. The Portal discovers them through Atlas, and the
-> Navigator combines them into a community agent.
-
-Nota: ambas frases usan "satélite"/"satellite" como término general
-(Opción A). Si se elige la Opción B, hay que ajustar la frase para
-distinguir "estrellas" (razonamiento) de "satélites" (herramientas) antes
-de publicarla.
+> GalaxIA is a sovereign AI galaxy where old computers become stars and
+> satellites. Each star contributes reasoning; each satellite
+> contributes a capability — OCR, search, memory or automation. The
+> Portal discovers them through Atlas, and the Navigator combines them
+> into a community agent.
 
 ## Riesgos y mitigaciones
 
 | Riesgo | Impacto | Mitigación |
 |---|---|---|
 | Aplicar el vocabulario nuevo solo en documentos nuevos deja inconsistencia con lo ya escrito (`docs/`, `spec-native/`, la presentación, el portal) | Medio | Mientras no se ejecute la actualización retroactiva (fuera de alcance), documentar explícitamente que ambos vocabularios conviven — el técnico en código/protocolo, el espacial en material nuevo de cara a usuario |
-| Cambiar el significado de "satélite" (Opción B) después de ya usarlo en 2 specs y en `ROADMAP.md`/`TRACEABILITY.md` | Medio | Si se elige Opción B, actualizar esas menciones como parte de la misma iniciativa que resuelve esta spec — no dejarlas a medias |
+| Cambiar el significado de "satélite" después de ya usarlo en 2 specs y en `ROADMAP.md`/`TRACEABILITY.md` | Medio | Resuelto: `satelite-rating`, `p2p-discovery`, `ROADMAP.md` y `TRACEABILITY.md` ya se actualizaron al vocabulario nuevo (nodo/estrella/satélite) como parte de esta misma iteración |
 | Renombrar código/carpetas/contenedores reales bajo presión de "se ve más bonito", sin medir el costo de romper despliegues ya verificados en 3 máquinas | Alto si se hiciera ahora | Explícitamente fuera de alcance en esta iteración (ver arriba) — cualquier renombrado de código requiere su propia spec y decisión |
 | Inconsistencia entre la frase de posicionamiento (ya asume Opción A) y lo que finalmente se decida | Bajo | La frase se marca explícitamente como "pendiente de ajuste si se elige Opción B" (ver arriba) |
 
 ## Criterios de aceptación
 
-- [ ] Decisión explícita tomada entre Opción A y Opción B (documentada en
-      `spec-native/DECISIONS.md` como nueva entrada, no solo en esta spec).
+- [x] Decisión explícita tomada entre Opción A y Opción B — Opción B,
+      documentada en `spec-native/DECISIONS.md` como nueva entrada.
 - [ ] Tabla de vocabulario publicada en un único lugar referenciable
       (`docs/vocabulario.md`, nombre tentativo) que otros documentos citan
       en vez de reinventar la lista.
-- [ ] Sección "Vocabulario" de `satelite-rating/SPEC.md` y
-      `p2p-discovery/SPEC.md` actualizada si se elige la Opción B, o
-      confirmada sin cambios si se elige la Opción A.
+- [x] Sección "Vocabulario" de `satelite-rating/SPEC.md` y
+      `p2p-discovery/SPEC.md` actualizada a la Opción B (nodo/estrella/
+      satélite), incluyendo sus `TASKS.md` y diagramas de secuencia.
 - [ ] Frase de posicionamiento (ES/EN) incorporada al portal web
-      (`site/index.md` de este mismo repo), ajustada según la opción
-      elegida.
+      (`site/index.md` de este mismo repo) — ya redactada arriba,
+      distinguiendo estrellas de satélites, falta incorporarla al sitio.
 - [ ] Ningún archivo de código (`.ts`, nombres de carpeta, nombres de
       contenedor) se modifica como parte de esta spec — solo
       documentación/vocabulario.
-- [ ] `docs/README.md`, `docs/protocolo.md` y `site/protocolo.md`
-      actualizados de `Federation of Sovereign Hosts` /
+- [x] `docs/README.md`, `docs/protocolo.md`, `site/protocolo.md` y
+      `package.json` actualizados de `Federation of Sovereign Hosts` /
       `Federación de Nodos Soberanos` a `Federation of Sovereign
       Horizons` / `Federación de Horizontes Soberanos`, manteniendo la
-      sigla `FHS` sin cambios.
+      sigla `FHS` sin cambios (TASK-VOCAB-0004b).
 
 ## Enlaces relacionados
 
