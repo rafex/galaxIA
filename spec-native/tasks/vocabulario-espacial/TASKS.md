@@ -42,12 +42,12 @@
 ### TASK-VOCAB-0004b - Reformular la expansión de las siglas FHS
 
 - ID: TASK-VOCAB-0004b
-- State: `pending`
+- State: `done`
 - Owner: rafex
 - Dependencies: ninguna — no depende de TASK-VOCAB-0001 (no toca la decisión Star/Satélite)
-- Expected files: `docs/README.md`, `docs/protocolo.md`, `site/protocolo.md`
-- Close criteria: `Federation of Sovereign Hosts` / `Federación de Nodos Soberanos` reemplazado por `Federation of Sovereign Horizons` / `Federación de Horizontes Soberanos` en los 3 archivos. La sigla `FHS` no cambia. La presentación `red-soberana-de-ia` (repo `presentaciones-cursos-talleres`, aparte) se actualiza como tarea de seguimiento, no bloqueante aquí.
-- Validation: `grep -rn "Sovereign Hosts\|Nodos Soberanos"` en el repo no debe encontrar nada.
+- Expected files: `docs/README.md`, `docs/protocolo.md`, `site/protocolo.md`, `package.json`
+- Close criteria: `Federation of Sovereign Hosts` / `Federación de Nodos Soberanos` reemplazado por `Federation of Sovereign Horizons` / `Federación de Horizontes Soberanos` en los archivos del repo. La sigla `FHS` no cambia. La presentación `red-soberana-de-ia` (repo `presentaciones-cursos-talleres`, aparte) queda pendiente como tarea de seguimiento separada (otro repo, fuera del alcance de este commit).
+- Validation: `grep -rn "Sovereign Hosts\|Nodos Soberanos"` en el repo — 2026-07-05, confirmado sin resultados fuera de esta misma spec/tarea (que documentan la frase vieja intencionalmente). También se encontró y corrigió `package.json` (no estaba en el plan original de 3 archivos).
 
 ### TASK-VOCAB-0004 - Frase de posicionamiento en el portal web
 

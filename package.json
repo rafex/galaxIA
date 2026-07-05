@@ -2,7 +2,7 @@
   "name": "galaxia",
   "version": "0.1.0",
   "private": true,
-  "description": "FHS — Federation of Sovereign Hosts. Chat comunitario federado con LLM y tools MCP.",
+  "description": "FHS — Federation of Sovereign Horizons. Chat comunitario federado con LLM y tools MCP.",
   "type": "module",
   "workspaces": [
     "packages/*",

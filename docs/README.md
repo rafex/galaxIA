@@ -1,6 +1,6 @@
 # galaxIA — Documentación para humanos
 
-Bienvenido a la documentación de **galaxIA**, un prototipo de **Federation of Sovereign Hosts (FHS)**.
+Bienvenido a la documentación de **galaxIA**, un prototipo de **Federation of Sovereign Horizons (FHS)**.
 
 Esta documentación explica, en lenguaje humano, qué es el proyecto, cómo funciona el protocolo y cómo usarlo.
 

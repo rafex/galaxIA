@@ -1,6 +1,6 @@
 # Protocolo FHS v0.1
 
-FHS significa **Federation of Sovereign Hosts** (Federación de Nodos Soberanos). Es un protocolo para que computadoras locales se descubran entre sí y compartan recursos de inteligencia artificial.
+FHS significa **Federation of Sovereign Horizons** (Federación de Horizontes Soberanos). Es un protocolo para que computadoras locales se descubran entre sí y compartan recursos de inteligencia artificial.
 
 ## Idea central
 

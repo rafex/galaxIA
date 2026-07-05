@@ -6,8 +6,8 @@ permalink: /protocolo/
 
 # Cómo funciona el protocolo
 
-**FHS** significa **Federation of Sovereign Hosts** (Federación de Nodos
-Soberanos). Es el protocolo que hace posible que computadoras de una
+**FHS** significa **Federation of Sovereign Horizons** (Federación de
+Horizontes Soberanos). Es el protocolo que hace posible que computadoras de una
 comunidad — una Mac mini con un modelo local, una laptop con OCR, una
 Raspberry Pi con otra herramienta — se descubran entre sí y compartan
 capacidades de IA sin depender de un servidor central de terceros.
