@@ -22,7 +22,12 @@ export interface RegistryConnection {
 export interface WebSocketLike {
   send(data: string): void;
   close(code?: number, reason?: string): void;
+  /** 0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED (mismos valores que WebSocket estándar). */
+  readyState?: number;
 }
+
+const WS_OPEN = 1;
+const WS_CONNECTING = 0;
 
 export class Registry {
   private store: RegistryStore;
@@ -39,6 +44,26 @@ export class Registry {
 
   get leaseSeconds() {
     return DEFAULT_LEASE_SECONDS;
+  }
+
+  /**
+   * DEC-0009: si otra conexión ya está activa con este providerId, un
+   * `hello` nuevo debe rechazarse en vez de sobrescribirla en silencio —
+   * evita que un segundo nodo suplante la identidad de otro mientras el
+   * DID siga sin firma criptográfica (DEC-0004). "Activa" se verifica por
+   * el estado real del socket (no solo por estar en el mapa): si el
+   * socket previo ya está CLOSING/CLOSED, se considera libre aunque el
+   * `close` de esa conexión no se haya procesado todavía (ej. el proceso
+   * remoto murió sin cerrar limpio). Si `readyState` no está disponible
+   * (stub de pruebas), se asume activa por seguridad — mismo criterio
+   * conservador que el resto de esta regla.
+   */
+  hasActiveConnection(providerId: string): boolean {
+    const conn = this.connections.get(providerId);
+    if (!conn) return false;
+    const state = conn.socket.readyState;
+    if (state === undefined) return true;
+    return state === WS_OPEN || state === WS_CONNECTING;
   }
 
   registerConnection(providerId: string, socket: WebSocketLike) {

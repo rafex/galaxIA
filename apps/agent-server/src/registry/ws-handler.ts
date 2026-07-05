@@ -39,6 +39,18 @@ export async function setupWebSocket(app: FastifyInstance, registry: Registry) {
       switch (msg.type) {
         case "hello": {
           const hello = msg as HelloMessage;
+          if (registry.hasActiveConnection(hello.providerId)) {
+            // DEC-0009: no sobrescribir una conexión activa en silencio.
+            send({
+              type: "error",
+              data: {
+                code: "ALREADY_REGISTERED",
+                message: `providerId ${hello.providerId} ya tiene una conexión activa`,
+              },
+            } as any);
+            socket.close(4009, "already-registered");
+            return;
+          }
           providerId = hello.providerId;
           registry.registerConnection(providerId, socket as any);
           send({

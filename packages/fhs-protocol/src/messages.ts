@@ -66,12 +66,27 @@ export interface NodeUpdatedMessage extends BaseMessage {
   services: { kind: string; capabilities: string[] }[];
 }
 
+/**
+ * Rechazo del Registry antes de completar el registro — ej. `hello` con un
+ * `providerId` que ya tiene una conexión activa (DEC-0009). El provider debe
+ * tratar esto igual que un cierre de conexión: no reintentar con el mismo
+ * `providerId` sin resolver el conflicto primero.
+ */
+export interface RegistryErrorMessage extends BaseMessage {
+  type: "error";
+  data: {
+    code: "NOT_IDENTIFIED" | "ALREADY_REGISTERED" | "INVALID_MANIFEST" | "PARSE_ERROR";
+    message: string;
+  };
+}
+
 export type RegistryOutboundMessage =
   | WelcomeMessage
   | RegisteredMessage
   | PongMessage
   | NodeOnlineMessage
   | NodeLostMessage
+  | RegistryErrorMessage
   | NodeUpdatedMessage;
 
 export type RegistryInboundMessage =

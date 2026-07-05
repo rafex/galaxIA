@@ -105,6 +105,13 @@ function connectToRegistry() {
     if (msg.type === "registered") {
       log(`Registrado: ${msg.acceptedServices} servicio(s) aceptado(s)`);
     }
+
+    if (msg.type === "error") {
+      // DEC-0009: el Registry rechaza el hello si el providerId ya tiene
+      // una conexión activa — no reintentar aquí, el "close" que sigue ya
+      // dispara el backoff de reconexión normal.
+      log(`Registry rechazó la conexión: ${msg.data?.code} — ${msg.data?.message}`);
+    }
   });
 
   ws.on("close", () => {
