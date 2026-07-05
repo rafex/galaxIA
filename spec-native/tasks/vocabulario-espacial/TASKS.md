@@ -39,6 +39,16 @@
 - Close criteria: si se eligió Opción B, ambas secciones "Vocabulario" se actualizan para distinguir "Star" (LLM) de "Satellite" (tools). Si se eligió Opción A, se agrega una nota confirmando que no hay cambios.
 - Validation: revisión manual de ambos documentos.
 
+### TASK-VOCAB-0004b - Reformular la expansión de las siglas FHS
+
+- ID: TASK-VOCAB-0004b
+- State: `pending`
+- Owner: rafex
+- Dependencies: ninguna — no depende de TASK-VOCAB-0001 (no toca la decisión Star/Satélite)
+- Expected files: `docs/README.md`, `docs/protocolo.md`, `site/protocolo.md`
+- Close criteria: `Federation of Sovereign Hosts` / `Federación de Nodos Soberanos` reemplazado por `Federation of Sovereign Horizons` / `Federación de Horizontes Soberanos` en los 3 archivos. La sigla `FHS` no cambia. La presentación `red-soberana-de-ia` (repo `presentaciones-cursos-talleres`, aparte) se actualiza como tarea de seguimiento, no bloqueante aquí.
+- Validation: `grep -rn "Sovereign Hosts\|Nodos Soberanos"` en el repo no debe encontrar nada.
+
 ### TASK-VOCAB-0004 - Frase de posicionamiento en el portal web
 
 - ID: TASK-VOCAB-0004

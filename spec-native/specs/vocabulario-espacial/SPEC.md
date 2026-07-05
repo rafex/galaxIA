@@ -53,6 +53,18 @@ resolver antes de aplicar cualquier tabla de nombres.
 - Un lugar único donde vivir la tabla canónica (`docs/vocabulario.md`,
   nombre tentativo) que cualquier otro documento pueda citar en vez de
   reinventar la lista.
+- **Reformular la expansión de las siglas FHS**: de `Federation of
+  Sovereign Hosts` (`Federación de Nodos Soberanos`) a `Federation of
+  Sovereign Horizons` (`Federación de Horizontes Soberanos`) — mismas
+  siglas `FHS`, más coherente con la metáfora espacial de la marca y
+  menos "servidores", más "expansión comunitaria". Confirmado de bajo
+  riesgo: la expansión completa solo aparece en 3 archivos de
+  documentación (`docs/README.md`, `docs/protocolo.md`,
+  `site/protocolo.md`) más la presentación `red-soberana-de-ia` (repo
+  aparte) — **ningún identificador de código, constante ni mensaje
+  tipado** deletrea las palabras completas (`FHS_VERSION`, `type: "hello"`,
+  etc. usan solo la sigla). A diferencia del resto de renombrados de esta
+  spec, este sí se puede ejecutar como parte de la misma iteración.
 
 ### Fuera del alcance (para esta iteración)
 
@@ -67,10 +79,10 @@ resolver antes de aplicar cualquier tabla de nombres.
   (`fhs-agent-server`, `fhs-llm-provider`, `fhs-ocr-provider`,
   `fhs-web`). Se registra como decisión futura separada, con su propia
   spec si se decide avanzar; no se ejecuta aquí.
-- **Cambiar el nombre del protocolo FHS** (`Federation of Sovereign
-  Hosts`) o sus mensajes tipados (`hello`, `register`, `chat.request`,
-  etc.). No se pidió, y invalidaría todo lo ya publicado en
-  `docs/protocolo.md` y `spec-native/DECISIONS.md`.
+- **Cambiar los mensajes tipados del protocolo** (`hello`, `register`,
+  `chat.request`, etc.) o la sigla `FHS` en sí — solo se reformula qué
+  significan las siglas (ver "Dentro del alcance"), no los mensajes ni el
+  nombre corto del protocolo.
 - **Actualizar retroactivamente** todo lo ya escrito con el vocabulario
   viejo (`docs/*.md`, `spec-native/*.md`, la presentación
   `red-soberana-de-ia`, el portal web `site/`). Son decenas de archivos;
@@ -198,6 +210,11 @@ de publicarla.
 - [ ] Ningún archivo de código (`.ts`, nombres de carpeta, nombres de
       contenedor) se modifica como parte de esta spec — solo
       documentación/vocabulario.
+- [ ] `docs/README.md`, `docs/protocolo.md` y `site/protocolo.md`
+      actualizados de `Federation of Sovereign Hosts` /
+      `Federación de Nodos Soberanos` a `Federation of Sovereign
+      Horizons` / `Federación de Horizontes Soberanos`, manteniendo la
+      sigla `FHS` sin cambios.
 
 ## Enlaces relacionados
 
