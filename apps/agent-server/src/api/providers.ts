@@ -8,7 +8,21 @@ export async function setupProvidersApi(app: FastifyInstance, registry: Registry
 
   app.get("/api/fhs/providers", async (req) => {
     const type = (req.query as { type?: string }).type;
-    return registry.getProviders(type as any);
+    const providers = registry.getProviders(type as any);
+    // SPEC-SATRATING-0001: adjunta fiabilidad/rating por capability — por
+    // modelo si es tipo "llm", por capability declarada si es tipo "mcp".
+    // null si nunca se registró una muestra (nodo recién conectado).
+    return providers.map((p) => {
+      const capabilityIds =
+        p.type === "llm"
+          ? (p.service.models || []).map((m) => m.id)
+          : (p.service.capabilities || []).map((c) => c.id);
+      const metrics = capabilityIds.map((capability) => ({
+        capability,
+        ...registry.getMetrics(p.providerId, capability),
+      }));
+      return { ...p, metrics };
+    });
   });
 
   app.get("/api/fhs/models", async () => {

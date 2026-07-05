@@ -125,12 +125,27 @@ export interface ChatErrorMessage extends BaseMessage {
   message: string;
 }
 
+/**
+ * Ack del mosquito/dispatcher del nodo: confirma que encoló la petición y
+ * va a procesarla, antes de empezar el trabajo real (SPEC-SATRATING-0001).
+ * Obligatorio para todo chat.request/tool.call que el nodo acepte; si lo
+ * rechaza de inmediato, va directo a chat.error/tool.error sin este ack.
+ * Compatible hacia atrás: un nodo que no lo envía sigue funcionando igual,
+ * solo sin latencia de despacho en las métricas del Registry.
+ */
+export interface DispatchAckMessage extends BaseMessage {
+  type: "dispatch.ack";
+  requestId: string;
+  queuedAt: number;
+}
+
 export type LlmProviderInboundMessage = ChatRequestMessage;
 
 export type LlmProviderOutboundMessage =
   | ChatDeltaMessage
   | ChatCompletedMessage
-  | ChatErrorMessage;
+  | ChatErrorMessage
+  | DispatchAckMessage;
 
 export type LlmProviderMessage =
   | LlmProviderInboundMessage
@@ -184,7 +199,8 @@ export type ToolProviderInboundMessage =
 export type ToolProviderOutboundMessage =
   | ToolCallResultMessage
   | ToolCallErrorMessage
-  | ToolListResponseMessage;
+  | ToolListResponseMessage
+  | DispatchAckMessage;
 
 export type ToolProviderMessage =
   | ToolProviderInboundMessage

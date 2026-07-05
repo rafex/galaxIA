@@ -1,5 +1,6 @@
 import { EventBus } from "../sse/event-bus.js";
 import { MemoryRegistryStore, type RegistryStore } from "./db.js";
+import { NodeMetricsStore, type LatencySample, type NodeMetricsSummary } from "./metrics.js";
 import {
   DEFAULT_LEASE_SECONDS,
   HEARTBEAT_INTERVAL_SECONDS,
@@ -33,9 +34,19 @@ export class Registry {
   private store: RegistryStore;
   private connections = new Map<string, RegistryConnection>();
   private checkTimer?: NodeJS.Timeout;
+  private metrics = new NodeMetricsStore();
 
   constructor(private eventBus: EventBus) {
     this.store = new MemoryRegistryStore();
+  }
+
+  /** SPEC-SATRATING-0001: historial de latencia/éxito por nodo + capability. */
+  recordSample(providerId: string, capability: string, sample: LatencySample) {
+    this.metrics.recordSample(providerId, capability, sample);
+  }
+
+  getMetrics(providerId: string, capability: string): NodeMetricsSummary | null {
+    return this.metrics.getSummary(providerId, capability);
   }
 
   get version() {

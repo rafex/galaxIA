@@ -51,6 +51,8 @@ flowchart TD
 
 Requisito concreto: el heartbeat (`ping`) debe implementarse en un timer/tarea independiente del manejo de peticiones — nunca dentro del mismo bucle síncrono que procesa `chat.request`/`tool.call`. En Node.js esto es casi gratis (event loop); en lenguajes con I/O bloqueante (ej. un script Python síncrono sin `asyncio`) es la razón principal por la que un provider mal escrito deja de responder heartbeat bajo carga.
 
+**Señal verificable de que el mosquito ya tomó la petición:** un heartbeat sano no prueba que una petición específica esté siendo atendida, solo que la conexión sigue viva. Por eso el mosquito debe enviar `dispatch.ack { requestId, queuedAt }` (ver `docs/protocolo.md`) inmediatamente al encolar cada `chat.request`/`tool.call`, antes de empezar el trabajo real — separa la latencia de despacho (tiempo hasta el ack) de la latencia de procesamiento (tiempo hasta el resultado final), y le da al Registry una base real para calcular fiabilidad por nodo (`spec-native/specs/satelite-rating/SPEC.md`). Es obligatorio para nodos nuevos, pero compatible hacia atrás: uno que no lo envíe sigue funcionando, solo sin esa métrica.
+
 ## Manifiesto — campos obligatorios sin excepción
 
 Independientemente del tipo (`llm` o `mcp`), todo manifiesto debe declarar:
@@ -103,6 +105,7 @@ Un provider nuevo puede conectarse al Registry sin ningún cambio en `apps/agent
 
 - [ ] Implementa el ciclo de vida completo (`Connecting → Identifying → Registering → Ready`) del diagrama de arriba.
 - [ ] El heartbeat corre en una tarea/timer independiente del procesamiento de peticiones (dispatcher concurrente).
+- [ ] Envía `dispatch.ack { requestId, queuedAt }` inmediatamente al encolar cada `chat.request`/`tool.call` en su dispatcher, antes de empezar a procesar (ver "Regla central: el dispatcher concurrente" arriba).
 - [ ] El manifiesto incluye todos los campos obligatorios de la tabla de arriba, incluidos los de privacidad.
 - [ ] Usa los códigos de error estandarizados, no códigos propios.
 - [ ] Loggea metadata de trazabilidad por `requestId`, nunca contenido fuera de lo permitido por `retention`.

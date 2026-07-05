@@ -7,6 +7,7 @@ import type {
   ChatDeltaMessage,
   ChatCompletedMessage,
   ChatErrorMessage,
+  DispatchAckMessage,
 } from "@galaxia/fhs-protocol";
 import { LlmBridge } from "./llm-bridge.js";
 
@@ -163,6 +164,15 @@ async function handleMessage(socket: WebSocket, raw: WebSocket.Data) {
     log(
       `  tools=${req.request.tools ? req.request.tools.length : 0}, messages=${req.request.messages?.length || 0}`
     );
+
+    // Mosquito: confirmar que la petición ya está encolada, antes de
+    // procesarla (SPEC-SATRATING-0001, docs/protocolo.md).
+    const ack: DispatchAckMessage = {
+      type: "dispatch.ack",
+      requestId: req.requestId,
+      queuedAt: Date.now(),
+    };
+    socket.send(JSON.stringify(ack));
 
     try {
       if (req.request.stream) {

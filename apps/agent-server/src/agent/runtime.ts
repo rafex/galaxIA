@@ -299,11 +299,17 @@ export class AgentRuntime {
     try {
       const parsed = parseDataUrl(artifact);
       const args = { file_base64: parsed.base64, filename: `upload-${Date.now()}.${parsed.extension}` };
-      const result = await this.mcpHost.callTool(tool.providerId, tool.name, args);
+      const { message: result, dispatchMs } = await this.mcpHost.callTool(tool.providerId, tool.name, args);
       const duration = Date.now() - startTime;
       const textResult = extractText(result);
 
       this.emit({ type: "tool.completed", data: { name: tool.name, duration, success: true } });
+      this.registry.recordSample(tool.providerId, tool.capabilityId, {
+        dispatchMs,
+        totalMs: duration,
+        success: true,
+        at: Date.now(),
+      });
       this.usedTools.push({
         capability: tool.capabilityId,
         providerId: tool.providerId,
@@ -312,7 +318,14 @@ export class AgentRuntime {
       });
       return textResult;
     } catch (err: any) {
+      const duration = Date.now() - startTime;
       this.emit({ type: "tool.error", data: { name: tool.name, error: err.message } });
+      this.registry.recordSample(tool.providerId, tool.capabilityId, {
+        dispatchMs: null,
+        totalMs: duration,
+        success: false,
+        at: Date.now(),
+      });
       return null;
     }
   }
@@ -368,11 +381,17 @@ export class AgentRuntime {
         args.filename = args.filename || `upload-${Date.now()}.${parsed.extension}`;
       }
 
-      const result = await this.mcpHost.callTool(tool.providerId, toolName, args);
+      const { message: result, dispatchMs } = await this.mcpHost.callTool(tool.providerId, toolName, args);
       const duration = Date.now() - startTime;
       const textResult = extractText(result);
 
       this.emit({ type: "tool.completed", data: { name: toolName, duration, success: true } });
+      this.registry.recordSample(tool.providerId, tool.capabilityId, {
+        dispatchMs,
+        totalMs: duration,
+        success: true,
+        at: Date.now(),
+      });
       this.usedTools.push({
         capability: tool.capabilityId,
         providerId: tool.providerId,
@@ -384,6 +403,12 @@ export class AgentRuntime {
     } catch (err: any) {
       const duration = Date.now() - startTime;
       this.emit({ type: "tool.error", data: { name: toolName, error: err.message } });
+      this.registry.recordSample(tool.providerId, tool.capabilityId, {
+        dispatchMs: null,
+        totalMs: duration,
+        success: false,
+        at: Date.now(),
+      });
       messages?.push({ role: "tool", content: `Error: ${err.message}`, tool_call_id: toolCall.id });
     }
   }
@@ -401,10 +426,30 @@ export class AgentRuntime {
       temperature: 0.7,
     };
 
-    const response = await this.llmGateway.generate(
-      { nodeId: llm.nodeId, providerName: llm.providerName, service: llm.service, model: llm.model },
-      request
-    );
+    const startTime = Date.now();
+    let dispatchResult;
+    try {
+      dispatchResult = await this.llmGateway.generate(
+        { nodeId: llm.nodeId, providerName: llm.providerName, service: llm.service, model: llm.model },
+        request
+      );
+    } catch (err) {
+      this.registry.recordSample(llm.nodeId, llm.model.id, {
+        dispatchMs: null,
+        totalMs: Date.now() - startTime,
+        success: false,
+        at: Date.now(),
+      });
+      throw err;
+    }
+
+    const { response, dispatchMs } = dispatchResult;
+    this.registry.recordSample(llm.nodeId, llm.model.id, {
+      dispatchMs,
+      totalMs: Date.now() - startTime,
+      success: true,
+      at: Date.now(),
+    });
 
     // Stream el delta si el frontend lo espera
     if (response.message.content && response.toolCalls.length === 0) {

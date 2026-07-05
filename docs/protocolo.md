@@ -276,6 +276,7 @@ sequenceDiagram
 
 ```
 Agent Server → Provider:  chat.request   { requestId, request: GenerateRequest }
+Provider → Agent Server:  dispatch.ack   { requestId, queuedAt }  (opcional, ver abajo)
 Provider → Agent Server:  chat.delta     { requestId, delta: string }
 Provider → Agent Server:  chat.completed { requestId, response: GenerateResponse }
 Provider → Agent Server:  chat.error     { requestId, code, message }
@@ -287,11 +288,30 @@ Provider → Agent Server:  chat.error     { requestId, code, message }
 Agent Server → Provider:  tool.list         { requestId }
 Provider → Agent Server:  tool.list.response  { requestId, tools: [...] }
 Agent Server → Provider:  tool.call         { requestId, toolName, arguments }
+Provider → Agent Server:  dispatch.ack      { requestId, queuedAt }  (opcional, ver abajo)
 Provider → Agent Server:  tool.result       { requestId, toolName, content: [...] }
 Provider → Agent Server:  tool.error        { requestId, toolName, code, message }
 ```
 
 `requestId` es obligatorio y debe repetirse igual en la respuesta — es la base de la trazabilidad operacional (ver más abajo).
+
+**`dispatch.ack` — el "mosquito" confirmando que ya tomó la petición**
+
+```json
+{ "type": "dispatch.ack", "requestId": "...", "queuedAt": 1719700000123 }
+```
+
+Un nodo lo envía inmediatamente al encolar un `chat.request`/`tool.call` en
+su dispatcher interno ("mosquito"), **antes** de empezar el trabajo real —
+distingue la latencia de despacho (tiempo hasta este ack) de la latencia
+de procesamiento (tiempo hasta el resultado final). Es obligatorio para
+todo nodo nuevo que implemente el contrato de
+[`protocolo-provider.md`](./protocolo-provider.md), pero **opcional para
+compatibilidad hacia atrás**: un nodo que no lo envía sigue funcionando
+igual, solo sin latencia de despacho en las métricas de fiabilidad del
+Registry (ver `spec-native/specs/satelite-rating/SPEC.md`). Si el nodo
+rechaza la petición de inmediato, no envía este ack — va directo a
+`chat.error`/`tool.error`.
 
 ## Resolución por ámbito (scope) — cómo decide el Registry
 

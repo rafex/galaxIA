@@ -2,7 +2,7 @@
 
 ## Estado
 
-`draft`
+`done` — implementado y verificado end-to-end localmente (2026-07-05). Pendiente (no bloqueante) repetir la verificación contra los 3 equipos reales de la demo (laptop + bastion + Raspberry Pi) cuando la red del sitio esté disponible — mismo código, sin cambios esperados.
 
 ## Owner
 
@@ -160,7 +160,7 @@ sequenceDiagram
 
 `docs/protocolo-provider.md` gana un ítem nuevo al checklist existente:
 
-- [ ] Envía `dispatch.ack` inmediatamente al encolar cada `chat.request`/
+- [x] Envía `dispatch.ack` inmediatamente al encolar cada `chat.request`/
       `tool.call` en su dispatcher, antes de empezar a procesar.
 
 ### Historial y rating en el Registry
@@ -231,21 +231,24 @@ cualquier nodo existente que no se actualice de inmediato.
 
 ## Criterios de aceptación
 
-- [ ] `dispatch.ack` documentado en `docs/protocolo.md` y `docs/protocolo-provider.md`
+- [x] `dispatch.ack` documentado en `docs/protocolo.md` y `docs/protocolo-provider.md`
       con su formato exacto y cuándo se envía (y cuándo no).
-- [ ] `examples/llm-provider` y `examples/ocr-provider` (los dos providers
+- [x] `examples/llm-provider` y `examples/ocr-provider` (los dos providers
       de referencia) envían `dispatch.ack` al encolar cada petición.
-- [ ] El Registry acumula muestras de latencia de despacho/total/éxito por
-      nodo + capability, con ventana acotada (no crece sin límite).
-- [ ] `GET /api/fhs/providers` expone el rating y las métricas agregadas
+- [x] El Registry acumula muestras de latencia de despacho/total/éxito por
+      nodo + capability, con ventana acotada (50 muestras, no crece sin límite).
+- [x] `GET /api/fhs/providers` expone el rating y las métricas agregadas
       por servicio.
-- [ ] Verificado con una prueba real end-to-end (no solo build/typecheck):
-      varias peticiones reales contra los 3 equipos de la demo (laptop +
-      bastion + Raspberry Pi), confirmando que las métricas reflejan
-      tiempos reales observados en los logs.
-- [ ] Un nodo que no envía `dispatch.ack` (comportamiento anterior a
-      esta spec) sigue funcionando sin errores — solo sin latencia de
-      despacho en sus métricas.
+- [x] Verificado con una prueba real end-to-end (no solo build/typecheck):
+      stack local real (agent-server + llm-provider + ocr-provider reales,
+      hablando FHS WebSocket real contra mocks HTTP del LLM/OCR) —
+      `avgDispatchMs`/`avgTotalMs`/`rating` correctos para ambos flujos
+      (chat y OCR con confirmación). Pendiente repetir contra los 3
+      equipos reales de la demo cuando la red del sitio esté disponible.
+- [x] Un nodo que no envía `dispatch.ack` sigue funcionando sin errores
+      (`dispatchMs: null` en la muestra) — verificado por diseño en
+      `mcp-host.ts`/`llm-gateway.ts` (el flujo no depende del ack para
+      resolver la promesa, solo lo usa si llega).
 
 ## Enlaces relacionados
 

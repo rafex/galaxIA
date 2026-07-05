@@ -16,9 +16,17 @@ export interface LoadedTool {
   capabilityId: string;
 }
 
+export interface DispatchResult {
+  message: any;
+  /** null si el nodo nunca envió dispatch.ack (SPEC-SATRATING-0001) */
+  dispatchMs: number | null;
+}
+
 interface PendingCall {
-  resolve: (msg: any) => void;
+  resolve: (result: DispatchResult) => void;
   reject: (err: Error) => void;
+  startedAt: number;
+  ackAt?: number;
 }
 
 export interface McpProviderClient {
@@ -83,11 +91,22 @@ export class McpHost {
       }
       const entry = pending.get(msg.requestId);
       if (!entry) return;
+
+      // Mosquito: el ack de despacho no resuelve la petición — solo marca
+      // cuándo el nodo la tomó, para separar latencia de despacho de la
+      // latencia total (SPEC-SATRATING-0001). Se usa el reloj del Agent
+      // Server en ambos extremos (startedAt/ackAt), no `queuedAt` del nodo.
+      if (msg.type === "dispatch.ack") {
+        entry.ackAt = Date.now();
+        return;
+      }
+
       pending.delete(msg.requestId);
+      const dispatchMs = entry.ackAt ? entry.ackAt - entry.startedAt : null;
       if (msg.type === "tool.error") {
         entry.reject(new Error(`${msg.code}: ${msg.message}`));
       } else {
-        entry.resolve(msg);
+        entry.resolve({ message: msg, dispatchMs });
       }
     });
 
@@ -103,7 +122,7 @@ export class McpHost {
 
     const listRequestId = randomUUID();
     const listMsg: ToolListRequestMessage = { type: "tool.list", requestId: listRequestId };
-    const listResponse = await this.sendAndWait(providerClient, listMsg, listRequestId);
+    const { message: listResponse } = await this.sendAndWait(providerClient, listMsg, listRequestId);
 
     providerClient.tools = (listResponse.tools || []).map((tool: any) => ({
       name: tool.name,
@@ -133,7 +152,7 @@ export class McpHost {
     return allTools;
   }
 
-  async callTool(providerId: string, toolName: string, args: Record<string, any>): Promise<any> {
+  async callTool(providerId: string, toolName: string, args: Record<string, any>): Promise<DispatchResult> {
     const client = this.clients.get(providerId);
     if (!client || client.ws.readyState !== WebSocket.OPEN) {
       throw new Error(`FHS tool provider no conectado: ${providerId}`);
@@ -151,16 +170,17 @@ export class McpHost {
     }
   }
 
-  private sendAndWait(client: McpProviderClient, msg: any, requestId: string): Promise<any> {
+  private sendAndWait(client: McpProviderClient, msg: any, requestId: string): Promise<DispatchResult> {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         client.pending.delete(requestId);
         reject(new Error(`Timeout esperando respuesta FHS de ${client.providerId}`));
       }, CALL_TIMEOUT_MS);
       client.pending.set(requestId, {
-        resolve: (m) => {
+        startedAt: Date.now(),
+        resolve: (result) => {
           clearTimeout(timeout);
-          resolve(m);
+          resolve(result);
         },
         reject: (e) => {
           clearTimeout(timeout);

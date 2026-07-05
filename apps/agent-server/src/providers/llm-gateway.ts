@@ -26,11 +26,17 @@ export interface LlmProviderSelection {
   model: ModelInfo;
 }
 
+export interface GenerateDispatchResult {
+  response: GenerateResponse;
+  /** null si el nodo nunca envió dispatch.ack (SPEC-SATRATING-0001) */
+  dispatchMs: number | null;
+}
+
 export class LlmGateway {
   async generate(
     selection: LlmProviderSelection,
     request: GenerateRequest
-  ): Promise<GenerateResponse> {
+  ): Promise<GenerateDispatchResult> {
     return this.fhsGenerate(selection.service.endpoint.url, request);
   }
 
@@ -44,10 +50,13 @@ export class LlmGateway {
   private fhsGenerate(
     url: string,
     request: GenerateRequest
-  ): Promise<GenerateResponse> {
+  ): Promise<GenerateDispatchResult> {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(url, wsOptions(url));
       const requestId = randomUUID();
+      const startedAt = Date.now();
+      // Mosquito: null hasta que llegue dispatch.ack (SPEC-SATRATING-0001).
+      let ackAt: number | null = null;
 
       const timeout = setTimeout(() => {
         ws.close();
@@ -68,10 +77,16 @@ export class LlmGateway {
           const msg = JSON.parse(raw.toString());
           if (msg.requestId !== requestId) return;
 
+          if (msg.type === "dispatch.ack") {
+            ackAt = Date.now();
+            return;
+          }
+
           if (msg.type === "chat.completed") {
             clearTimeout(timeout);
             ws.close();
-            resolve((msg as ChatCompletedMessage).response);
+            const dispatchMs = ackAt ? ackAt - startedAt : null;
+            resolve({ response: (msg as ChatCompletedMessage).response, dispatchMs });
           } else if (msg.type === "chat.error") {
             clearTimeout(timeout);
             ws.close();

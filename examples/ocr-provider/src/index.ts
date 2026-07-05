@@ -8,6 +8,7 @@ import type {
   ToolCallErrorMessage,
   ToolListRequestMessage,
   ToolListResponseMessage,
+  DispatchAckMessage,
 } from "@galaxia/fhs-protocol";
 import { OcrBridge } from "./ocr-bridge.js";
 
@@ -204,6 +205,15 @@ function startToolServer() {
         if (msg.type === "tool.call") {
           const req = msg as ToolCallRequestMessage;
           log(`tool.call ${req.requestId}: ${req.toolName}`);
+
+          // Mosquito: confirmar que la petición ya está encolada, antes de
+          // procesarla (SPEC-SATRATING-0001, docs/protocolo.md).
+          const ack: DispatchAckMessage = {
+            type: "dispatch.ack",
+            requestId: req.requestId,
+            queuedAt: Date.now(),
+          };
+          socket.send(JSON.stringify(ack));
 
           try {
             if (req.toolName === "ocr_extract") {
