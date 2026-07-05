@@ -33,7 +33,7 @@
 
 ## Más adelante
 
-- **Descubrimiento descentralizado:** reemplazar Registry central por mDNS + DHT ligero (posiblemente libp2p) para eliminar puntos centrales.
+- **Descubrimiento descentralizado (fase 1, en spec):** autodescubrimiento del Registry por mDNS en la LAN local, como complemento opcional a `REGISTRY_URL` manual — no reemplaza el Registry centralizado (SPEC-P2P-0001 en `spec-native/specs/p2p-discovery/SPEC.md`). No se inicia hasta decisión explícita. DHT/libp2p para descubrimiento fuera de la LAN queda como fase 2, sin spec todavía.
 - **Más tipos de proveedores:** `embedding`, `storage`, `resource`, `agent`.
 - **NAT traversal:** permitir nodos fuera de la red local.
 - **Gateway FHS en Rust/Rust-like:** versión ligera del protocolo para equipos pequeños.
