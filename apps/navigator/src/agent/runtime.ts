@@ -34,6 +34,20 @@ export interface ModelPreferences {
    * atoró — esto solo controla la paciencia del lado del Portal.
    */
   maxWaitMs?: number;
+  /**
+   * Modo manual (SPEC-KB-0001, DEC-0027): providerId de la KB elegida
+   * explícitamente por el usuario. Puede cambiar entre preguntas de una
+   * misma conversación — a diferencia de RAG, no queda fija.
+   */
+  kb?: string;
+  /**
+   * Cuántas KBs se consultan por una sola pregunta (default 1). Subirlo
+   * puede saturar el contexto de modelos pequeños — el Portal debe advertir
+   * explícitamente antes de permitirlo (DEC-0027). Esta iteración solo
+   * implementa el caso `1`; valores mayores se documentan como pendiente,
+   * ver TASK-KB-0004.
+   */
+  kbMaxPerQuestion?: number;
 }
 
 interface ResolvedLlm {
@@ -72,7 +86,9 @@ export class AgentRuntime {
     message: UserMessage,
     preferences: ModelPreferences,
     artifacts?: string[],
-    preExtractedText?: string
+    preExtractedText?: string,
+    ragActive?: boolean,
+    kbProviderId?: string
   ) {
     this.artifacts = preExtractedText ? [] : artifacts || [];
     this.emitStatus("classifying", "Analizando tu petición...");
@@ -140,6 +156,27 @@ export class AgentRuntime {
         userContent = ocrText
           ? `[Texto extraído automáticamente del archivo adjunto mediante OCR]\n${ocrText}\n\n[Pregunta del usuario]\n${message.content}`
           : `${message.content}\n\n(No se pudo extraer texto del archivo adjunto.)`;
+      }
+    }
+
+    // SPEC-RAG-0001: recuperación determinística, nunca una decisión del LLM
+    // vía tool calling — se dispara en cada turno de una conversación ya
+    // marcada como "RAG activa" por chat-ws.ts. Silenciosa: no se expone en
+    // la UI qué fragmentos se recuperaron (a diferencia de OCR).
+    if (ragActive) {
+      const ragContext = await this.queryRagContext(message.content, preferences);
+      if (ragContext) {
+        userContent = `[Fragmentos relevantes del documento indexado]\n${ragContext}\n\n[Pregunta del usuario]\n${userContent}`;
+      }
+    }
+
+    // SPEC-KB-0001: kbProviderId ya viene resuelto por chat-ws.ts — modo
+    // manual (preferences.kb) o modo recomendado ya confirmado por el
+    // usuario (kb.decision). Nunca el LLM decide qué KB usar.
+    if (kbProviderId) {
+      const kbContext = await this.queryKb(kbProviderId, message.content, preferences);
+      if (kbContext) {
+        userContent = `[Fragmentos relevantes de la base de conocimiento]\n${kbContext}\n\n${userContent}`;
       }
     }
 
@@ -285,6 +322,171 @@ export class AgentRuntime {
       this.emit({ type: "ocr.extracted", data: { filename, text } });
     }
     return text;
+  }
+
+  /**
+   * Indexa un documento ya confirmado en un rag-provider (SPEC-RAG-0001) —
+   * llamado por chat-ws.ts en el mismo instante en que se resuelve
+   * `attachment.decision { use: true }`, nunca antes ni de forma
+   * especulativa. Degradación graceful: si no hay ningún rag-provider en el
+   * scope del usuario, simplemente no hay RAG disponible para esta
+   * conversación — no es un error visible para el usuario.
+   */
+  async indexDocumentForRag(text: string, preferences: ModelPreferences): Promise<boolean> {
+    const toolProviders = await this.resolveToolProviders(["document.index"], preferences.scope);
+    const loadedTools = await this.mcpHost.loadToolsForCapabilities(
+      toolProviders.map((t) => ({ providerId: t.providerId, providerName: t.providerName, service: t.service }))
+    );
+    const indexTool = loadedTools.find((t) => t.capabilityId === "document.index");
+    if (!indexTool) return false;
+
+    try {
+      await this.mcpHost.callTool(
+        indexTool.providerId,
+        indexTool.name,
+        { text, conversationId: this.conversationId },
+        preferences.maxWaitMs,
+        { conversationId: this.conversationId, capabilityId: indexTool.capabilityId }
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Recupera los fragmentos más relevantes del índice RAG de esta
+   * conversación — silencioso (SPEC-RAG-0001: "la recuperación en turnos
+   * 2+ es silenciosa", sin eventos tool.selected/running/completed como sí
+   * emite OCR). Devuelve null si no hay rag-provider o no hay nada indexado.
+   */
+  private async queryRagContext(query: string, preferences: ModelPreferences): Promise<string | null> {
+    const toolProviders = await this.resolveToolProviders(["document.query"], preferences.scope);
+    const loadedTools = await this.mcpHost.loadToolsForCapabilities(
+      toolProviders.map((t) => ({ providerId: t.providerId, providerName: t.providerName, service: t.service }))
+    );
+    const queryTool = loadedTools.find((t) => t.capabilityId === "document.query");
+    if (!queryTool) return null;
+
+    const startTime = Date.now();
+    try {
+      const { message: result, dispatchMs } = await this.mcpHost.callTool(
+        queryTool.providerId,
+        queryTool.name,
+        { query, conversationId: this.conversationId, top_k: 3 },
+        preferences.maxWaitMs,
+        { conversationId: this.conversationId, capabilityId: queryTool.capabilityId }
+      );
+      const parsed = JSON.parse(extractText(result)) as { chunks: Array<{ text: string; score: number }> };
+      this.atlasClient.recordSample({
+        providerId: queryTool.providerId,
+        capability: queryTool.capabilityId,
+        sample: { dispatchMs, totalMs: Date.now() - startTime, success: true, at: Date.now() },
+      });
+      if (!parsed.chunks || parsed.chunks.length === 0) return null;
+
+      this.usedTools.push({
+        capability: queryTool.capabilityId,
+        providerId: queryTool.providerId,
+        providerName: queryTool.providerName,
+        toolName: queryTool.name,
+      });
+      return parsed.chunks.map((c) => c.text).join("\n---\n");
+    } catch {
+      this.atlasClient.recordSample({
+        providerId: queryTool.providerId,
+        capability: queryTool.capabilityId,
+        sample: { dispatchMs: null, totalMs: Date.now() - startTime, success: false, at: Date.now() },
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Modo "recomendado" de kb-provider (SPEC-KB-0001, DEC-0027): compara la
+   * pregunta contra `capability.description`/`tags` (DEC-0028) de cada KB
+   * registrada con un matching de texto determinístico — nunca el LLM
+   * decide. Devuelve la mejor coincidencia por encima de un umbral mínimo,
+   * o null si ninguna KB coincide razonablemente (nunca fuerza una
+   * elección de baja relevancia). `chat-ws.ts` pide confirmación al
+   * usuario antes de consultar la KB recomendada.
+   */
+  async recommendKb(
+    question: string,
+    scope?: PrivacyScope
+  ): Promise<{ providerId: string; providerName: string; description: string } | null> {
+    const providers = await this.atlasClient.getProviders("mcp");
+    const questionTokens = tokenizeForMatching(question);
+
+    let best: { providerId: string; providerName: string; description: string; score: number } | null = null;
+    for (const p of providers) {
+      if (scope && !matchesScope(p.service, scope)) continue;
+      const kbCapability = p.service.capabilities.find((c) => c.id === "kb.query");
+      if (!kbCapability) continue;
+
+      const descriptionText = [kbCapability.description, ...(kbCapability.tags || [])].filter(Boolean).join(" ");
+      const score = jaccardSimilarity(questionTokens, tokenizeForMatching(descriptionText));
+      if (score > 0.05 && (!best || score > best.score)) {
+        best = {
+          providerId: p.providerId,
+          providerName: p.name,
+          description: kbCapability.description || kbCapability.id,
+          score,
+        };
+      }
+    }
+
+    return best ? { providerId: best.providerId, providerName: best.providerName, description: best.description } : null;
+  }
+
+  /**
+   * Consulta una KB específica (`kb.query`) — no está scoped por
+   * `conversationId` (a diferencia de RAG): cualquier conversación que
+   * consulte este nodo ve el mismo corpus (SPEC-KB-0001).
+   */
+  private async queryKb(kbProviderId: string, query: string, preferences: ModelPreferences): Promise<string | null> {
+    const providers = await this.atlasClient.getProviders("mcp");
+    const target = providers.find((p) => p.providerId === kbProviderId);
+    if (!target) return null;
+
+    const loadedTools = await this.mcpHost.loadToolsForCapabilities([
+      { providerId: target.providerId, providerName: target.name, service: target.service },
+    ]);
+    const kbTool = loadedTools.find((t) => t.capabilityId === "kb.query");
+    if (!kbTool) return null;
+
+    const startTime = Date.now();
+    try {
+      const { message: result, dispatchMs } = await this.mcpHost.callTool(
+        kbTool.providerId,
+        kbTool.name,
+        { query, top_k: 3 },
+        preferences.maxWaitMs,
+        { conversationId: this.conversationId, capabilityId: kbTool.capabilityId }
+      );
+      const parsed = JSON.parse(extractText(result)) as { chunks: Array<{ text: string; score: number }> };
+      this.atlasClient.recordSample({
+        providerId: kbTool.providerId,
+        capability: kbTool.capabilityId,
+        sample: { dispatchMs, totalMs: Date.now() - startTime, success: true, at: Date.now() },
+      });
+      if (!parsed.chunks || parsed.chunks.length === 0) return null;
+
+      this.usedTools.push({
+        capability: kbTool.capabilityId,
+        providerId: kbTool.providerId,
+        providerName: kbTool.providerName,
+        toolName: kbTool.name,
+      });
+      return parsed.chunks.map((c) => c.text).join("\n---\n");
+    } catch {
+      this.atlasClient.recordSample({
+        providerId: kbTool.providerId,
+        capability: kbTool.capabilityId,
+        sample: { dispatchMs: null, totalMs: Date.now() - startTime, success: false, at: Date.now() },
+      });
+      return null;
+    }
   }
 
   /**
@@ -524,6 +726,30 @@ function classifyIntent(content: string): string[] {
   }
 
   return capabilities;
+}
+
+// SPEC-KB-0001: matching determinístico de texto para el modo "recomendado"
+// — mismo mecanismo de similitud (Jaccard) que rag-provider usa para
+// recuperación, reutilizado aquí para decidir qué KB recomendar, nunca cuál
+// invocar (eso lo confirma el usuario).
+function tokenizeForMatching(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .split(/\s+/)
+      .filter((t) => t.length > 1)
+  );
+}
+
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let intersection = 0;
+  for (const token of a) {
+    if (b.has(token)) intersection++;
+  }
+  const union = a.size + b.size - intersection;
+  return union === 0 ? 0 : intersection / union;
 }
 
 function matchesScope(service: PublishedService, scope: PrivacyScope): boolean {

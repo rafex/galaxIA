@@ -258,16 +258,28 @@ export class McpHost {
     });
   }
 
+  /**
+   * Elige, entre varias capabilities de un mismo provider, la que mejor
+   * corresponde a un nombre de tool — por cantidad de palabras compartidas,
+   * no por la primera coincidencia parcial. Necesario desde que un provider
+   * puede declarar varias capabilities con un prefijo común (ej.
+   * rag-provider: "document.index"/"document.retrieve" ambas comparten
+   * "document") — quedarse con el primer match ambiguaba `document_query`
+   * hacia "document.index" en vez de "document.retrieve", encontrado
+   * verificando rag-provider end-to-end (SPEC-RAG-0001).
+   */
   private matchCapabilityId(capabilities: Signal[], toolName: string): string {
     if (capabilities.length === 1) return capabilities[0].id;
 
     const toolWords = new Set(toolName.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+    let best: { id: string; score: number } | null = null;
     for (const cap of capabilities) {
       const capWords = cap.id.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-      if (capWords.some((w) => toolWords.has(w))) {
-        return cap.id;
+      const score = capWords.filter((w) => toolWords.has(w)).length;
+      if (score > 0 && (!best || score > best.score)) {
+        best = { id: cap.id, score };
       }
     }
-    return toolName;
+    return best?.id ?? toolName;
   }
 }

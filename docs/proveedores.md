@@ -25,7 +25,7 @@ Un nodo FHS que envuelve un motor de inferencia (llama.cpp). Corre en Node.js, s
 
 ### Cómo funciona
 
-1. **Registro**: se conecta al Registry (`ws://navigator:8081/fhs/v1/ws`) y envía `hello` + `register` con un manifiesto `LlmProviderManifest`
+1. **Registro**: se conecta a Atlas (`ws://atlas:8081/fhs/v1/ws`) y envía `hello` + `register` con un manifiesto `StarBeacon`
 2. **Chat FHS**: expone un servidor WebSocket en `:43111`. Cuando el Agent Server se conecta:
    - Recibe `chat.request` con el `GenerateRequest` (modelo, mensajes, tools)
    - Llama a llama.cpp vía `curl` (child_process, evita bug de Undici + ws en Node.js)
@@ -59,7 +59,7 @@ const stdout = await this.curlPost("http://llama:43110/v1/chat/completions", bod
 |---|---|---|
 | `LLM_PROVIDER_PORT` | `43111` | Puerto del WebSocket FHS de chat |
 | `LLM_PROVIDER_HOST` | `localhost` | Hostname para el manifiesto (en contenedores: `star`) |
-| `REGISTRY_URL` | `ws://localhost:8083/fhs/v1/ws` | URL del Registry |
+| `REGISTRY_URL` | `ws://localhost:8081/fhs/v1/ws` | URL del Registry |
 | `LLAMA_CPP_URL` | `http://localhost:43110/v1` | URL del servidor llama.cpp (en el bastion: `:8080`, ver `docs/despliegue.md`) |
 | `PROVIDER_ID` | `did:key:macmini-raul` | Identidad del proveedor |
 | `MODEL_ID` | `qwen2.5-coder-3b-instruct` | ID del modelo publicado en el manifiesto (DEC-0019) |
@@ -77,7 +77,7 @@ Un nodo FHS que envuelve un servicio de OCR (ether-ocr). Corre en Node.js, se re
 
 ### Cómo funciona
 
-1. **Registro**: se conecta al Registry y envía un manifiesto `McpProviderManifest` con la capability `document.ocr`
+1. **Registro**: se conecta a Atlas y envía un manifiesto `SatelliteBeacon` con la capability `document.ocr`
 2. **Tools FHS**: expone un servidor WebSocket en `:43112`. Cuando un cliente (Agent Server o script) se conecta:
    - Recibe `tool.list` → devuelve las tools disponibles con su schema
    - Recibe `tool.call` con `{ toolName, arguments }` → ejecuta el OCR y devuelve `tool.result`
@@ -122,10 +122,79 @@ Usa `curl` con `multipart/form-data` hacia la API REST de ether-ocr (`POST /api/
 |---|---|---|
 | `OCR_PROVIDER_PORT` | `43112` | Puerto del WebSocket FHS de tools |
 | `OCR_PROVIDER_HOST` | `localhost` | Hostname para el manifiesto (en contenedores: `satellite-ocr`) |
-| `REGISTRY_URL` | `ws://localhost:8083/fhs/v1/ws` | URL del Registry |
+| `REGISTRY_URL` | `ws://localhost:8081/fhs/v1/ws` | URL del Registry |
 | `OCR_SERVICE_URL` | `http://ether-ocr-api:8000` | URL base de la API REST de OCR |
 | `OCR_API_KEY` | `dev-key-ether-ocr` | API key para autenticación |
 | `PROVIDER_ID` | `did:key:satellite-ocr-01` | Identidad del proveedor |
+
+---
+
+## RAG Provider (`examples/rag-provider/`)
+
+### Qué es
+
+Un nodo FHS de tipo `mcp` que indexa y recupera fragmentos de un documento por conversación (SPEC-RAG-0001). Corre en Node.js, se registra en Atlas y expone un WebSocket FHS de tools en el puerto `43113`.
+
+### Motor interno: deliberadamente mínimo, no una recomendación
+
+`rag-bridge.ts` usa similitud de Jaccard (solapamiento de palabras) sobre chunks de tamaño fijo — **no embeddings semánticos reales**. Esto es a propósito (DEC-0026, DEC-0037): el protocolo FHS define el contrato de `document_index`/`document_query`, nunca el motor detrás de ellas. Cualquier operador real puede sustituir esto por `llama-server --embedding`, un modelo ONNX en proceso, o lo que prefiera, sin tocar el contrato.
+
+### Tools expuestas
+
+| Tool | Parámetros | Descripción |
+|---|---|---|
+| `document_index` | `text`, `conversationId`, `chunkSize` (opcional), `overlap` (opcional) | Trocea e indexa un documento para esta conversación |
+| `document_query` | `query`, `conversationId`, `top_k` (opcional) | Recupera los fragmentos más relevantes ya indexados |
+
+### Disparo determinístico, nunca vía tool calling del LLM
+
+`AgentRuntime.indexDocumentForRag()` se llama en el mismo instante en que `chat-ws.ts` resuelve `attachment.decision { use: true }` — reutiliza exactamente el flujo de confirmación de OCR ya existente, sin UI nueva. En turnos siguientes de una conversación marcada como "RAG activa" (`ragActiveConversations`), `AgentRuntime.queryRagContext()` se dispara antes de cada llamada al LLM, de forma silenciosa (sin eventos `tool.*` visibles, a diferencia de OCR).
+
+### Variables de entorno
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `RAG_PROVIDER_PORT` | `43113` | Puerto del WebSocket FHS de tools |
+| `RAG_PROVIDER_HOST` | `localhost` | Hostname para el manifiesto (en contenedores: `rag-provider`) |
+| `REGISTRY_URL` | `ws://localhost:8081/fhs/v1/ws` | URL de Atlas |
+| `PROVIDER_ID` | `did:key:rag-provider-01` | Identidad del proveedor |
+
+---
+
+## KB Provider (`examples/kb-provider/`)
+
+### Qué es
+
+Un nodo FHS de tipo `mcp` que expone una base de conocimiento de solo lectura, compartida entre conversaciones (SPEC-KB-0001) — para contenido público reutilizado por muchos usuarios (ej. la Constitución de México), a diferencia de RAG (privado, por conversación). Corre en Node.js, se registra en Atlas y expone un WebSocket FHS en el puerto `43114`.
+
+### Contenido: carpeta local, NO un proceso de indexado recomendado
+
+`examples/kb-provider/content/` se carga completa al arrancar el proceso (ver `content/README.md`, que declara explícitamente que esto es solo un mecanismo de prueba). TASK-KB-0002 se cerró aclarando que cómo un operador cura/indexa su KB es responsabilidad exclusiva suya, fuera del alcance del protocolo (mismo principio que DEC-0026 para RAG).
+
+### Tools expuestas
+
+| Tool | Parámetros | Descripción |
+|---|---|---|
+| `kb_query` | `query`, `top_k` (opcional) | Consulta la base de conocimiento por similitud — **no** está scoped por `conversationId`, cualquier conversación ve el mismo corpus |
+
+### Dos modos de disparador (DEC-0027)
+
+1. **Manual** — el usuario elige la KB explícitamente (`preferences.kb`, un dropdown en el `Portal`). Se resuelve directo, sin confirmación, y puede cambiar entre preguntas de la misma conversación.
+2. **Recomendado** — `AgentRuntime.recommendKb()` compara la pregunta contra `capability.description`/`tags` (DEC-0028) de cada KB registrada con un matching determinístico (Jaccard, nunca el LLM decide) y, si hay coincidencia razonable, pide confirmación al usuario (`kb.recommended`/`kb.decision`) antes de consultar. Puede recomendar "ninguna" si nada coincide bien.
+
+El modo "mágico" (recomendar sin pedir confirmación) queda documentado en DEC-0027 como premisa a futuro, explícitamente no implementado — mismo riesgo que llevó a DEC-0020 a exigir confirmación en OCR: una KB mal elegida "con confianza" es un fallo silencioso, peor que un `tool.error` visible.
+
+### Variables de entorno
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `KB_PROVIDER_PORT` | `43114` | Puerto del WebSocket FHS |
+| `KB_PROVIDER_HOST` | `localhost` | Hostname para el manifiesto (en contenedores: `kb-provider`) |
+| `KB_CONTENT_DIR` | `./content` (relativo al módulo, no a `cwd`) | Carpeta con archivos `.txt` a cargar al arrancar |
+| `KB_DESCRIPTION` | Constitución Política... (texto de ejemplo) | Descripción usada por el modo recomendado para el matching |
+| `KB_TAGS` | `constitucion,mexico,derechos humanos,ley` | Tags autodeclarados (DEC-0028), separados por coma |
+| `REGISTRY_URL` | `ws://localhost:8081/fhs/v1/ws` | URL de Atlas |
+| `PROVIDER_ID` | `did:key:kb-provider-01` | Identidad del proveedor |
 
 ---
 

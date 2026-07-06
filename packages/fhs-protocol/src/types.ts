@@ -45,6 +45,15 @@ export interface Signal {
   languages?: string[];
   /** Descripción corta. */
   description?: string;
+  /**
+   * Tags autodeclarados por el operador (DEC-0028) — mismo nivel de
+   * confianza que `description`, no verificados por el Registry/Atlas.
+   * Señal adicional para el matching determinístico del modo "recomendado"
+   * de kb-provider (SPEC-KB-0001). Los tags de comunidad (agregados por
+   * Atlas a partir de feedback real de usuarios) quedan bloqueados hasta
+   * que exista identidad de usuario (SPEC-AUTH-0001) — no se agregan aquí.
+   */
+  tags?: string[];
 }
 
 export interface ModelInfo {
@@ -71,8 +80,27 @@ export interface ModelInfo {
   };
 }
 
+/**
+ * Formato generalizado de retención (DEC-0025): `"none"` (no se guarda
+ * nada más allá de la petición en curso), `"session"` (vive mientras dure
+ * la conversación, sin más precisión), un TTL explícito en duración ISO
+ * 8601, o `"permanent-readonly"` (contenido curado por el operador, sin
+ * expiración — usado por kb-provider, nunca por contenido de usuario).
+ */
+export type RetentionPolicy =
+  | "none"
+  | "session"
+  | { ttl: string }
+  | "permanent-readonly";
+
 export interface PrivacyPolicy {
-  retention?: string;
+  retention?: RetentionPolicy;
+  /**
+   * Obligatorio quando `retention` no es `"none"` (DEC-0025) — texto que el
+   * Portal debe mostrar al usuario antes de aceptar el primer adjunto,
+   * explicando en lenguaje llano qué pasa con su contenido.
+   */
+  warning?: string;
   trainingUse?: boolean;
   jurisdiction?: string;
 }

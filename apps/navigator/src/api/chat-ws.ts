@@ -15,6 +15,13 @@ interface PendingAttachment {
   confirmed: boolean;
 }
 
+interface PendingKbRecommendation {
+  message: UserMessage;
+  preferences: ModelPreferences;
+  providerId: string;
+  providerName: string;
+}
+
 export async function setupChatWebSocket(
   app: FastifyInstance,
   atlasClient: AtlasClient,
@@ -25,6 +32,13 @@ export async function setupChatWebSocket(
   // mientras dure la conexión WebSocket — se limpia al confirmar, descartar
   // o cerrar la conexión. Mismo scope que `runtimes`.
   const pendingAttachments = new Map<string, PendingAttachment>();
+  // SPEC-RAG-0001: conversaciones con un documento ya indexado — el runtime
+  // consulta document_query en cada turno siguiente si el id está aquí.
+  // Mismo scope y ciclo de vida que `pendingAttachments`/`runtimes`.
+  const ragActiveConversations = new Set<string>();
+  // SPEC-KB-0001: modo recomendado — una KB encontrada por matching
+  // determinístico, esperando confirmación del usuario antes de consultarla.
+  const pendingKbRecommendations = new Map<string, PendingKbRecommendation>();
 
   app.get("/api/chat/ws", { websocket: true }, (socket: WebSocket) => {
     let conversationId: string | null = null;
@@ -62,6 +76,8 @@ export async function setupChatWebSocket(
       if (conversationId) {
         runtimes.delete(conversationId);
         pendingAttachments.delete(conversationId);
+        ragActiveConversations.delete(conversationId);
+        pendingKbRecommendations.delete(conversationId);
       }
     });
 
@@ -70,19 +86,88 @@ export async function setupChatWebSocket(
       message: UserMessage,
       preferences: ModelPreferences,
       preExtractedText?: string,
-      artifacts?: string[]
+      artifacts?: string[],
+      kbProviderId?: string
     ) {
       const runtime = new AgentRuntime(atlasClient, eventBus, id);
       runtimes.set(id, runtime);
 
+      if ((preferences.kbMaxPerQuestion ?? 1) > 1) {
+        // TASK-KB-0004: solo se soporta 1 KB por pregunta en esta iteración —
+        // avisar en vez de fingir que se respetó el límite pedido.
+        send({
+          type: "kb.warning",
+          data: { conversationId: id, message: "Solo se consulta 1 KB por pregunta en esta versión, aunque pediste más." },
+        });
+      }
+
       runtime
-        .run(message, preferences, artifacts, preExtractedText)
+        .run(message, preferences, artifacts, preExtractedText, ragActiveConversations.has(id), kbProviderId)
         .catch((err: any) => {
           console.error("Agent runtime error:", err);
           send({ type: "error", data: { conversationId: id, code: "RUNTIME_ERROR", message: err.message } });
         })
         .finally(() => {
           runtimes.delete(id);
+        });
+    }
+
+    // SPEC-KB-0001: modo recomendado — matching determinístico contra
+    // capability.description/tags, nunca el LLM decide. Si hay coincidencia,
+    // se pide confirmación antes de consultar (mismo espíritu que la
+    // confirmación de adjunto de OCR/RAG). Modo manual (preferences.kb) se
+    // resuelve sin pasar por aquí — se aplica directo, sin confirmación
+    // (SPEC-KB-0001: "esa elección se usa... hasta que el usuario la cambie").
+    function resolveKbAndChat(id: string, message: UserMessage, preferences: ModelPreferences) {
+      if (preferences.kb) {
+        runChat(id, message, preferences, undefined, undefined, preferences.kb);
+        return;
+      }
+
+      const runtime = new AgentRuntime(atlasClient, eventBus, id);
+      runtime
+        .recommendKb(message.content, preferences.scope)
+        .then((recommendation) => {
+          if (!recommendation) {
+            runChat(id, message, preferences);
+            return;
+          }
+          pendingKbRecommendations.set(id, {
+            message,
+            preferences,
+            providerId: recommendation.providerId,
+            providerName: recommendation.providerName,
+          });
+          send({
+            type: "kb.recommended",
+            data: {
+              conversationId: id,
+              providerId: recommendation.providerId,
+              providerName: recommendation.providerName,
+              description: recommendation.description,
+            },
+          });
+        })
+        .catch((err: any) => {
+          console.error("KB recommendation error:", err);
+          runChat(id, message, preferences);
+        });
+    }
+
+    // SPEC-RAG-0001: se llama en el mismo instante en que se confirma
+    // "usar" el adjunto — nunca antes, nunca de forma especulativa. Si no
+    // hay ningún rag-provider disponible, simplemente no se marca la
+    // conversación como "RAG activa" (degradación graceful, sin error
+    // visible: el usuario ya obtiene su respuesta vía el texto OCR completo).
+    function indexForRag(id: string, text: string, preferences: ModelPreferences) {
+      const runtime = new AgentRuntime(atlasClient, eventBus, id);
+      runtime
+        .indexDocumentForRag(text, preferences)
+        .then((indexed) => {
+          if (indexed) ragActiveConversations.add(id);
+        })
+        .catch((err: any) => {
+          console.error("RAG indexing error:", err);
         });
     }
 
@@ -147,7 +232,24 @@ export async function setupChatWebSocket(
           return;
         }
 
-        runChat(id, body.message, preferences);
+        resolveKbAndChat(id, body.message, preferences);
+        return;
+      }
+
+      if (msg.type === "kb.decision") {
+        const body = msg as { conversationId: string; use: boolean };
+        const pending = pendingKbRecommendations.get(body.conversationId);
+        if (!pending) return;
+        pendingKbRecommendations.delete(body.conversationId);
+
+        runChat(
+          body.conversationId,
+          pending.message,
+          pending.preferences,
+          undefined,
+          undefined,
+          body.use ? pending.providerId : undefined
+        );
         return;
       }
 
@@ -160,6 +262,8 @@ export async function setupChatWebSocket(
           pendingAttachments.delete(body.conversationId);
           return;
         }
+
+        indexForRag(body.conversationId, pending.text, pending.preferences);
 
         if (pending.question) {
           // El usuario ya había escrito su pregunta junto con el archivo —

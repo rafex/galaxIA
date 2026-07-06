@@ -24,7 +24,11 @@ const server = http.createServer((req, res) => {
       const messages = data.messages || [];
       const lastUser = messages.filter((m: any) => m.role === "user").pop();
       const text = lastUser?.content?.toLowerCase() || "";
-      const useTool = text.includes("ocr") || text.includes("imagen") || text.includes("foto");
+      // Palabra completa, no substring — "ocr" como substring hacía falso
+      // positivo con cualquier texto que contuviera "democrática" (contiene
+      // "ocr"), encontrado probando kb-provider/rag-provider con contenido
+      // real (SPEC-KB-0001/SPEC-RAG-0001).
+      const useTool = /\b(ocr|imagen|foto)\b/.test(text);
 
       const response: any = {
         id: "mock-llm-1",

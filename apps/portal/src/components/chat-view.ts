@@ -8,6 +8,12 @@ interface ModelOption {
   providerName: string;
 }
 
+interface KbOption {
+  providerId: string;
+  providerName: string;
+  description: string;
+}
+
 export function createApp(container: HTMLElement, version: string = "unknown") {
   const state: ChatState = {
     messages: [],
@@ -15,6 +21,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     selectedModel: "auto",
     privacyScope: "community",
     ocrMode: "confirm",
+    kbProviderId: "",
   };
 
   let conversationId: string | null = null;
@@ -79,6 +86,12 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
             <option value="auto">Automático (más rápido, sin confirmar)</option>
           </select>
         </label>
+        <label>
+          Base de conocimiento:
+          <select class="kb-selector">
+            <option value="" selected>Recomendada automáticamente (con confirmación)</option>
+          </select>
+        </label>
       </footer>
     </div>
   `;
@@ -92,9 +105,11 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
   const modelSelector = container.querySelector(".model-selector") as HTMLSelectElement;
   const scopeSelector = container.querySelector(".scope-selector") as HTMLSelectElement;
   const ocrModeSelector = container.querySelector(".ocr-mode-selector") as HTMLSelectElement;
+  const kbSelector = container.querySelector(".kb-selector") as HTMLSelectElement;
   const provenancePlaceholder = container.querySelector(".provenance-placeholder") as HTMLElement;
 
   loadModels();
+  loadKbs();
 
   modelSelector.addEventListener("change", () => {
     state.selectedModel = modelSelector.value as any;
@@ -106,6 +121,10 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
 
   ocrModeSelector.addEventListener("change", () => {
     state.ocrMode = ocrModeSelector.value as ChatState["ocrMode"];
+  });
+
+  kbSelector.addEventListener("change", () => {
+    state.kbProviderId = kbSelector.value;
   });
 
   textareaEl.addEventListener("keydown", (event) => {
@@ -150,6 +169,32 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     }
   }
 
+  async function loadKbs() {
+    try {
+      const response = await fetch("/api/fhs/providers?type=mcp");
+      const providers = (await response.json()) as Array<{
+        providerId: string;
+        name: string;
+        service: { capabilities: Array<{ id: string; description?: string }> };
+      }>;
+      const kbs: KbOption[] = providers
+        .map((p) => {
+          const cap = p.service.capabilities.find((c) => c.id === "kb.query");
+          return cap ? { providerId: p.providerId, providerName: p.name, description: cap.description || p.name } : null;
+        })
+        .filter((kb): kb is KbOption => kb !== null);
+
+      for (const kb of kbs) {
+        const option = document.createElement("option");
+        option.value = kb.providerId;
+        option.textContent = `${kb.providerName} — ${kb.description}`;
+        kbSelector.appendChild(option);
+      }
+    } catch (err) {
+      console.error("Failed to load KBs", err);
+    }
+  }
+
   async function submitMessage() {
     const text = textareaEl.value.trim();
     if ((!text && !pendingAttachment) || state.isStreaming) return;
@@ -186,6 +231,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
         scope: state.privacyScope,
         allowExternalProviders: state.privacyScope === "external",
         ocrMode: state.ocrMode,
+        kb: state.kbProviderId || undefined,
       },
     };
 
@@ -241,6 +287,15 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
         break;
       case "node.online":
         addActivityItem("success", `Nodo disponible: ${event.data.providerName}`);
+        break;
+      case "kb.recommended":
+        hideThinking();
+        addKbRecommendedMessage(event.data.conversationId, event.data.providerName, event.data.description);
+        state.isStreaming = false;
+        sendBtn.disabled = false;
+        break;
+      case "kb.warning":
+        addActivityItem("warning", event.data.message);
         break;
       case "error":
         hideThinking();
@@ -335,6 +390,43 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
         ? "✓ Usando este documento — si aún no habías escrito tu pregunta, escríbela ahora."
         : "Documento descartado.";
       if (conversationId) chatConnection?.sendDecision(conversationId, use);
+    };
+
+    useBtn.addEventListener("click", () => decide(true));
+    discardBtn.addEventListener("click", () => decide(false));
+    actions.appendChild(useBtn);
+    actions.appendChild(discardBtn);
+    div.appendChild(actions);
+
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function addKbRecommendedMessage(convId: string, providerName: string, description: string) {
+    const div = document.createElement("div");
+    div.className = "message assistant kb-recommendation";
+
+    const question = document.createElement("p");
+    question.textContent = `📚 Encontré una base de conocimiento relevante: "${providerName}" (${description}). ¿La uso para responder?`;
+    div.appendChild(question);
+
+    const actions = document.createElement("div");
+    actions.className = "ocr-preview-actions";
+
+    const useBtn = document.createElement("button");
+    useBtn.type = "button";
+    useBtn.textContent = "Usar esta KB";
+    const discardBtn = document.createElement("button");
+    discardBtn.type = "button";
+    discardBtn.className = "secondary";
+    discardBtn.textContent = "No usar";
+
+    const decide = (use: boolean) => {
+      useBtn.disabled = true;
+      discardBtn.disabled = true;
+      actions.remove();
+      question.textContent = use ? `✓ Usando "${providerName}" para responder.` : "No se usó ninguna KB para esta pregunta.";
+      chatConnection?.sendKbDecision(convId, use);
     };
 
     useBtn.addEventListener("click", () => decide(true));

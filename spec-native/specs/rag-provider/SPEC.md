@@ -2,7 +2,7 @@
 
 ## Estado
 
-`draft` (diseño cerrado tras DEC-0025 — sin riesgos de diseño abiertos, lista para iniciar implementación cuando se decida)
+`done (local)` — implementado y verificado con procesos reales en local (2026-07-06). Pendiente verificación contra hardware real (mismo bloqueo que issue #1). El motor de recuperación interno del nodo de referencia es intencionalmente mínimo (Jaccard/solapamiento de palabras) — no una recomendación, ver DEC-0026 y TASK-RAG-0002.
 
 ## Owner
 
@@ -97,7 +97,7 @@ sequenceDiagram
     AS->>AS: una sola llamada al LLM con el contexto ya resuelto
 ```
 
-Nótese que el diagrama ya no nombra un motor de embeddings específico dentro del contrato — desde la perspectiva del Agent Server, `rag-provider` es una caja negra que cumple `document.index`/`document.retrieve`; cómo resuelve "trocear + embeber + guardar" por dentro es decisión exclusiva de quien lo opera (DEC-0026).
+Nótese que el diagrama ya no nombra un motor de embeddings específico dentro del contrato — desde la perspectiva del Agent Server, `rag-provider` es una caja negra que cumple `document.index`/`document.query`; cómo resuelve "trocear + embeber + guardar" por dentro es decisión exclusiva de quien lo opera (DEC-0026).
 
 ### Tools expuestas
 
@@ -128,7 +128,7 @@ Nótese que el diagrama ya no nombra un motor de embeddings específico dentro d
       "languages": ["es", "en"]
     },
     {
-      "id": "document.retrieve",
+      "id": "document.query",
       "name": "Recuperación de fragmentos relevantes",
       "languages": ["es", "en"]
     }

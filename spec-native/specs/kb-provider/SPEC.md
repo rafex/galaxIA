@@ -2,7 +2,7 @@
 
 ## Estado
 
-`draft` (diseño de disparador cerrado — DEC-0027 — listo para tareas de implementación)
+`done (local)` — implementado y verificado con procesos reales en local, incluyendo prueba real en navegador (2026-07-06). Pendiente verificación contra hardware real (mismo bloqueo que issue #1). `kbMaxPerQuestion > 1` queda parcial — ver TASK-KB-0004.
 
 ## Owner
 

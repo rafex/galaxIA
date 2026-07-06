@@ -67,6 +67,13 @@ container-up-ocr:
       --build-arg BUILD_DATE={{build-date}} \
       satellite-ocr
 
+container-up-rag:
+    @echo "→ Levantando rag-provider (SPEC-RAG-0001)..."
+    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build \
+      --build-arg COMMIT_HASH={{commit-hash}} \
+      --build-arg BUILD_DATE={{build-date}} \
+      rag-provider
+
 # Detiene y elimina un contenedor específico
 container-rm service:
     @echo "→ Eliminando {{service}}..."

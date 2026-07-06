@@ -10,12 +10,15 @@ export interface ApiOptions {
     scope?: "local" | "network" | "community" | "external";
     allowExternalProviders?: boolean;
     ocrMode?: "confirm" | "auto";
+    kb?: string;
+    kbMaxPerQuestion?: number;
   };
 }
 
 export interface ChatConnection {
   send(options: ApiOptions): void;
   sendDecision(conversationId: string, use: boolean): void;
+  sendKbDecision(conversationId: string, use: boolean): void;
   close(): void;
 }
 
@@ -79,9 +82,16 @@ export function connectToChat(
     }
   }
 
+  function sendKbDecision(conversationId: string, use: boolean) {
+    if (ready) {
+      socket.send(JSON.stringify({ type: "kb.decision", conversationId, use }));
+    }
+  }
+
   return {
     send,
     sendDecision,
+    sendKbDecision,
     close: () => socket.close(),
   };
 }
