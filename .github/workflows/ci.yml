@@ -34,6 +34,16 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      - name: Compilar fhs-protocol
+        # Requisito para el typecheck de las demás workspaces: main/types en
+        # packages/fhs-protocol/package.json apuntan a dist/, y dist/ está
+        # gitignored (es un artefacto de build) — un checkout limpio no lo
+        # trae. Sin este paso antes, tsc falla con "Cannot find module
+        # '@rafex/galaxia-fhs-protocol'" en atlas/navigator/portal aunque el
+        # código esté bien (encontrado corriendo este mismo workflow en
+        # real, ver spec-native/DECISIONS.md DEC-0042).
+        run: npm run build -w packages/fhs-protocol
+
       - name: Typecheck (todos los workspaces)
         run: npm run typecheck --workspaces
 

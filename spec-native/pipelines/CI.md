@@ -42,6 +42,8 @@ Estos checks deben pasar antes de mergear cualquier cambio:
 
 **Nota sobre `npm run build --workspaces` vs. `npm run build`:** el script raíz `build` (`package.json`) solo compila `packages/fhs-protocol` + `apps/navigator` + `apps/portal` — se le olvidó `apps/atlas` cuando Atlas se separó de Navigator en DEC-0035 (un gap real, encontrado al armar este CI). `ci.yml` usa `--workspaces` a propósito para que si alguien rompe la compilación de Atlas, el PR falle — con el script raíz no se habría detectado.
 
+**Por qué `ci.yml` compila `packages/fhs-protocol` antes del typecheck (paso "Compilar fhs-protocol"):** `main`/`types` en `packages/fhs-protocol/package.json` apuntan a `dist/` — que está gitignored (es un artefacto de build, no se versiona). En un checkout limpio (como el de un runner de CI, o cualquier clon nuevo) `dist/` no existe todavía, así que `tsc --noEmit` en `apps/atlas`/`navigator`/`portal` falla con `Cannot find module '@rafex/galaxia-fhs-protocol'` aunque el código de esos workspaces esté perfectamente bien — el error es por la ausencia del build previo, no por un bug real. Esto se detectó en la primera corrida real de `ci.yml` en producción (falló) y se reprodujo/confirmó clonando el repo desde cero dos veces (`git clone` a un directorio temporal, sin arrastrar ningún `dist/` ya compilado de una sesión anterior) antes de agregar el paso de build previo.
+
 ### Gates opcionales o informativos
 
 | Gate | Herramienta | Observaciones |
