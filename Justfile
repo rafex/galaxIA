@@ -53,26 +53,10 @@ container-up-atlas:
       --build-arg BUILD_DATE={{build-date}} \
       atlas
 
-container-up-llm:
-    @echo "→ Levantando star (Star/LLM provider FHS)..."
-    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build \
-      --build-arg COMMIT_HASH={{commit-hash}} \
-      --build-arg BUILD_DATE={{build-date}} \
-      star
-
-container-up-ocr:
-    @echo "→ Levantando satellite-ocr (Satellite/OCR provider FHS)..."
-    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build \
-      --build-arg COMMIT_HASH={{commit-hash}} \
-      --build-arg BUILD_DATE={{build-date}} \
-      satellite-ocr
-
-container-up-rag:
-    @echo "→ Levantando rag-provider (SPEC-RAG-0001)..."
-    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build \
-      --build-arg COMMIT_HASH={{commit-hash}} \
-      --build-arg BUILD_DATE={{build-date}} \
-      rag-provider
+# Nota: los providers de referencia (star, satellite-ocr, rag-provider,
+# kb-provider) ya no viven en este repo — se levantan desde el
+# containers/compose.yaml de `galaxIA-satellite-star`
+# (https://github.com/rafex/galaxIA-satellite-star).
 
 # Detiene y elimina un contenedor específico
 container-rm service:
@@ -99,19 +83,3 @@ container-up-core-tls:
       --build-arg COMMIT_HASH={{commit-hash}} \
       --build-arg BUILD_DATE={{build-date}} \
       atlas navigator portal
-
-# Levanta star (Star/LLM provider) con TLS
-container-up-llm-tls:
-    @echo "→ Levantando star con TLS..."
-    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} -f {{TLS_COMPOSE_FILE}} up -d --build \
-      --build-arg COMMIT_HASH={{commit-hash}} \
-      --build-arg BUILD_DATE={{build-date}} \
-      star
-
-# Levanta satellite-ocr (Satellite/OCR provider) con TLS
-container-up-ocr-tls:
-    @echo "→ Levantando satellite-ocr con TLS..."
-    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} -f {{TLS_COMPOSE_FILE}} up -d --build \
-      --build-arg COMMIT_HASH={{commit-hash}} \
-      --build-arg BUILD_DATE={{build-date}} \
-      satellite-ocr

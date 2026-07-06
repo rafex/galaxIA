@@ -3,6 +3,8 @@
 Hasta ahora todo el stack (`portal`, `navigator`, `star`, `satellite-ocr`) corría en un solo host (el bastion, `192.168.3.173`), simulando federación pero en realidad todo en una sola máquina. Este documento describe el paso a una topología real de **dos nodos en la misma LAN**, que es lo que el protocolo FHS está diseñado para demostrar: recursos de IA repartidos en hardware distinto, descubiertos por WebSocket, no por Docker DNS local.
 
 > Desde DEC-0035, el core de la laptop son **tres** servicios, no dos: `apps/atlas` (Registry) se separó de `apps/navigator` (Agent Runtime). Los providers del bastion se registran directamente contra Atlas, no contra Navigator — ver `docs/atlas.md`/`docs/navigator.md`.
+>
+> **Nota (split de repos):** `examples/star-example` y `examples/satellite-ocr-example`, referenciados en este documento, ya no viven en este repo (`galaxIA`) — se movieron a [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star). El checkout del bastion debe clonar ese repo por separado; el resto de esta topología (puertos, UFW, `PROVIDER_REGISTRY_URL`) no cambia.
 
 ## Topología objetivo
 

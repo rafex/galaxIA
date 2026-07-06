@@ -28,17 +28,9 @@ container-up-atlas:
 	$(COMPOSE_CMD) -f $(COMPOSE_FILE) up -d --build atlas
 	$(call ok,Atlas arriba)
 
-.PHONY: container-up-llm
-container-up-llm:
-	$(call section,Levantando star (Star/LLM) FHS)
-	$(COMPOSE_CMD) -f $(COMPOSE_FILE) up -d --build star
-	$(call ok,Star arriba)
-
-.PHONY: container-up-ocr
-container-up-ocr:
-	$(call section,Levantando satellite-ocr (Satellite/OCR) FHS)
-	$(COMPOSE_CMD) -f $(COMPOSE_FILE) up -d --build satellite-ocr
-	$(call ok,Satellite OCR arriba)
+# Los providers de referencia (star, satellite-ocr, rag-provider,
+# kb-provider) ya no viven en este repo — se levantan desde el
+# containers/compose.yaml de `galaxIA-satellite-star`.
 
 .PHONY: container-down
 container-down:

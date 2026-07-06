@@ -12,9 +12,6 @@ install:
 
 .PHONY: build
 build: build-protocol build-atlas build-agent build-web
-	$(call section,Build de ejemplos)
-	npm run build -w $(WS_LLM_EX)
-	npm run build -w $(WS_OCR_EX)
 	$(call ok,Build completo terminado)
 
 .PHONY: build-protocol
@@ -40,15 +37,6 @@ build-web: build-protocol
 	$(call info,Compilando portal)
 	npm run build -w $(WS_WEB)
 	$(call ok,portal compilado)
-
-.PHONY: build-examples
-build-examples: build-protocol
-	$(call info,Compilando star-example)
-	npm run build -w $(WS_LLM_EX)
-	$(call ok,star-example compilado)
-	$(call info,Compilando satellite-ocr-example)
-	npm run build -w $(WS_OCR_EX)
-	$(call ok,satellite-ocr-example compilado)
 
 .PHONY: typecheck
 typecheck:

@@ -27,29 +27,12 @@ dev-web:
     @echo "→ Frontend Web en http://localhost:5173"
     npm run dev -w {{WS_WEB}}
 
-# ── LLM Provider FHS ──────────────────────────────────────────────────────
-
-# Levanta el llm-provider FHS (requiere mock-llm o llama.cpp en LLAMA_CPP_URL)
-dev-llm-provider:
-    @echo "→ LLM Provider FHS en ws://localhost:{{LLM_PORT}}"
-    @echo "  llama.cpp: {{LLAMA_CPP_URL}}"
-    @echo "  Registry: {{REGISTRY_URL}}"
-    LLM_PROVIDER_PORT={{LLM_PORT}} \
-    LLAMA_CPP_URL={{LLAMA_CPP_URL}} \
-    REGISTRY_URL={{REGISTRY_URL}} \
-    npx tsx {{WS_LLM_EX}}/src/index.ts
-
-# ── OCR Provider FHS ───────────────────────────────────────────────────────
-
-# Levanta el ocr-provider FHS
-dev-ocr-provider:
-    @echo "→ OCR Provider FHS en ws://localhost:{{OCR_PORT}}"
-    @echo "  OCR Svc: {{OCR_SVC_URL}}"
-    @echo "  Registry: {{REGISTRY_URL}}"
-    OCR_PROVIDER_PORT={{OCR_PORT}} \
-    OCR_SERVICE_URL={{OCR_SVC_URL}} \
-    REGISTRY_URL={{REGISTRY_URL}} \
-    npx tsx {{WS_OCR_EX}}/src/index.ts
+# ── Providers de referencia (Star/LLM, Satellite/OCR, RAG, KB) ─────────────
+#
+# Ya no viven en este repo — ver `galaxIA-satellite-star`
+# (https://github.com/rafex/galaxIA-satellite-star). Para desarrollo local,
+# clona ese repo aparte y usa `npm run dev -w examples/<provider>` ahí,
+# apuntando REGISTRY_URL al Atlas que levantes aquí (just dev-atlas).
 
 # ── Mock LLM Server ────────────────────────────────────────────────────────
 
@@ -69,5 +52,5 @@ dev-mock-providers:
 
 # TODO: en versiones futuras de just, usar varios comandos concurrentes.
 # Por ahora se arranca cada servicio en su propia terminal con las recetas
-# individuales: just dev-atlas, just dev-agent, just dev-mock-llm,
-# just dev-llm-provider, etc.
+# individuales: just dev-atlas, just dev-agent, just dev-mock-llm, más los
+# providers desde `galaxIA-satellite-star` (ver nota arriba).

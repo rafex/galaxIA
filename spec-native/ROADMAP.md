@@ -2,6 +2,7 @@
 
 ## Ahora
 
+- **Completado (DEC-0038):** separación de repos — `galaxIA` queda como protocolo/SDK/servicios core (Atlas, Navigator, Portal); las implementaciones de referencia de providers (`star-example`, `satellite-ocr-example`, `rag-provider`, `kb-provider`) se movieron a [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star) — 2026-07-06. `@galaxia/fhs-protocol` se consume ahí vía git (`github:rafex/galaxIA#fhs-protocol-dist`), no publicado a npm todavía.
 - **Iniciativa activa:** `fhs-mvp` — MVP del protocolo FHS y chat comunitario para la ponencia.
   - Federar LLMs locales y tools MCP.
   - Frontend web vanilla con Vite.

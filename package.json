@@ -6,8 +6,7 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "apps/*",
-    "examples/*"
+    "apps/*"
   ],
   "scripts": {
     "dev:web": "npm run dev -w apps/portal",

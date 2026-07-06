@@ -2,12 +2,12 @@
 # Incluir con: import 'helpers/just/common.just'
 
 # ── Workspaces ─────────────────────────────────────────────────────────────
+# Los providers de referencia (Star/LLM, Satellite/OCR, RAG, KB) viven en el
+# repo separado `galaxIA-satellite-star` — ya no son workspaces de este repo.
 WS_PROTOCOL := "packages/fhs-protocol"
 WS_ATLAS    := "apps/atlas"
 WS_AGENT    := "apps/navigator"
 WS_WEB      := "apps/portal"
-WS_LLM_EX   := "examples/star-example"
-WS_OCR_EX   := "examples/satellite-ocr-example"
 
 # ── Puerto defaults (se pueden sobrescribir en .env) ───────────────────────
 # DEC-0035: ATLAS_PORT (Registry, antes era el mismo AGENT_PORT) y AGENT_PORT

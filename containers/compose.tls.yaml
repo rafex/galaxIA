@@ -1,6 +1,9 @@
 # Overlay opcional para activar TLS/HTTPS con certificado autofirmado en
-# toda la comunicación FHS (navegador↔portal, portal↔navigator, navigator↔
-# providers). No modifica containers/compose.yaml — se usa junto a él.
+# la comunicación FHS del core (navegador↔portal, portal↔navigator).
+# No modifica containers/compose.yaml — se usa junto a él.
+#
+# El overlay TLS de los providers externos (Star/Satellite/RAG/KB) vive en
+# `galaxIA-satellite-star` (repo separado), no aquí.
 #
 # Nota (DEC-0035): el link HTTP Navigator→Atlas (ATLAS_URL) NO está cubierto
 # por este overlay todavía — AtlasClient usa `fetch` nativo sin override de
@@ -55,17 +58,3 @@ services:
     volumes:
       - ${CERTS_DIR:-../certs}:/etc/nginx/certs:ro
       - ./portal/nginx-tls.conf:/etc/nginx/conf.d/default.conf:ro
-
-  star:
-    environment:
-      - TLS_CERT_PATH=/certs/dev.crt
-      - TLS_KEY_PATH=/certs/dev.key
-    volumes:
-      - ${CERTS_DIR:-../certs}:/certs:ro
-
-  satellite-ocr:
-    environment:
-      - TLS_CERT_PATH=/certs/dev.crt
-      - TLS_KEY_PATH=/certs/dev.key
-    volumes:
-      - ${CERTS_DIR:-../certs}:/certs:ro

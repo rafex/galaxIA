@@ -1,5 +1,7 @@
 # Proveedores FHS — Nodos que aportan recursos
 
+> **Las implementaciones de referencia de estos providers ya no viven en este repo.** Se movieron a [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star), que depende de `@galaxia/fhs-protocol` publicado desde aquí. Este documento describe el contrato del protocolo y el comportamiento determinístico del lado de Navigator (que sí vive aquí) — las rutas `examples/*-provider/` referidas abajo apuntan a ese otro repo.
+
 Los proveedores son nodos independientes que se registran en el Registry FHS y exponen capacidades (LLM, tools) a través del protocolo FHS WebSocket. **El Agent Server nunca llama directo a las APIs nativas de los servicios.** Todo pasa por el protocolo FHS.
 
 ## ¿Por qué wrappers FHS?
@@ -223,13 +225,15 @@ Provider → Agent Server:  tool.error        { requestId, toolName, code, messa
 
 ## Agregar un nuevo provider
 
+Los providers nuevos se agregan en [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star), no aquí:
+
 1. Crear carpeta en `examples/<nombre>-provider/`
 2. Implementar `src/index.ts` con:
    - Conexión al Registry y registro con manifiesto
    - Servidor WebSocket FHS para el protocolo (chat o tools)
 3. Implementar `src/<nombre>-bridge.ts` con el puente al servicio real
 4. Crear `Containerfile` para despliegue en contenedor
-5. Agregar al `compose.yaml`
-6. Registrar en `mock-providers.ts` (opcional, para pruebas sin contenedor)
+5. Agregar al `compose.yaml` de ese repo
+6. Registrar en `mock-providers.ts` (opcional, para pruebas sin contenedor) — este script sí vive en este repo (`galaxIA`)
 
-El contrato del protocolo está en `packages/fhs-protocol/src/messages.ts`.
+El contrato del protocolo está en `packages/fhs-protocol/src/messages.ts` (este repo) — si el provider nuevo necesita algo que el protocolo no soporta, ese cambio se debate e implementa aquí primero.
