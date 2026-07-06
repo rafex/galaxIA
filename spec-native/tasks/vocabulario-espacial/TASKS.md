@@ -5,7 +5,7 @@
 - Iniciativa: vocabulario-espacial
 - Spec relacionada: `spec-native/specs/vocabulario-espacial/SPEC.md` (SPEC-VOCAB-0001)
 - Owner: Raúl Fletes (rafex)
-- Estado general: `in_progress` (decisión tomada — Opción B — specs dependientes ya alineadas; falta el documento canónico y la frase de posicionamiento en el portal)
+- Estado general: `in_progress` (decisión tomada — Opción B — specs dependientes ya alineadas; documento canónico y frase de posicionamiento ya publicados; queda pendiente solo TASK-VOCAB-0005, backlog no bloqueante)
 
 ## Tareas
 
@@ -22,12 +22,12 @@
 ### TASK-VOCAB-0002 - Documento canónico de vocabulario
 
 - ID: TASK-VOCAB-0002
-- State: `pending`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-VOCAB-0001
-- Expected files: `docs/vocabulario.md` (nuevo, nombre tentativo)
+- Expected files: `docs/vocabulario.md` (nuevo), `docs/README.md` (agregado a la tabla de documentos)
 - Close criteria: tabla de vocabulario de la SPEC trasladada a este documento, ya resuelta a la Opción B (nodo/estrella/satélite).
-- Validation: revisión manual — la tabla no debe contradecir la decisión tomada.
+- Validation: 2026-07-05, revisión manual — la tabla coincide exactamente con la de `spec-native/specs/vocabulario-espacial/SPEC.md`, sin contradecir la decisión Opción B (DEC-0024). Enlazado desde `docs/README.md`.
 
 ### TASK-VOCAB-0003 - Alinear specs existentes con la decisión
 
@@ -52,12 +52,12 @@
 ### TASK-VOCAB-0004 - Frase de posicionamiento en el portal web
 
 - ID: TASK-VOCAB-0004
-- State: `pending`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-VOCAB-0001, TASK-VOCAB-0002
 - Expected files: `site/index.md`
 - Close criteria: la frase de posicionamiento (ES, y EN si aplica) incorporada al portal, ajustada según la decisión de TASK-VOCAB-0001.
-- Validation: `just generate`/build de Jekyll (o el mecanismo que use `site/`) sin errores, revisión visual.
+- Validation: 2026-07-05, frase en español agregada como nueva sección "Estrellas y satélites" en `site/index.md`, entre "Cómo se arma la red" y "Súmate". No se pudo correr `bundle exec jekyll build` en este entorno (sin Gemfile/jekyll instalado localmente en `site/`) — validado por revisión manual del markup (HTML balanceado, mismo patrón que las secciones vecinas). Pendiente no bloqueante: confirmar visualmente con un build real de Jekyll (ej. GitHub Pages) antes de considerarlo verificado end-to-end.
 
 ### TASK-VOCAB-0005 - Backlog: actualización retroactiva de documentación existente
 

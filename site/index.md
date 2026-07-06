@@ -78,6 +78,17 @@ title: galaxIA — IA federada y soberana
 </section>
 
 <section>
+  <h2>Estrellas y satélites</h2>
+  <p>
+    galaxIA es una galaxia soberana de IA donde equipos reutilizados se
+    convierten en <strong>estrellas</strong> y <strong>satélites</strong>.
+    Cada estrella aporta razonamiento; cada satélite aporta una capacidad —
+    OCR, búsqueda, memoria o automatización. El Portal los descubre
+    mediante Atlas y el Navegador los combina en un agente comunitario.
+  </p>
+</section>
+
+<section>
   <h2>Súmate</h2>
   <p>
     galaxIA crece con cada nodo, cada tool y cada persona que se suma. Si

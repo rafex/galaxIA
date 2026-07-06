@@ -33,6 +33,7 @@ El objetivo es demostrar que no hace falta depender de la nube para tener IA út
 | [`contenedores.md`](./contenedores.md) | Cómo desplegar con Podman/Docker |
 | [`manifiesto-llm.md`](./manifiesto-llm.md) | Cómo publicizar un modelo LLM |
 | [`manifiesto-mcp.md`](./manifiesto-mcp.md) | Cómo publicizar un servidor MCP de tools |
+| [`vocabulario.md`](./vocabulario.md) | Vocabulario espacial de producto (Star/Satellite/Atlas/Portal/...) — solo documentación, no cambia el protocolo |
 
 ## En una frase
 
