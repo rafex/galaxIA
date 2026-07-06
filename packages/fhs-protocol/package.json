@@ -1,11 +1,12 @@
 {
   "name": "@rafex/galaxia-fhs-protocol",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "type": "module",
   "description": "Contratos compartidos del protocolo FHS v0.1.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": ["dist"],
   "exports": {
     ".": {
       "import": "./dist/index.js",
