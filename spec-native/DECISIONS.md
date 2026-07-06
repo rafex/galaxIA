@@ -686,3 +686,16 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - Nuevo: `spec-native/specs/ipfs-adjuntos/SPEC.md` (SPEC-IPFS-0001).
   - Sin cambios de código — este DEC cierra el diseño, no implementa.
   - Pendiente (backlog): escribir `spec-native/tasks/ipfs-adjuntos/TASKS.md` e implementar cuando se priorice; issue #12 sigue abierto en GitHub, ahora con el diseño real enlazado.
+
+## DEC-0045 — IPFS público/privado es elección del usuario; el protocolo transporta CID + descriptor de origen, no solo el hash
+
+- **Fecha:** 2026-07-06
+- **Estado:** `accepted` (diseño) — sin implementar, amplía DEC-0044
+- **Contexto:** DEC-0044 dejó explícitamente sin resolver si la red IPFS debía ser pública o un nodo privado del operador. El usuario resolvió esa pregunta abierta y agregó un requisito nuevo de protocolo que DEC-0044 no había cubierto.
+- **Decisión — red pública/privada es otra elección de quien sube el archivo, no una decisión fija:** mismo nivel que la elección transmisión-directa/IPFS de DEC-0044 — el protocolo debe soportar configurar cualquiera de las dos, nunca imponer una. No hay una respuesta "correcta" única (pública vs. privada) a nivel de diseño de protocolo; es una decisión operativa de cada usuario/operador según qué tan sensible sea el contenido.
+- **Consecuencia de diseño — el CID solo no es suficiente información:** un CID identifica contenido, no dice en qué red/nodo resolverlo. Si el usuario eligió un nodo privado, el provider necesita saber *dónde* pedir ese CID. Se agrega un descriptor de origen IPFS que viaja junto al CID en cualquier tool call que lo use: `{ cid, ipfs: { network: "public" | "private", endpoint?: string } }` — `endpoint` obligatorio si `network` es `"private"`, opcional (gateway público por default) si `"public"`. Este descriptor reemplaza la mención de un parámetro `file_cid` aislado que tenía DEC-0044.
+- **Decisión — simetría bidireccional:** un provider (satellite) no solo debe poder *recibir* un adjunto vía CID+descriptor — también debe poder *generar* un resultado, subirlo él mismo a IPFS, y devolver `{ cid, ipfs }` en vez de un payload inline. Mismo mecanismo en ambas direcciones, sin un diseño separado para "subida" vs. "descarga": cualquiera de las dos partes de una tool call puede terminar siendo quien sube o quien descarga.
+- **Nuevas preguntas abiertas que aparecen al resolver la anterior:** ¿cuál es el gateway público *default* si el usuario no especifica `endpoint`?; si el Portal sube a un nodo privado por una URL y el provider necesita descargar por otra (ej. interna vs. LAN/pública del mismo nodo), el descriptor actual asume una sola URL válida para ambos — no cubierto todavía.
+- **Consecuencias:**
+  - `spec-native/specs/ipfs-adjuntos/SPEC.md` actualizado: nueva sección "Red pública vs. privada" y "Dirección inversa" en Propuesta; tabla de Riesgos y Preguntas abiertas actualizadas (pregunta #1 original marcada resuelta, 2 preguntas nuevas agregadas).
+  - Sin cambios de código — sigue siendo diseño, no implementación.

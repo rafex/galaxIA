@@ -2,7 +2,7 @@
 
 ## Estado
 
-`accepted` (diseño cerrado) — sin implementar. Ver DEC-0044.
+`accepted` (diseño cerrado) — sin implementar. Ver DEC-0044, DEC-0045.
 
 ## Owner
 
@@ -25,6 +25,29 @@ Agregar IPFS como un **transporte alternativo de adjuntos**, elegible por el usu
 
 La elección es una preferencia explícita del usuario en el Portal (mismo patrón que `preferences.ocrMode`/`preferences.kb` — un control visible en la barra de configuración, no un comportamiento oculto).
 
+### Red pública vs. privada: también elección de quien sube el archivo (DEC-0045)
+
+La pregunta abierta original ("¿red IPFS pública o nodo privado del operador?") se resuelve así: **no es una decisión fija del operador ni de este spec — es otra elección de quien sube el archivo**, mismo nivel que la elección directo/IPFS. El protocolo debe soportar ambas configuraciones (un gateway/nodo público, o un nodo privado que el usuario u operador especifique), no imponer una.
+
+Consecuencia directa: **el CID solo no alcanza.** Un CID identifica el contenido, pero no dice en qué red/nodo buscarlo — si el usuario eligió un nodo privado, el provider (satellite) necesita saber *dónde* pedir ese CID, no solo *cuál* CID pedir. El protocolo debe transportar, junto al CID, un descriptor de origen IPFS:
+
+```
+{
+  cid: string,
+  ipfs: {
+    network: "public" | "private",
+    endpoint?: string   // URL del gateway/nodo — obligatorio si network es "private",
+                         // opcional si "public" (se puede usar un gateway público por default)
+  }
+}
+```
+
+Esto reemplaza el parámetro `file_cid` mencionado más abajo en "Alcance" — no es solo el CID, es CID + descriptor de dónde resolverlo.
+
+### Dirección inversa: el provider también puede subir y devolver un CID
+
+Además de recibir adjuntos vía IPFS, un provider debe poder **generar** un resultado (ej. una imagen procesada, un artefacto grande) y devolverlo de la misma forma — subiéndolo él mismo a IPFS (al mismo nodo/red que el descriptor de la petición indique, o a otro si así se configura) y devolviendo `{ cid, ipfs: {...} }` en vez de un payload inline. Mismo mecanismo, dirección simétrica: cualquiera de las dos partes (quien pide, quien resuelve) puede ser quien sube o quien descarga.
+
 ### Por qué IPFS resuelve el problema de fondo
 
 - **Desacopla la entrega del procesamiento.** Subir a IPFS y descargar del lado del provider son dos operaciones independientes en el tiempo — si el provider está ocupado, el archivo ya está disponible esperando en IPFS, no se pierde ni hay que reenviarlo. Esto es lo que permite tratar la descarga como un proceso batch/asíncrono en vez de una recepción síncrona.
@@ -39,8 +62,10 @@ Default: **3 horas** desde que se sube (`privacy.retention: { ttl: "PT3H" }`, mi
 ### Dentro del alcance
 
 - Selector en el Portal: transmisión directa (default) vs. IPFS, por adjunto o por conversación (a definir en implementación — ver preguntas abiertas).
+- Si se elige IPFS, selector adicional de red: pública (con gateway default) vs. privada (requiere especificar `endpoint`) — misma UI, mismo nivel de elección que directo/IPFS.
 - Subida del archivo a IPFS desde el Portal (o desde Navigator en nombre del Portal — a definir en implementación).
-- El protocolo FHS transporta el CID en vez del binario cuando el modo IPFS está activo — mismo mecanismo de tool call que hoy (`ocr_extract`, `document_index`, etc.), cambiando el parámetro de `file_base64` a algo como `file_cid`.
+- El protocolo FHS transporta `{ cid, ipfs: { network, endpoint? } }` en vez del binario cuando el modo IPFS está activo — mismo mecanismo de tool call que hoy (`ocr_extract`, `document_index`, etc.), reemplazando el parámetro `file_base64`.
+- Simetría: un provider puede devolver un resultado de la misma forma (subir a IPFS + devolver `{ cid, ipfs }`), no solo recibir adjuntos así.
 - Retención de 3 horas por default, extensible explícitamente por quien subió el archivo.
 
 ### Fuera del alcance (para esta iteración)
@@ -53,17 +78,20 @@ Default: **3 horas** desde que se sube (`privacy.retention: { ttl: "PT3H" }`, mi
 
 | Riesgo | Impacto | Mitigación |
 |---|---|---|
-| Un CID en una red IPFS **pública** es recuperable por cualquiera que lo tenga, indefinidamente mientras algún nodo lo mantenga pinneado — no hay control de acceso nativo. "Anonimizar el origen" no es lo mismo que "el contenido es privado". | Alto si el adjunto es sensible | Depende de la decisión de infraestructura (pregunta abierta #1) — una red privada/nodo propio del operador evita este riesgo; la red pública de IPFS no |
+| Un CID en una red IPFS **pública** es recuperable por cualquiera que lo tenga, indefinidamente mientras algún nodo lo mantenga pinneado — no hay control de acceso nativo. "Anonimizar el origen" no es lo mismo que "el contenido es privado". | Alto si el adjunto es sensible | Mitigado por diseño (DEC-0045): la elección de red pública/privada es del usuario que sube el archivo, no un default fijo — quien maneje contenido sensible puede elegir un nodo privado explícitamente. La responsabilidad de saber cuál conviene es del usuario/operador, el protocolo solo debe soportar ambas opciones |
+| Sin el descriptor `ipfs.endpoint`, un provider no puede resolver un CID subido a un nodo privado — el CID solo no basta | Alto (bloquea el caso privado por completo si se omite) | Resuelto en el diseño: el protocolo transporta `{ cid, ipfs: { network, endpoint } }`, nunca el CID aislado |
 | Nadie despina el CID después de la ventana de retención — el archivo queda huérfano pero recuperable | Medio | El mecanismo de expiración (quién corre el unpin tras el TTL) es responsabilidad de implementación, no resuelto en este spec |
 | El usuario no entiende la diferencia entre los dos modos y elige el que no le conviene | Bajo | El selector del Portal debe explicar la diferencia en una línea (mismo patrón que la advertencia de `kbMaxPerQuestion`, DEC-0027) |
 
 ## Preguntas abiertas (para cuando se priorice implementar)
 
-1. **¿Red IPFS pública (ej. gateway público + gestión de pinning por terceros) o un nodo IPFS privado operado por el propio operador de la red FHS?** Afecta directamente la propiedad de "anonimización" — con red pública, el contenido es recuperable por cualquiera con el CID indefinidamente; con nodo privado, el operador controla el acceso. No resuelto aquí.
+1. ~~¿Red IPFS pública o un nodo IPFS privado operado por el propio operador de la red FHS?~~ **Resuelta (DEC-0045):** es elección de quien sube el archivo, el protocolo soporta ambas vía `ipfs.network`/`ipfs.endpoint`.
 2. ¿La elección de transporte (directo vs. IPFS) es una preferencia por conversación, o por cada adjunto individual dentro de la misma conversación?
 3. ¿Quién sube el archivo a IPFS — el propio Portal (cliente) directo contra un nodo/gateway, o el Portal se lo entrega a Navigator y Navigator lo sube? Afecta qué componente necesita credenciales/acceso al nodo IPFS.
 4. ¿Cómo se implementa técnicamente "ampliar la ventana de retención" — un mensaje/acción nueva en el protocolo, o un parámetro adicional en la tool call original?
 5. ¿Quién ejecuta el unpin cuando expira el TTL — un proceso propio de Navigator, un servicio aparte, o se delega al propio nodo IPFS si soporta expiración nativa?
+6. ¿Cuál es el gateway público *default* cuando el usuario elige `network: "public"` sin especificar `endpoint`? ¿Configurable por el operador del nodo Portal, o hardcodeado a uno conocido (ej. `ipfs.io`)?
+7. Si el usuario especifica un nodo privado (`endpoint`) para subir, ¿ese mismo endpoint se usa también para que el provider descargue, o el provider podría necesitar una URL distinta (ej. el Portal sube vía un endpoint interno, pero el provider descarga vía una URL pública/LAN distinta del mismo nodo)? No asumido en el diseño actual — el descriptor `ipfs.endpoint` hoy asume una sola URL válida para ambas partes.
 
 ## Enlaces y decisiones relacionadas
 
