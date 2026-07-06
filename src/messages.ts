@@ -2,7 +2,7 @@
  * Mensajes del protocolo WebSocket entre proveedores y Registry FHS v0.1.
  */
 
-import type { ProviderManifest } from "./manifest.js";
+import type { Beacon } from "./manifest.js";
 
 export interface BaseMessage {
   type: string;
@@ -25,7 +25,7 @@ export interface WelcomeMessage extends BaseMessage {
 export interface RegisterMessage extends BaseMessage {
   type: "register";
   providerId: string;
-  manifest: ProviderManifest;
+  manifest: Beacon;
   timestamp: number;
   signature?: string;
 }

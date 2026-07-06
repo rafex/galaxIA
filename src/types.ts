@@ -2,9 +2,9 @@
  * Tipos base del protocolo FHS v0.1.
  */
 
-export type ProviderType = "llm" | "mcp" | "multi";
+export type NodeType = "llm" | "mcp" | "multi";
 
-export type ProviderVisibility = "local" | "network" | "community" | "external";
+export type NodeVisibility = "local" | "network" | "community" | "external";
 
 export type ServiceStatus = "available" | "unavailable" | "degraded" | "unknown";
 
@@ -12,15 +12,15 @@ export type NodeStatus = "online" | "lost" | "offline";
 
 export type PrivacyScope = "local" | "network" | "community" | "external";
 
-export interface ProviderIdentity {
+export interface NodeProfile {
   /** Identificador verificable del proveedor. En v0.1 es did:key:<nombre-simple>. */
   id: string;
   /** Nombre legible para humanos. */
   name: string;
   /** Tipo de proveedor. */
-  type: ProviderType;
+  type: NodeType;
   /** Visibilidad/ámbito del proveedor. */
-  visibility: ProviderVisibility;
+  visibility: NodeVisibility;
   /** Región opcional. */
   region?: string;
 }
@@ -34,7 +34,7 @@ export interface EndpointInfo {
   transport?: "streamable-http" | "stdio" | "sse";
 }
 
-export interface Capability {
+export interface Signal {
   /** Identificador único de la capacidad, e.g. document.ocr. */
   id: string;
   /** Nombre legible. */
@@ -102,9 +102,9 @@ export interface SignatureInfo {
 export interface PublishedService {
   id: string;
   nodeId: string;
-  kind: ProviderType;
+  kind: NodeType;
   endpoint: EndpointInfo;
-  capabilities: Capability[];
+  capabilities: Signal[];
   status: ServiceStatus;
   models?: ModelInfo[];
   privacy?: PrivacyPolicy;
