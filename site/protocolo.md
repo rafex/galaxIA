@@ -56,7 +56,7 @@ El objetivo concreto de este protocolo es que:
 
 1. **Identidad verificable** — todo nodo tiene un identificador único (`did:key:...`).
 2. **Registro por arrendamiento (lease)** — un nodo debe renovar su registro cada 30s o se considera perdido.
-3. **Heartbeat obligatorio** — cada nodo vivo envía un `ping` cada 10s, incluso mientras procesa otra petición.
+3. **Pulse obligatorio** — cada nodo vivo envía un `ping` cada 10s, incluso mientras procesa otra petición; el Registry además sondea cada conexión con ping/pong nativo de WebSocket para detectar caídas de red más rápido.
 4. **Servicios declarados** — un nodo dice explícitamente qué ofrece; nadie escanea puertos ni fuerza descubrimiento.
 5. **Capacidades, no implementaciones** — se pide `document.ocr`, no "¿tienes Tesseract?"; la implementación es intercambiable.
 6. **Resolución por ámbito (scope)** — `local` / `network` / `community` / `external` acotan quién puede resolver cada petición.
