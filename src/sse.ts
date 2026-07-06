@@ -102,6 +102,21 @@ export interface NodeOnlineEvent {
   };
 }
 
+export interface KbRecommendedEvent {
+  type: "kb.recommended";
+  data: {
+    conversationId: string;
+    providerId: string;
+    providerName: string;
+    description: string;
+  };
+}
+
+export interface KbWarningEvent {
+  type: "kb.warning";
+  data: { conversationId: string; message: string };
+}
+
 export interface ErrorEvent {
   type: "error";
   // conversationId ausente = error de conexión antes de establecer una conversación
@@ -123,4 +138,6 @@ export type AgentSSEEvent =
   | OcrExtractedEvent
   | NodeLostEvent
   | NodeOnlineEvent
+  | KbRecommendedEvent
+  | KbWarningEvent
   | ErrorEvent;
