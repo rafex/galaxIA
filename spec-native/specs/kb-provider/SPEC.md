@@ -2,7 +2,7 @@
 
 ## Estado
 
-`draft`
+`draft` (diseño de disparador cerrado — DEC-0027 — listo para tareas de implementación)
 
 ## Owner
 
@@ -35,16 +35,30 @@ La promoción de un documento de RAG a KB (por ejemplo, porque el operador nota 
 ### Fuera del alcance (para esta iteración)
 
 - Cualquier mecanismo de escritura o actualización vía el protocolo de chat de un usuario.
-- Selección de múltiples KBs simultáneas por consulta (se asume que cada nodo KB expone un corpus, y el usuario/operador elige a cuál conectarse).
 - Sincronización automática entre nodos KB de distintos operadores.
 - Detección o promoción automática de contenido desde RAG.
-- El mecanismo exacto de indexado administrativo (CLI, endpoint separado, etc.) — a decidir cuando se priorice esta iniciativa.
+- El mecanismo exacto de indexado administrativo (CLI, endpoint separado, etc.) — a decidir cuando se priorice la implementación.
+- **Modo "mágico" de selección automática de KB sin confirmación** — documentado como premisa a futuro en "Modo mágico (documentado, no implementado)" más abajo, explícitamente fuera de alcance por ahora (DEC-0027).
 
-## Diseño (borrador, a completar cuando se priorice)
+## Diseño (cerrado — DEC-0027)
 
 - `kb_query` sigue la misma forma que `document_query` de RAG (embeber + similitud coseno + top-k), pero **no** está scoped por `conversationId` — cualquier conversación que consulte este nodo ve el mismo corpus.
-- Determinístico o no: a diferencia de RAG (donde la recuperación es siempre automática porque hay un documento activo conocido), una KB podría requerir que el usuario o el operador indiquen explícitamente "consulta esta base de conocimiento" — el disparo determinístico de RAG no aplica igual aquí porque no hay un evento de "adjuntar" que lo dispare. Este es el primer punto a resolver en detalle antes de implementar.
-- Manifiesto: mismo formato base que RAG, con `capabilities: [{ id: "kb.query", ... }]` y `privacy.retention: "permanent-readonly"`.
+- **Dos modos de disparador, ambos dentro de alcance:**
+
+  1. **Manual explícito** — el usuario elige una KB (o ninguna) antes de preguntar, vía `preferences.kb: string` (id del nodo KB) — mismo patrón que `preferences.model` para elegir una Star manualmente. Esa elección se usa para responder hasta que el usuario la cambie; **no queda fija para toda la conversación** (a diferencia de RAG, donde un documento indexado sí lo está) — el usuario puede cambiar de KB entre preguntas dentro de la misma conversación.
+  2. **Recomendada** — para cada pregunta, el sistema compara el texto de la pregunta contra la `capability.description` de cada KB disponible (registrada en el Registry/Atlas) usando un mecanismo **determinístico y reproducible** (matching de texto o embeddings — nunca una decisión de tool-calling del LLM principal, ver justificación abajo), recomienda la de mejor coincidencia, y pide confirmación al usuario antes de consultarla (mismo patrón que la confirmación de adjunto de OCR/RAG). Si ninguna KB coincide razonablemente, el sistema debe poder recomendar "ninguna" — nunca forzar una elección de baja relevancia.
+
+- **Cambio de KB durante la conversación:** permitido y esperado en ambos modos — cada pregunta puede requerir un dominio distinto. No hay bloqueo de "una KB por conversación" como sí lo hay para RAG.
+- **Límite de KBs por pregunta:** `preferences.kbMaxPerQuestion` (default `1`) — por defecto, una sola KB se consulta por cada pregunta individual. El usuario puede subir este límite para permitir que una misma pregunta consulte varias KBs a la vez (ej. una pregunta que cruza dos dominios) — si lo hace, el `Portal` debe advertir explícitamente que los modelos pequeños de este stack (`qwen2.5-coder-3b`, sin GPU) pueden volverse notablemente más lentos o no completar una respuesta al combinar contexto de varias KBs simultáneamente. A lo largo de una conversación completa no hay límite de cuántas KBs *distintas* se usan (una por pregunta, o la misma repetida) — el límite es solo por pregunta.
+- Manifiesto: mismo formato base que RAG, con `capabilities: [{ id: "kb.query", description: "...", ... }]` y `privacy.retention: "permanent-readonly"`. La `description` de la capability es el texto que el modo "recomendada" usa para decidir — debe ser preciso y específico (ej. "Constitución Política de los Estados Unidos Mexicanos, texto vigente", no solo "documentos legales").
+
+### Modo mágico (documentado, no implementado — DEC-0027)
+
+**Premisa/objetivo:** que el sistema elija la KB más relevante para una pregunta sin pedir confirmación al usuario — la versión más fluida/"amigable" de los tres modos, sin fricción de selección ni de confirmación.
+
+**Por qué no se implementa en esta iteración:** dejar que el LLM de chat decida sin preguntar reintroduce el mismo riesgo que DEC-0020 resolvió para OCR — los modelos de este hardware comunitario no son confiables tomando este tipo de decisión vía tool-calling (DEC-0016/DEC-0017: tool-calling poco confiable, necesitó parser de respaldo). La consecuencia de una KB mal elegida es **peor** que la de una tool mal invocada: un `tool.error` es un fallo visible y recuperable; una **KB equivocada usada "con confianza"** produce una respuesta que suena autorizada pero viene del dominio incorrecto — un fallo silencioso que el usuario no puede detectar sin ya conocer la respuesta.
+
+**Camino posible a futuro, si se retoma:** el *routing* (qué KB elegir) tendría que seguir siendo determinístico/reproducible — el mismo mecanismo de matching del modo "recomendada", sin la LLM decidiendo — y lo único que cambiaría sería omitir el paso de confirmación. Es decir, "mágico" debería significar "recomendado sin preguntar", nunca "que el modelo elija libremente". Aun así, `provenance` tendría que declarar siempre qué KB se usó (o ninguna), para que sea auditable después aunque no se haya confirmado antes.
 
 ## Riesgos
 
@@ -52,11 +66,15 @@ La promoción de un documento de RAG a KB (por ejemplo, porque el operador nota 
 |---|---|---|
 | Sin proceso definido de curaduría/actualización de contenido | Medio | Fuera de alcance de esta iteración; documentar como paso manual del operador |
 | Confundir una KB con RAG en la UI (el usuario podría pensar que puede "subir" a una KB) | Medio | El `Portal` no debe ofrecer una acción de adjuntar contra un nodo KB — solo consulta |
-| Determinar cuándo se consulta una KB (a diferencia de RAG, no hay un evento de adjunto que lo dispare) | Alto | Ver "Diseño" — primer punto a resolver antes de implementar |
+| `capability.description` es autodeclarada por el operador, nadie la verifica | Medio | Fuera de alcance resolverlo ahora — se conecta con "Modelo de confianza comunitaria" en `spec-native/ROADMAP.md` ("Después"), no implementado todavía |
+| Ninguna KB coincide bien con la pregunta, pero el sistema recomienda una de baja relevancia igual | Medio | El modo "recomendada" debe poder recomendar explícitamente "ninguna" — nunca forzar una elección |
+| Permitir varias KBs por pregunta (`kbMaxPerQuestion` > 1) puede saturar el contexto de un modelo de 4096 tokens y degradar o colgar la respuesta | Medio | Advertencia obligatoria en el `Portal` al subir el límite por encima de 1 (DEC-0027) |
 
 ## Enlaces y decisiones relacionadas
 
+- DEC-0020 — Ejecución determinística de OCR (razón por la que el modo "mágico" no se implementa todavía).
 - DEC-0025 — Separación memoria de conversación / RAG / KB, retención generalizada.
+- DEC-0027 — Disparador de kb-provider: manual y recomendado ahora; "mágico" documentado pero no implementado.
 - `spec-native/specs/rag-provider/SPEC.md` (SPEC-RAG-0001) — capability hermana para contenido privado por conversación.
 - `docs/protocolo-provider.md` — contrato base que debe cumplir cualquier nodo `mcp`.
 
@@ -66,4 +84,4 @@ La promoción de un documento de RAG a KB (por ejemplo, porque el operador nota 
 
 ## Notas
 
-- No implementar todavía. Este draft nace de la discusión sobre RAG (2026-07-05, DEC-0025) — el diseño está menos maduro que `rag-provider` a propósito; falta resolver el punto de "cómo se dispara la consulta" antes de considerarlo listo para tareas de implementación.
+- Diseño del disparador cerrado el 2026-07-06 (DEC-0027) — modos manual y recomendado especificados, listos para tareas de implementación. El modo "mágico" queda documentado como premisa a futuro, explícitamente no implementado. Falta aún TASK-KB-0002 (proceso administrativo de indexado) antes de escribir código.

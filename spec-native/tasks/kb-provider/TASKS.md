@@ -5,21 +5,19 @@
 - Iniciativa: kb-provider
 - Spec relacionada: `spec-native/specs/kb-provider/SPEC.md` (SPEC-KB-0001)
 - Owner: Raúl Fletes (rafex)
-- Estado general: `todo` — bloqueado en diseño, no en implementación (ver TASK-KB-0001)
+- Estado general: `todo` — diseño del disparador cerrado (DEC-0027); falta TASK-KB-0002 antes de escribir código
 
 ## Tareas
 
 ### TASK-KB-0001 - Resolver cómo se dispara una consulta a KB
 
 - ID: TASK-KB-0001
-- State: `todo`
-- Owner:
+- State: `done`
+- Owner: rafex
 - Dependencies: ninguna
-- Expected files: `spec-native/specs/kb-provider/SPEC.md`
-- Close criteria: decisión documentada (como sección "Diseño" actualizada en el SPEC, o un nuevo DEC) sobre qué dispara `kb_query` — a diferencia de RAG, no hay un evento de "adjuntar" que lo active automáticamente.
-- Validation: revisión de diseño, sin código todavía.
-
-Bloqueante para el resto de las tareas — el SPEC señala esto como el riesgo de diseño principal, sin resolver.
+- Expected files: `spec-native/DECISIONS.md` (DEC-0027), `spec-native/specs/kb-provider/SPEC.md`
+- Close criteria: decisión documentada sobre qué dispara `kb_query`.
+- Validation: resuelto en DEC-0027 (2026-07-06) — modo manual (`preferences.kb`) y modo recomendado (matching determinístico contra `capability.description` + confirmación) quedan dentro de alcance; modo "mágico" (sin confirmación) documentado como premisa a futuro, explícitamente no implementado, por el mismo riesgo que DEC-0020 resolvió para OCR. La KB usada puede cambiar entre preguntas de una misma conversación; `preferences.kbMaxPerQuestion` (default 1) limita cuántas KBs se consultan por una sola pregunta, con advertencia obligatoria si se sube.
 
 ### TASK-KB-0002 - Definir el proceso administrativo de indexado
 
