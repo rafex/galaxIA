@@ -26,7 +26,7 @@ promocion o cambie el proceso de release.
   3. `make protocol-verify` — compila y corre `npm pack --dry-run`, verificando con `helpers/shell/verify-protocol-package.sh` que el tarball incluya `dist/*.js` (guarda contra el bug de la versión `0.1.0`, ver DEC-0040).
   4. `npm publish -w packages/fhs-protocol`.
 - **Auth:** usa el `GITHUB_TOKEN` automático de Actions (`permissions.contents: write` + `packages: write` declarados en el workflow) — no requiere un secret adicional. El bump/commit son intra-repo, por eso no hace falta un PAT con alcance a otros repos.
-- **Consumo hoy:** `galaxIA-satellite-star` ya consume `@rafex/galaxia-fhs-protocol` vía GitHub Packages (migrado en DEC-0040, ya no la rama git `fhs-protocol-dist`) — pero **sincronizar la versión nueva ahí sigue siendo manual** (ver "Proceso de release" abajo). Automatizar solo `galaxIA` fue una decisión explícita del usuario en DEC-0041 para no requerir un secret con permiso de escritura sobre un repo externo.
+- **Consumo hoy:** `galaxIA-satellite-star` ya consume `@rafex/galaxia-fhs-protocol` vía GitHub Packages (migrado en DEC-0040, ya no la rama git `fhs-protocol-dist`). Cómo y cuándo ese repo actualiza su dependencia **no es responsabilidad de `galaxIA`** — es el mismo principio de DEC-0026/DEC-0037 (el protocolo define el contrato, nunca gestiona a sus consumidores) llevado al ciclo de publicación: `galaxIA` publica versiones a un registro público, cualquier consumidor (`galaxIA-satellite-star` u otro) decide solo cuándo y cómo actualizarse.
 
 ### 2. Sitio público (`galax-ia.rafex.io`)
 
