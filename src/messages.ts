@@ -75,7 +75,7 @@ export interface NodeUpdatedMessage extends BaseMessage {
 export interface RegistryErrorMessage extends BaseMessage {
   type: "error";
   data: {
-    code: "NOT_IDENTIFIED" | "ALREADY_REGISTERED" | "INVALID_MANIFEST" | "PARSE_ERROR";
+    code: "NOT_IDENTIFIED" | "ALREADY_REGISTERED" | "INVALID_MANIFEST" | "INVALID_SIGNATURE" | "PARSE_ERROR";
     message: string;
   };
 }
