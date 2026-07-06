@@ -5,7 +5,7 @@
 - Iniciativa: satelite-rating
 - Spec relacionada: `spec-native/specs/satelite-rating/SPEC.md` (SPEC-SATRATING-0001)
 - Owner: Raúl Fletes (rafex)
-- Estado general: `done` — implementado y verificado end-to-end localmente (ver TASK-SATRATING-0008 para el detalle; pendiente repetir contra los 3 equipos reales de la demo cuando estén disponibles)
+- Estado general: `done` — implementado y verificado end-to-end localmente (ver TASK-SATRATING-0008 para el detalle); TASK-SATRATING-0008 bloqueada (`blocked`) para la reverificación contra hardware real por falta de acceso actual a la infraestructura (laptop + bastion + Raspberry Pi) — no bloquea el resto del roadmap
 
 ## Tareas
 
@@ -82,7 +82,7 @@
 ### TASK-SATRATING-0008 - Verificación end-to-end
 
 - ID: TASK-SATRATING-0008
-- State: `done` (local; pendiente repetir contra los 3 equipos reales cuando estén disponibles — no bloqueante, mismo código)
+- State: `done` (local) / `blocked` (reverificación contra los 3 equipos reales — 2026-07-05, sin acceso actual a la infraestructura física desde este entorno de trabajo; no bloquea el resto del roadmap, mismo código ya validado localmente)
 - Owner: rafex
 - Dependencies: TASK-SATRATING-0002, TASK-SATRATING-0003, TASK-SATRATING-0006, TASK-SATRATING-0007
 - Expected files: ninguno (verificación, no código)
