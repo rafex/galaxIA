@@ -6,8 +6,10 @@ import {
   type PingMessage,
   type FhsMessage,
   HEARTBEAT_INTERVAL_SECONDS,
+  FHS_ERROR_CODES,
 } from "@galaxia/fhs-protocol";
 import { Registry } from "./registry.js";
+import { validateManifest } from "./manifest-validation.js";
 
 export async function setupWebSocket(app: FastifyInstance, registry: Registry) {
   app.get("/fhs/v1/ws", { websocket: true }, (socket: WebSocket, req: FastifyRequest) => {
@@ -54,7 +56,7 @@ export async function setupWebSocket(app: FastifyInstance, registry: Registry) {
         const msg = JSON.parse(raw.toString()) as FhsMessage;
         handleMessage(msg);
       } catch (err) {
-        send({ type: "error", data: { code: "PARSE_ERROR", message: "Invalid JSON" } } as any);
+        send({ type: "error", data: { code: FHS_ERROR_CODES.PARSE_ERROR, message: "Invalid JSON" } } as any);
       }
     });
 
@@ -74,7 +76,7 @@ export async function setupWebSocket(app: FastifyInstance, registry: Registry) {
             send({
               type: "error",
               data: {
-                code: "ALREADY_REGISTERED",
+                code: FHS_ERROR_CODES.ALREADY_REGISTERED,
                 message: `providerId ${hello.providerId} ya tiene una conexión activa`,
               },
             } as any);
@@ -93,7 +95,21 @@ export async function setupWebSocket(app: FastifyInstance, registry: Registry) {
         case "register": {
           const register = msg as RegisterMessage;
           if (!providerId) {
-            send({ type: "error", data: { code: "NOT_IDENTIFIED", message: "Send hello first" } } as any);
+            send({ type: "error", data: { code: FHS_ERROR_CODES.NOT_IDENTIFIED, message: "Send hello first" } } as any);
+            return;
+          }
+          // DEC-0013: rechazar manifiestos incompletos, no aceptarlos con
+          // valores por defecto silenciosos (ver docs/protocolo-provider.md,
+          // "Manifiesto — campos obligatorios sin excepción").
+          const validation = validateManifest(register.manifest);
+          if (!validation.valid) {
+            send({
+              type: "error",
+              data: {
+                code: FHS_ERROR_CODES.INVALID_MANIFEST,
+                message: `Manifiesto incompleto, faltan campos obligatorios: ${validation.missing.join(", ")}`,
+              },
+            } as any);
             return;
           }
           const accepted = registry.registerOrUpdate(providerId, register.manifest);

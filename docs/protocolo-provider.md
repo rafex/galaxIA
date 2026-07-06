@@ -67,7 +67,7 @@ Independientemente del tipo (`llm` o `mcp`), todo manifiesto debe declarar:
 | `privacy.retention` | Sí | Ver sección de privacidad en `protocolo.md` — nunca se asume |
 | `privacy.trainingUse` | Sí, si `type: "llm"` | Debe ser explícito, no implícito |
 
-Un manifiesto sin `privacy.retention` **debe ser rechazado por el Registry**, no aceptado con un valor por defecto silencioso (hoy el Registry no valida esto — ver Deuda técnica más abajo).
+Un manifiesto sin `privacy.retention` **debe ser rechazado por el Registry**, no aceptado con un valor por defecto silencioso — implementado en `apps/agent-server/src/registry/manifest-validation.ts` (DEC-0013), conectado en `ws-handler.ts`: responde `error { code: "INVALID_MANIFEST" }` con el detalle de qué campo falta.
 
 ## Códigos de error estandarizados
 
@@ -124,6 +124,6 @@ Estos tres bugs se encontraron probando el pipeline OCR de punta a punta por pri
 
 ## Deuda técnica conocida
 
-- El Registry (`apps/agent-server/src/registry/ws-handler.ts`) hoy **no valida** que el manifiesto traiga `privacy.retention` — lo acepta igual. Ver `spec-native/DECISIONS.md` DEC-0009 (validación de identidad en `hello`) y DEC-0013 (validación de manifiesto, en spec) para este gap.
+- **DEC-0013 (validación de manifiesto + códigos de error) ya está cerrado** (2026-07-06) — ver `apps/agent-server/src/registry/manifest-validation.ts` y `FHS_ERROR_CODES` en `packages/fhs-protocol/src/constants.ts`. Ver `spec-native/DECISIONS.md` DEC-0009 para la validación de identidad en `hello` (aparte, ya resuelta).
 - **DEC-0012 (trazabilidad) ya está cerrado del lado del Agent Server** (`apps/agent-server/src/observability/trace.ts`, ver `mcp-host.ts`/`llm-gateway.ts`) — sigue como deuda que los providers de ejemplo (`examples/llm-provider`, `examples/ocr-provider`) no loggeen todavía su propia metadata local por `requestId`, solo el Agent Server lo hace hoy.
 - `examples/llm-provider` y `examples/ocr-provider` no comparten código de dispatcher/heartbeat — cada uno lo reimplementa. Extraer un helper común (aunque sea solo para TypeScript) es la forma más directa de que el contrato de este documento deje de depender de que cada autor lo lea y lo siga a mano.

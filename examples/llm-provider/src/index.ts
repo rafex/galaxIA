@@ -9,6 +9,7 @@ import type {
   ChatErrorMessage,
   DispatchAckMessage,
 } from "@galaxia/fhs-protocol";
+import { FHS_ERROR_CODES } from "@galaxia/fhs-protocol";
 import { LlmBridge } from "./llm-bridge.js";
 
 const REGISTRY_URL =
@@ -56,6 +57,12 @@ const manifest: LlmProviderManifest = {
   endpoint: {
     protocol: "fhs",
     url: `${WS_SCHEME}://${LLM_PROVIDER_HOST}:${LLM_PROVIDER_PORT}/fhs/v1/chat`,
+  },
+  // DEC-0013: obligatorio para cualquier provider — este de referencia no
+  // retiene nada del contenido de la conversación ni lo usa para entrenar.
+  privacy: {
+    retention: "none",
+    trainingUse: false,
   },
   models: [
     {
@@ -213,10 +220,12 @@ async function handleMessage(socket: WebSocket, raw: WebSocket.Data) {
     } catch (err: any) {
       log(`  → ERROR: ${err.message}`);
       console.error(`[fhs-llm] bridge error:`, err);
+      // El bridge llama a llama-server (servicio real) — cualquier fallo
+      // aquí es del upstream, no de este provider (DEC-0013).
       const errorMsg: ChatErrorMessage = {
         type: "chat.error",
         requestId: req.requestId,
-        code: "LLM_ERROR",
+        code: FHS_ERROR_CODES.UPSTREAM_UNAVAILABLE,
         message: err.message,
       };
       socket.send(JSON.stringify(errorMsg));
@@ -228,7 +237,7 @@ async function handleMessage(socket: WebSocket, raw: WebSocket.Data) {
       JSON.stringify({
         type: "chat.error",
         requestId: "unknown",
-        code: "PARSE_ERROR",
+        code: FHS_ERROR_CODES.PARSE_ERROR,
         message: err.message,
       })
     );

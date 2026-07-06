@@ -10,6 +10,7 @@ import type {
   ToolListResponseMessage,
   DispatchAckMessage,
 } from "@galaxia/fhs-protocol";
+import { FHS_ERROR_CODES } from "@galaxia/fhs-protocol";
 import { OcrBridge } from "./ocr-bridge.js";
 
 const REGISTRY_URL =
@@ -46,6 +47,11 @@ const manifest: McpProviderManifest = {
   endpoint: {
     protocol: "fhs",
     url: `${WS_SCHEME}://${OCR_PROVIDER_HOST}:${OCR_PROVIDER_PORT}/fhs/v1/tools`,
+  },
+  // DEC-0013: obligatorio para cualquier provider — este de referencia no
+  // retiene el archivo ni el texto extraído más allá de la petición en curso.
+  privacy: {
+    retention: "none",
   },
   capabilities: [
     {
@@ -235,17 +241,19 @@ function startToolServer() {
                 type: "tool.error",
                 requestId: req.requestId,
                 toolName: req.toolName,
-                code: "UNKNOWN_TOOL",
+                code: FHS_ERROR_CODES.UNSUPPORTED_CAPABILITY,
                 message: `Tool no soportada: ${req.toolName}`,
               };
               socket.send(JSON.stringify(error));
             }
           } catch (err: any) {
+            // El bridge llama a ether-ocr-api (servicio real) — cualquier
+            // fallo aquí es del upstream, no de este provider (DEC-0013).
             const error: ToolCallErrorMessage = {
               type: "tool.error",
               requestId: req.requestId,
               toolName: req.toolName,
-              code: "EXECUTION_ERROR",
+              code: FHS_ERROR_CODES.UPSTREAM_UNAVAILABLE,
               message: err.message,
             };
             socket.send(JSON.stringify(error));
@@ -257,7 +265,7 @@ function startToolServer() {
             type: "tool.error",
             requestId: "unknown",
             toolName: "unknown",
-            code: "PARSE_ERROR",
+            code: FHS_ERROR_CODES.PARSE_ERROR,
             message: err.message,
           })
         );

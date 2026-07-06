@@ -166,14 +166,19 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
 
 ## DEC-0013 — Contrato formal de provider ("protocolo-provider") para plug-and-play
 
-- **Fecha:** 2026-07-01
-- **Estado:** `proposed`
+- **Fecha:** 2026-07-01 — validación y migración implementadas 2026-07-06
+- **Estado:** `accepted`
 - **Contexto:** `examples/llm-provider` y `examples/ocr-provider` cumplen el protocolo FHS de mensajes, pero cada uno reimplementa desde cero su propio manejo de conexión, heartbeat y códigos de error. Sin un contrato explícito, cada provider nuevo tiende a "personalizarse" en detalles que deberían ser uniformes, obligando a conocimiento especial en el Agent Server por proveedor en vez de por tipo (`llm`/`mcp`).
 - **Decisión:** Definir `docs/protocolo-provider.md` como el contrato obligatorio de implementación de cualquier provider: ciclo de vida de 5 estados (`Connecting → Identifying → Registering → Ready → Reconnecting`), dispatcher concurrente que no bloquea el heartbeat (relacionado con DEC-0009), manifiesto con campos obligatorios (incluyendo privacidad), tabla de códigos de error estandarizados, y checklist de trazabilidad obligatoria (DEC-0012). Cumplir este contrato es lo que permite que un provider nuevo se conecte sin cambios en `apps/agent-server`.
+- **Implementado (2026-07-06):**
+  - `packages/fhs-protocol/src/constants.ts` — `FHS_ERROR_CODES` (`NOT_IDENTIFIED`, `INVALID_MANIFEST`, `ALREADY_REGISTERED`, `UPSTREAM_UNAVAILABLE`, `UPSTREAM_TIMEOUT`, `INVALID_ARGUMENTS`, `UNSUPPORTED_CAPABILITY`, `INTERNAL_ERROR`, `PARSE_ERROR`) — canónico pero no un tipo cerrado a nivel de protocolo (DEC-0026: no se mandata implementación a otros lenguajes).
+  - `apps/agent-server/src/registry/manifest-validation.ts` (nuevo) — `validateManifest()` verifica `fhsVersion`, `provider.id/type/visibility`, `privacy.retention`, `privacy.trainingUse` (si `type: "llm"`), y `endpoint`/`services[].endpoint` según el tipo. Conectado en `ws-handler.ts`: un manifiesto incompleto se rechaza con `INVALID_MANIFEST` y el detalle de qué falta, sin registrar el nodo.
+  - `examples/llm-provider` y `examples/ocr-provider` migrados a `FHS_ERROR_CODES` (`UNSUPPORTED_CAPABILITY` en vez de `UNKNOWN_TOOL`, `UPSTREAM_UNAVAILABLE` en vez de `EXECUTION_ERROR`/`LLM_ERROR` para fallos del servicio real detrás del provider).
+  - **Hallazgo real al activar la validación**: ninguno de los dos providers de referencia declaraba `privacy` en su propio manifiesto — la validación los habría rechazado a ellos mismos. Corregido: `llm-provider` declara `{ retention: "none", trainingUse: false }`, `ocr-provider` declara `{ retention: "none" }` (coincide con lo ya documentado en `docs/manifiesto-llm.md`/`docs/manifiesto-mcp.md`, nunca implementado en el código real). Mismo patrón que la lección de DEC-0016/DEC-0017: "documentado" no es "implementado" hasta que se verifica con una ejecución real.
+- **Verificación:** `npm run typecheck` limpio en los 4 paquetes tocados. Prueba real: un manifiesto sin `privacy.retention` es rechazado con `INVALID_MANIFEST` y el detalle de campos faltantes; `llm-provider` real (con el fix de privacidad) se registra y completa un chat E2E contra un LLM mock sin problemas.
 - **Consecuencias:**
-  - El Registry debería validar manifiestos contra estos campos obligatorios (hoy no lo hace — deuda técnica documentada en el propio `protocolo-provider.md`).
-  - `examples/llm-provider` y `examples/ocr-provider` deben migrar a los códigos de error estandarizados y a loggear metadata de trazabilidad — hoy no lo hacen completamente.
-  - Facilita que futuros SDKs en Python/Rust/Java (DEC-0011) implementen el contrato una sola vez, en vez de adivinar el comportamiento leyendo el código TypeScript de referencia.
+  - Facilita que futuros SDKs en Python/Rust/Java (DEC-0011) implementen el contrato una sola vez, verificable contra el Registry real, en vez de adivinar el comportamiento leyendo el código TypeScript de referencia.
+  - Pendiente no bloqueante: `ChatErrorMessage.code`/`ToolCallErrorMessage.code` siguen tipados como `string` libre (no como unión literal de `FHS_ERROR_CODES`) — deliberado, para no sobre-restringir a providers en otros lenguajes con códigos propios no cubiertos por la lista canónica.
 
 ## DEC-0014 — `McpHost` hablaba MCP-HTTP nativo en vez de FHS WebSocket (bug crítico, corregido)
 
