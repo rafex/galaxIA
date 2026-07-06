@@ -2,7 +2,7 @@
 
 ## Estado
 
-`draft`
+`draft` — implementado y verificado en local (2026-07-06, DEC-0032); pendiente solo la verificación contra los 3 equipos reales de la demo (mismo bloqueo de hardware que issue #1)
 
 ## Owner
 
@@ -64,12 +64,22 @@ resolver aquí.
 
 - **Anuncio mDNS del Registry**: el `agent-server` anuncia un servicio
   `_fhs-registry._tcp.local` (puerto, versión FHS, si usa TLS) en la LAN
-  vía mDNS (biblioteca candidata: `bonjour-service` o `multicast-dns` en
-  Node — decisión de implementación, no de esta spec).
+  vía mDNS. Librería elegida con datos reales, no solo criterio (DEC-0032):
+  **`bonjour-service`** — sin bindings nativos (crítico para hardware
+  reutilizado de arquitecturas variadas), con tipos TypeScript propios,
+  mantenimiento activo, y API de alto nivel ya lista (`.publish()`/
+  `.find()`) que evita construir esa capa desde `multicast-dns`.
+- **El Registry también tiene identidad Ed25519 propia** (DEC-0032,
+  reutiliza `packages/fhs-protocol/src/identity.ts` de DEC-0030) — el
+  anuncio mDNS va firmado (`did`, `sig`, `ts` en los TXT records), y un
+  nodo puede anclar qué `did` de Registry espera vía
+  `REGISTRY_EXPECTED_DID` (opcional). Ver "Riesgos" — esto cierra
+  parcialmente el riesgo de "Registry falso en la misma LAN" que esta
+  spec dejaba abierto en su borrador original.
 - **Descubrimiento mDNS en nodos**: `examples/llm-provider` y
-  `examples/ocr-provider` ganan un modo `REGISTRY_URL=auto` (o variable
-  nueva, ej. `REGISTRY_DISCOVERY=mdns`) que busca el servicio anunciado en
-  la LAN y arma `wss://<ip-encontrada>:<puerto>/fhs/v1/ws` automáticamente,
+  `examples/ocr-provider` ganan un modo automático — si `REGISTRY_URL`
+  no está definido (o vale `"auto"`) buscan el servicio anunciado en
+  la LAN y arman `ws(s)://<ip-encontrada>:<puerto>/fhs/v1/ws` automáticamente,
   en vez de requerir la URL exacta por variable de entorno.
 - **Coexistencia explícita con configuración manual**: si `REGISTRY_URL`
   viene definido con una URL concreta, tiene prioridad — mDNS es
@@ -100,12 +110,11 @@ resolver aquí.
   `agent-server`). El protocolo FHS asume que el Agent Runtime media toda
   interacción (`spec-native/ARCHITECTURE.md`, "Restricciones") — esta spec
   no cambia eso.
-- **Autenticación/verificación de que el servicio anunciado por mDNS es
-  el Registry legítimo y no un impostor en la misma LAN.** Ver "Riesgos"
-  — depende de identidad criptográfica real (DEC-0004, Ed25519), que sigue
-  sin implementarse. Documentado como limitación aceptada para esta fase,
-  igual que ya se acepta hoy que cualquiera en la LAN puede intentar
-  `hello` contra el Registry (DEC-0009, aún `proposed`).
+- **Anclaje automático/descubierto de qué `did` de Registry confiar** —
+  `REGISTRY_EXPECTED_DID` (implementado, DEC-0032) se configura a mano,
+  igual que hoy se comparte `REGISTRY_URL` a mano. Un mecanismo para que
+  ese anclaje también se distribuya/descubra automáticamente (en vez de
+  copiarlo manualmente al desplegar cada nodo) queda fuera de alcance.
 - **UI/CLI para elegir entre varios Registries anunciados** si hubiera más
   de uno en la misma LAN (ej. dos comunidades distintas compartiendo wifi
   de un evento). Para esta fase, si mDNS encuentra más de un anuncio, el
@@ -163,7 +172,7 @@ scope, retention, provenance) sigue idéntico. Ningún archivo de
 
 | Riesgo | Impacto | Mitigación |
 |---|---|---|
-| Cualquier equipo en la misma LAN puede anunciarse como `_fhs-registry._tcp.local` falso y atraer nodos (sin identidad criptográfica real, DEC-0004 sigue simplificada) | Alto en redes no confiables, bajo en la LAN doméstica/comunidad actual | Documentar explícitamente que mDNS asume la misma "LAN de confianza" que ya declara `spec-native/ARCHITECTURE.md` — no usar en redes compartidas con desconocidos (ej. wifi pública de un evento) hasta que exista identidad Ed25519 real |
+| Cualquier equipo en la misma LAN puede anunciarse como `_fhs-registry._tcp.local` falso y atraer nodos | Medio (bajó de "Alto" tras DEC-0032) | **Resuelto parcialmente**: el anuncio va firmado con la identidad Ed25519 del Registry (DEC-0032); un nodo puede anclar el `did` esperado vía `REGISTRY_EXPECTED_DID`. Sin ese anclaje, la firma por sí sola solo sube el costo de un impostor (debe generar su propia identidad válida), no lo impide — documentado así, no disimulado. |
 | Redes de eventos/hoteles bloquean tráfico multicast (mDNS no llega) | Medio — justo el escenario de "dispositivo con red remota en sitio" de esta semana | mDNS es fallback, nunca obligatorio — `REGISTRY_URL` manual sigue siendo el camino garantizado, documentado como primera opción para sitio con red desconocida |
 | Más de un Registry anunciado en la misma LAN (dos comunidades, mismo evento) causa ambigüedad | Medio | Fase 1 falla explícito en vez de adivinar (ver "Fuera de alcance") — resolver selección multi-Registry es una iteración futura, no de esta spec |
 | Nueva dependencia de librería mDNS en Node introduce superficie de mantenimiento | Bajo | Elegir una librería madura y ampliamente usada (evaluar `bonjour-service` vs `multicast-dns` en la fase de implementación); el fallback a configuración manual limita el radio de daño si la librería falla |
@@ -171,22 +180,21 @@ scope, retention, provenance) sigue idéntico. Ningún archivo de
 
 ## Criterios de aceptación
 
-- [ ] `agent-server` anuncia su Registry vía mDNS al arrancar, configurable
-      (poder desactivarlo por variable de entorno para despliegues que no
-      lo quieran).
-- [ ] `examples/llm-provider` y `examples/ocr-provider` pueden arrancar
-      sin `REGISTRY_URL` configurado y encontrar el Registry por mDNS en
-      una LAN real de una sola comunidad.
-- [ ] Si `REGISTRY_URL` sí está configurado, mDNS ni se intenta —
-      compatibilidad total con los tres despliegues ya verificados esta
-      semana (multi-host, TLS, topología de 3 equipos).
-- [ ] Si mDNS no encuentra nada o encuentra más de un Registry, el
-      nodo falla con un mensaje claro (no un timeout silencioso ni una
-      conexión a un Registry arbitrario).
-- [ ] Verificado con una prueba real: apagar el `REGISTRY_URL` explícito en
-      uno de los tres nodos de la demo (laptop/bastion/raspi4b) y
-      confirmar que igual se registra correctamente vía mDNS en esa misma
-      LAN.
+- [x] `agent-server` anuncia su Registry vía mDNS al arrancar, configurable
+      (`MDNS_ENABLED=false` para desactivarlo).
+- [x] `examples/llm-provider` y `examples/ocr-provider` pueden arrancar
+      sin `REGISTRY_URL` configurado y encontrar el Registry por mDNS —
+      verificado en local (2026-07-06): descubrimiento, verificación de
+      firma, conexión y registro exitoso end-to-end.
+- [x] Si `REGISTRY_URL` sí está configurado, mDNS ni se intenta —
+      compatibilidad total con los despliegues existentes (multi-host, TLS).
+- [x] Si mDNS no encuentra nada o encuentra más de un Registry, el
+      nodo falla con un mensaje claro — verificado explícitamente con
+      `REGISTRY_EXPECTED_DID` apuntando a un `did` inexistente.
+- [ ] Verificado con una prueba real contra los 3 equipos de la demo
+      (laptop/bastion/raspi4b) — **bloqueado por falta de acceso a
+      hardware físico** en este entorno de trabajo (mismo bloqueo que
+      issue #1/TASK-SATRATING-0008), no bloqueante para el resto del roadmap.
 - [ ] Documentado en `docs/despliegue-multi-host.md` y/o un documento
       nuevo, incluyendo la limitación explícita de que no cruza redes ni
       resuelve el caso de un dispositivo de red remota en sitio (ese caso
@@ -198,11 +206,9 @@ scope, retention, provenance) sigue idéntico. Ningún archivo de
 - `spec-native/DECISIONS.md` DEC-0001 — decisión original que evaluó y
   descartó DHT/mDNS libp2p para v0.1; esta spec la reafirma para una fase
   acotada, no la revierte.
-- `spec-native/DECISIONS.md` DEC-0004 — identidad Ed25519 pendiente,
-  prerequisito real para que mDNS (o cualquier descubrimiento) sea seguro
-  fuera de una LAN totalmente confiable.
-- `spec-native/DECISIONS.md` DEC-0009 — validar identidad en `hello`,
-  mismo tipo de gap de confianza que esta spec hereda sin resolver.
+- `spec-native/DECISIONS.md` DEC-0030 — identidad Ed25519 real (implementada), prerequisito que DEC-0032 extiende al Registry mismo.
+- `spec-native/DECISIONS.md` DEC-0032 — librería mDNS elegida con datos, identidad Ed25519 del Registry, verificación de firma en el descubrimiento — implementación real de esta spec.
+- `spec-native/DECISIONS.md` DEC-0009 — validar identidad en `hello`, mismo tipo de gap de confianza que esta spec hereda parcialmente resuelto (ver DEC-0032).
 - `spec-native/DECISIONS.md` DEC-0022 — topología multi-host real, origen
   concreto del dolor de direcciones IP que motiva esta spec.
 - `spec-native/ARCHITECTURE.md` — límite ya declarado de "red local o

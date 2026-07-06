@@ -9,10 +9,16 @@ import { setupProvidersApi } from "./api/providers.js";
 import { setupEventsApi } from "./api/events.js";
 import { setupChatWebSocket } from "./api/chat-ws.js";
 import { EventBus } from "./sse/event-bus.js";
+import { loadOrCreateIdentity } from "./registry/identity-store.js";
+import { announceRegistry } from "./registry/mdns-announce.js";
 import versionInfo from "./version.json" with { type: "json" };
 
 const PORT = Number(process.env.PORT || 8081);
 const HOST = process.env.HOST || "127.0.0.1";
+// SPEC-P2P-0001 (fase 1): anuncio mDNS del Registry, opt-out explícito —
+// fallback de conveniencia, nunca obligatorio. Ver docs/protocolo.md.
+const MDNS_ENABLED = process.env.MDNS_ENABLED !== "false";
+const IDENTITY_KEY_PATH = process.env.IDENTITY_KEY_PATH || "./.fhs-identity-registry.pem";
 // TLS opt-in: si TLS_CERT_PATH/TLS_KEY_PATH están seteados, el Registry y el
 // Chat API sirven wss:// en vez de ws:// — necesario para que providers en
 // otra máquina no manden el manifiesto/mensajes en texto plano por la LAN
@@ -61,6 +67,12 @@ async function main() {
   } catch (err) {
     app.log.error(err);
     process.exit(1);
+  }
+
+  if (MDNS_ENABLED) {
+    const identity = loadOrCreateIdentity(IDENTITY_KEY_PATH);
+    announceRegistry(identity, PORT, tlsEnabled);
+    app.log.info(`Anunciando Registry por mDNS (did: ${identity.did})`);
   }
 }
 

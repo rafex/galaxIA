@@ -12,9 +12,16 @@ import type {
 import { FHS_ERROR_CODES, signPayload } from "@galaxia/fhs-protocol";
 import { LlmBridge } from "./llm-bridge.js";
 import { loadOrCreateIdentity } from "./identity-store.js";
+import { discoverRegistryUrl } from "./registry-discovery.js";
 
-const REGISTRY_URL =
-  process.env.REGISTRY_URL || "ws://localhost:8083/fhs/v1/ws";
+// SPEC-P2P-0001 (fase 1): sin REGISTRY_URL configurado (o = "auto"), se
+// intenta descubrir el Registry por mDNS en la LAN — fallback de
+// conveniencia, nunca obligatorio. REGISTRY_EXPECTED_DID (opcional) ancla
+// qué identidad de Registry se espera para esta comunidad (DEC-0032).
+const REGISTRY_URL_ENV = process.env.REGISTRY_URL;
+const USE_MDNS_DISCOVERY = !REGISTRY_URL_ENV || REGISTRY_URL_ENV === "auto";
+const REGISTRY_EXPECTED_DID = process.env.REGISTRY_EXPECTED_DID;
+let REGISTRY_URL = REGISTRY_URL_ENV && REGISTRY_URL_ENV !== "auto" ? REGISTRY_URL_ENV : "";
 const LLM_PROVIDER_PORT = Number(process.env.LLM_PROVIDER_PORT || 43111);
 const LLM_PROVIDER_HOST =
   process.env.LLM_PROVIDER_HOST || "localhost";
@@ -298,11 +305,28 @@ function log(message: string) {
   console.log(`[fhs-llm ${ts}] ${message}`);
 }
 
-log(`Iniciando LLM Provider FHS v${manifest.fhsVersion}`);
-log(`  Provider : ${PROVIDER_NAME} (${PROVIDER_ID})`);
-log(`  Registry : ${REGISTRY_URL}`);
-log(`  llama.cpp: ${LLAMA_CPP_URL}`);
-log(`  Chat FHS : ${WS_SCHEME}://localhost:${LLM_PROVIDER_PORT}`);
+async function main() {
+  log(`Iniciando LLM Provider FHS v${manifest.fhsVersion}`);
+  log(`  Provider : ${PROVIDER_NAME} (${PROVIDER_ID})`);
+  log(`  llama.cpp: ${LLAMA_CPP_URL}`);
+  log(`  Chat FHS : ${WS_SCHEME}://localhost:${LLM_PROVIDER_PORT}`);
 
-connectToRegistry();
-startChatServer();
+  if (USE_MDNS_DISCOVERY) {
+    log("REGISTRY_URL no configurado — buscando Registry por mDNS...");
+    try {
+      const found = await discoverRegistryUrl(REGISTRY_EXPECTED_DID);
+      REGISTRY_URL = found.url;
+      log(`Registry encontrado por mDNS: ${REGISTRY_URL} (did: ${found.did})`);
+    } catch (err: any) {
+      log(`No se pudo autodescubrir el Registry: ${err.message}`);
+      process.exit(1);
+    }
+  } else {
+    log(`  Registry : ${REGISTRY_URL}`);
+  }
+
+  connectToRegistry();
+  startChatServer();
+}
+
+main();

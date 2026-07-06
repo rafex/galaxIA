@@ -461,3 +461,28 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - "Quién es el administrador que aprueba" deja de tener una respuesta única cuando la red crece más allá de una sola comunidad — no resuelto, relacionado con "Separar Registry del Agent Backend" (`ROADMAP.md`, soporte a múltiples backends/comunidades).
 - **Explícitamente pendiente de debate más profundo, sin resolver ni asignar a ninguna solución concreta todavía:** mecanismos técnicos para garantizar que el servicio realmente en ejecución corresponde al código publicado en `sourceUrl` — se mencionaron como posibles direcciones a explorar más adelante (sin comprometerse a ninguna): estrategias basadas en un agente de atestación corriendo junto al servicio, verificación de hash/build reproducible, u otras alternativas todavía no evaluadas. Este punto se deja fuera de esta decisión a propósito — es un tema de fondo que requiere su propia discusión, no una nota lateral de DEC-0031.
 - **Consecuencias:** ninguna implementación como parte de esta entrada. Sirve como punto de partida documentado para cuando se priorice diseñar el nivel "premium" con más detalle (formato exacto de los campos, mecanismo de mTLS, y el proceso de aprobación).
+
+## DEC-0032 — p2p-discovery (mDNS): librería elegida con datos, Registry con identidad Ed25519 propia
+
+- **Fecha:** 2026-07-06
+- **Estado:** `accepted`
+- **Contexto:** `SPEC-P2P-0001` (fase 1 de descubrimiento) dejaba la elección de librería mDNS y la verificación de identidad del Registry como decisiones de implementación abiertas. Se pidió resolverlas con datos reales, no solo criterio, y aprovechar que DEC-0030 ya implementó identidad Ed25519 real para providers.
+- **Decisión — librería:** `bonjour-service`, confirmado con datos (no solo la intuición original de la spec):
+
+  | Paquete | Descargas/mes | Bindings nativos | Tipos TS | Mantenimiento |
+  |---|---|---|---|---|
+  | **bonjour-service** | 58.5M | No | Sí, propios | Activo (jun 2026) |
+  | multicast-dns | 67.3M | No | No (habría que escribirlos) | Activo, pero de más bajo nivel — requeriría construir la capa de publish/find nosotros |
+  | bonjour (legado) | 10.7M | No | No | Sin mejoras activas, predecesor de bonjour-service |
+  | mdns | 15.8k | Sí (node-gyp + Avahi/Bonjour del sistema) | No | 2022, abandonado |
+  | dnssd | 359k | Sí (node-gyp + dns-sd del sistema) | No | 2022, abandonado |
+
+  `mdns`/`dnssd` se descartan por bindings nativos — en una red de hardware reutilizado (Raspberry Pi, arquitecturas variadas), depender de compilar addons C++ por nodo es la fricción que el proyecto evita (`docs/protocolo-provider.md`). Verificado con una prueba real en este entorno (publish + find con TXT records) antes de integrarlo al código — sin privilegios especiales.
+- **Decisión — el Registry también tiene identidad Ed25519 propia:** reutiliza el mismo módulo `packages/fhs-protocol/src/identity.ts` de DEC-0030 (`apps/agent-server/src/registry/identity-store.ts`, mismo patrón que los providers). El anuncio mDNS (`apps/agent-server/src/registry/mdns-announce.ts`) va firmado (`did`, `sig`, `ts` en los TXT records) — un nodo que descubre el Registry por mDNS puede verificar que el anuncio viene de quien dice ser, no de un impostor sin firma en la misma LAN.
+  - **Límite reconocido, explícito:** sin anclar qué identidad se espera, verificar la firma sube el costo de un impostor de "difundir cualquier cosa" a "generar su propia identidad Ed25519 y autofirmarse" — trivial para un atacante mínimamente capaz. La verificación de firma por sí sola **no** resuelve el riesgo de raíz señalado en la spec original.
+  - **Lo que sí lo resuelve:** `REGISTRY_EXPECTED_DID` (variable de entorno opcional en los providers) ancla qué `did:key` de Registry se espera para esa comunidad — obtenido fuera de banda (quien monta la red lo comparte una vez, igual que hoy se comparte `REGISTRY_URL` a mano). Sin ese anclaje, mDNS sigue siendo "encuentra *algo* que se anuncia y firma", no "encuentra *el* Registry legítimo" — documentado así, sin disimularlo.
+- **Verificación real:** `agent-server` anuncia con su `did:key` propio; `llm-provider` sin `REGISTRY_URL` lo descubre, verifica la firma, arma la URL, y se registra correctamente (`GET /api/fhs/providers` lo confirma). Con `REGISTRY_EXPECTED_DID` apuntando a un `did` que no existe, el provider rechaza y falla con mensaje claro en vez de conectarse a ciegas — probado explícitamente. `npm run typecheck` limpio en los 3 paquetes tocados.
+- **Consecuencias:**
+  - `SPEC-P2P-0001` se actualiza: ya no queda como "decisión de implementación" pendiente la librería, y la sección de riesgos se corrige (ya no dice "depende de identidad criptográfica real, que sigue sin implementarse" — DEC-0030 lo cerró, y esta decisión extiende esa identidad al Registry).
+  - `TASK-P2P-0001..0004` pasan a `done`. `TASK-P2P-0005` (documentación) y `TASK-P2P-0006` (verificación contra los 3 equipos reales de la demo) siguen pendientes — `TASK-P2P-0006` comparte la misma limitación que TASK-SATRATING-0008 (issue #1): requiere acceso a hardware físico no disponible en este entorno.
+  - Nueva dependencia real en el monorepo: `bonjour-service` en `apps/agent-server`, `examples/llm-provider`, `examples/ocr-provider`.

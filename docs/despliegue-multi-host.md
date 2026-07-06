@@ -90,6 +90,17 @@ sequenceDiagram
     Note over REG: Si algún provider no hace ping en 30s,<br/>el Registry lo marca "lost" y notifica al chat
 ```
 
+## Descubrimiento automático del Registry por mDNS (opcional, SPEC-P2P-0001)
+
+En vez de configurar `REGISTRY_URL`/`PROVIDER_REGISTRY_URL` a mano en cada provider, el `agent-server` puede anunciarse por mDNS en la LAN (`_fhs-registry._tcp.local`) y que los providers lo encuentren solos:
+
+- **Activado por default** en `agent-server` — se puede desactivar con `MDNS_ENABLED=false` si no se quiere el anuncio (ej. redes que bloquean multicast, o se prefiere no anunciar el Registry).
+- En cada provider, si `REGISTRY_URL` **no está definido** (o vale `"auto"`), se intenta el descubrimiento por mDNS antes de conectar. Si `REGISTRY_URL` sí trae una URL concreta, mDNS ni se intenta — coexisten sin conflicto.
+- El anuncio va firmado con la identidad Ed25519 propia del Registry (DEC-0032) — el provider verifica la firma antes de confiar en lo encontrado. Para anclar explícitamente **qué** Registry se espera en esta comunidad (y no solo "alguno que firme válidamente"), define `REGISTRY_EXPECTED_DID=did:key:...` en cada provider — el `did` del Registry se ve en su log al arrancar (`Anunciando Registry por mDNS (did: ...)`).
+- Si mDNS no encuentra ningún Registry válido, o encuentra más de uno, el provider **falla al arrancar** con un mensaje claro pidiendo `REGISTRY_URL` manual — nunca se queda esperando en silencio ni elige uno arbitrariamente.
+
+**Límite explícito, no un bug**: mDNS solo funciona dentro del mismo segmento de multicast/broadcast (misma LAN). No resuelve el caso de un dispositivo con red remota distinta a la del resto (ej. un router 4G/5G aparte en el sitio de una demo) — ese caso sigue requiriendo `REGISTRY_URL` manual, como ya pasó en despliegues reales de esta PoC. Tampoco reemplaza el Registry centralizado ni cambia el protocolo `hello`/`register`/Pulse — solo resuelve "¿en qué IP:puerto está?".
+
 ## Puertos y firewall
 
 | Servicio | Host | Puerto | Quién debe alcanzarlo |

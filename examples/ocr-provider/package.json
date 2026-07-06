@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@galaxia/fhs-protocol": "*",
+    "bonjour-service": "^1.4.2",
     "ws": "^8.18.0"
   },
   "devDependencies": {
