@@ -5,6 +5,7 @@
 include helpers/mk/common.mk
 include helpers/mk/node.mk
 include helpers/mk/container.mk
+include helpers/mk/protocol.mk
 
 .DEFAULT_GOAL := help
 
@@ -32,5 +33,11 @@ help:
 	@echo "  make container-down     Detener contenedores"
 	@echo "  make container-logs     Ver logs de contenedores"
 	@echo "  make container-restart  Reiniciar contenedores"
+	@echo ""
+	@echo "$(C_BOLD)Paquete del protocolo (@rafex/galaxia-fhs-protocol):$(C_RESET)"
+	@echo "  make protocol-bump-check  Solo reporta si hace falta subir versión (no escribe)"
+	@echo "  make protocol-bump        Sube la versión si la actual ya está publicada"
+	@echo "  make protocol-verify      Build + verifica que el tarball incluya dist/"
+	@echo "  make protocol-publish     bump + verify + npm publish (requiere GH_TOKEN)"
 	@echo ""
 	@echo "$(C_BOLD)Orquestación:$(C_RESET) usar $(C_CYAN)just$(C_RESET) (ver Justfile o ejecutar 'just --list')"

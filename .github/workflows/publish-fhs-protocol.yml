@@ -2,9 +2,16 @@ name: Publish @rafex/galaxia-fhs-protocol to GitHub Packages
 
 # CD (entrega continua), no CI — ver spec-native/pipelines/CD.md.
 # Publica el SDK del protocolo (packages/fhs-protocol) a GitHub Packages en
-# cada push a main que lo modifique. No publica si la versión en
-# package.json ya existe en el registro (evita fallos ruidosos en pushes
-# que no tocan la versión).
+# cada push a main que lo modifique.
+#
+# Automatización (DEC-0041, ver helpers/shell y helpers/python):
+# - Si la versión en package.json ya está publicada, el propio workflow la
+#   sube automáticamente (helpers/python/bump_protocol_version.py) y
+#   commitea el bump de vuelta a main — ya no depende de que quien mergea
+#   se acuerde de subir el número a mano.
+# - Antes de publicar, verifica que el tarball incluya dist/ compilado
+#   (helpers/shell/verify-protocol-package.sh) — la versión 0.1.0 se publicó
+#   rota por esto exacto (ver DEC-0040), este chequeo evita que se repita.
 
 on:
   push:
@@ -15,18 +22,18 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/fhs-protocol
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Necesario para poder pushear el commit de bump de vuelta a main.
+          persist-credentials: true
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -35,34 +42,36 @@ jobs:
           registry-url: "https://npm.pkg.github.com"
           scope: "@rafex"
 
-      - name: Instalar dependencias del paquete
-        run: npm install
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Instalar jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Instalar dependencias del workspace
+        run: npm ci
+
+      - name: Bump de versión si ya está publicada
+        run: make protocol-bump
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build
-        run: npm run build
-
-      - name: Verificar si la versión ya está publicada
-        id: check
+      - name: Commitear el bump de versión (si hubo)
         run: |
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
-          if npm view "@rafex/galaxia-fhs-protocol@$PKG_VERSION" version \
-            --registry https://npm.pkg.github.com >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+          if ! git diff --quiet -- packages/fhs-protocol/package.json package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add packages/fhs-protocol/package.json package-lock.json
+            git commit -m "chore: bump @rafex/galaxia-fhs-protocol version [skip ci]"
+            git push
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Sin cambios de versión — nada que commitear."
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verificar contenido del paquete (build + dist/ en el tarball)
+        run: make protocol-verify
 
       - name: Publicar a GitHub Packages
-        if: steps.check.outputs.exists == 'false'
-        run: npm publish
+        run: npm publish -w packages/fhs-protocol
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Ya publicada, no se hace nada
-        if: steps.check.outputs.exists == 'true'
-        run: echo "Versión ${{ steps.check.outputs.version }} ya existe en GitHub Packages — sube el version en package.json para publicar una nueva."

@@ -20,9 +20,13 @@ promocion o cambie el proceso de release.
 - **Archivo de configuración:** `.github/workflows/publish-fhs-protocol.yml`.
 - **Dónde ver el estado:** pestaña "Actions" del repo (workflow "Publish @rafex/galaxia-fhs-protocol to GitHub Packages"); paquete publicado visible en la pestaña "Packages" de `github.com/rafex/galaxIA`.
 - **Trigger:** push a `main` que modifique `packages/fhs-protocol/**`, o `workflow_dispatch` manual.
-- **Qué hace:** compila `packages/fhs-protocol` (`tsc`) y publica el resultado a `npm.pkg.github.com` bajo el scope `@rafex`. Antes de publicar, verifica si la versión de `package.json` ya existe en el registro — si ya existe, no hace nada (no falla el run, solo lo reporta). Para publicar una versión nueva, hay que subir el campo `version` en `packages/fhs-protocol/package.json` antes de mergear a `main`.
-- **Auth:** usa el `GITHUB_TOKEN` automático de Actions (permiso `packages: write` declarado en el workflow) — no requiere un secret adicional.
-- **Consumo hoy:** este pipeline es nuevo (2026-07-06) y coexiste con el mecanismo previo — `galaxIA-satellite-star` sigue consumiendo el protocolo vía una dependencia git a la rama `fhs-protocol-dist` (subtree split manual, ver DEC-0038). Migrar esa dependencia a `@rafex/galaxia-fhs-protocol` vía GitHub Packages es un paso futuro, no automático — requiere que los consumidores configuren un `.npmrc` con el scope `@rafex` apuntando a `npm.pkg.github.com` y un token con permiso `read:packages` (GitHub Packages exige autenticación incluso para paquetes públicos, a diferencia del registro público de npm).
+- **Qué hace (DEC-0041):**
+  1. `make protocol-bump` — si la versión de `package.json` ya está publicada en GitHub Packages, la sube automáticamente (patch) usando `helpers/python/bump_protocol_version.py` (`uv run`). Ya no depende de que quien mergea se acuerde de subir el `version` a mano.
+  2. Si el bump modificó `package.json`/`package-lock.json`, los commitea y pushea a `main` (`chore: bump ... [skip ci]`).
+  3. `make protocol-verify` — compila y corre `npm pack --dry-run`, verificando con `helpers/shell/verify-protocol-package.sh` que el tarball incluya `dist/*.js` (guarda contra el bug de la versión `0.1.0`, ver DEC-0040).
+  4. `npm publish -w packages/fhs-protocol`.
+- **Auth:** usa el `GITHUB_TOKEN` automático de Actions (`permissions.contents: write` + `packages: write` declarados en el workflow) — no requiere un secret adicional. El bump/commit son intra-repo, por eso no hace falta un PAT con alcance a otros repos.
+- **Consumo hoy:** `galaxIA-satellite-star` ya consume `@rafex/galaxia-fhs-protocol` vía GitHub Packages (migrado en DEC-0040, ya no la rama git `fhs-protocol-dist`) — pero **sincronizar la versión nueva ahí sigue siendo manual** (ver "Proceso de release" abajo). Automatizar solo `galaxIA` fue una decisión explícita del usuario en DEC-0041 para no requerir un secret con permiso de escritura sobre un repo externo.
 
 ### 2. Sitio público (`galax-ia.rafex.io`)
 
@@ -46,10 +50,19 @@ No hay ambiente de "staging" — el proyecto es una PoC de un solo operador (no 
 ## Proceso de release (paquete `@rafex/galaxia-fhs-protocol`)
 
 1. Cambiar `packages/fhs-protocol/src/*`.
-2. Subir el campo `version` en `packages/fhs-protocol/package.json` (sin esto, el workflow detecta que la versión ya existe y no publica nada).
-3. Mergear a `main`.
-4. El workflow `publish-fhs-protocol.yml` corre automáticamente y publica la nueva versión a GitHub Packages.
-5. (Pendiente, manual por ahora) Si `galaxIA-satellite-star` necesita la versión nueva, actualizar su dependencia — hoy eso significa reconstruir la rama `fhs-protocol-dist` (ver `spec-native/DECISIONS.md` DEC-0038); tras migrar a GitHub Packages, sería un simple bump de versión en su `package.json`.
+2. Mergear a `main` — **ya no hace falta subir `version` a mano** (DEC-0041): el workflow lo hace automáticamente si detecta que la versión actual ya está publicada.
+3. El workflow `publish-fhs-protocol.yml` corre, sube la versión si hace falta (y commitea ese bump de vuelta a `main`), verifica el contenido del paquete, y publica a GitHub Packages.
+4. (Pendiente, manual por ahora — alcance explícito de DEC-0041) Si `galaxIA-satellite-star` necesita la versión nueva: ir a ese repo, subir el rango en el `package.json` de los providers si hace falta (`^0.1.0` ya cubre cualquier `0.1.x` automáticamente), y correr `npm install` con `GH_TOKEN` exportado.
+
+### Comandos locales equivalentes (`make`)
+
+```bash
+export GH_TOKEN=$(gh auth token)
+make protocol-bump-check   # solo reporta si haría falta subir versión
+make protocol-bump         # sube la versión si ya está publicada
+make protocol-verify       # build + verifica que el tarball incluya dist/
+make protocol-publish      # bump + verify + npm publish
+```
 
 ## Gates de promoción
 
