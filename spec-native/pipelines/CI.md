@@ -12,36 +12,35 @@ y que debe pasar antes de que un cambio pueda mergearse.
 Actualizar cuando cambie un gate, se agregue una nueva validacion
 automatica o se modifique la plataforma de CI.
 
-## Estado actual: sin CI automatizado de validación de PRs
-
-No existe todavía un workflow de GitHub Actions que corra typecheck/lint/tests en cada pull request o push — los dos workflows que sí existen (`.github/workflows/publish-fhs-protocol.yml`, `.github/workflows/jekyll-gh-pages.yml`) son de **entrega** (CD, ver `CD.md`), no de validación. Todos los gates de abajo son manuales: se corren localmente antes de commitear/mergear, no hay un check obligatorio de GitHub que bloquee un PR si fallan.
-
-Este es un hueco real, no una decisión de diseño — queda anotado como pendiente en `spec-native/ROADMAP.md`.
-
 ### Plataforma
 
-- Plataforma de CI: ninguna todavía (candidata: GitHub Actions, ya en uso para CD).
-- Archivo de configuración: N/A.
-- Dónde ver resultados: no aplica — correr los comandos de la sección siguiente localmente.
+- Plataforma de CI: GitHub Actions.
+- Archivo de configuración: `.github/workflows/ci.yml`.
+- Dónde ver resultados: pestaña "Actions" del repo, o directamente en los checks del Pull Request (bloquean el merge si fallan y hay branch protection configurada — ver "Política de falla").
 
 ### Triggers
 
 | Evento | Pipeline que se ejecuta |
 | --- | --- |
-| Pull request abierto | Ninguno automatizado — revisar manualmente |
-| Push a rama principal | Ninguno automatizado (excepto los pipelines de CD de `CD.md`) |
+| Pull request abierto/actualizado contra `main` | `ci.yml`: typecheck + build + lint |
+| Push a `main` | `ci.yml` (mismo pipeline, más los pipelines de CD de `CD.md` si aplica) |
+| `workflow_dispatch` manual | `ci.yml` bajo demanda |
 | Release publicado | N/A — no hay releases formales todavía |
 
-### Gates obligatorios (hoy: manuales, no automatizados)
+Corridas concurrentes del mismo PR se cancelan entre sí (`concurrency` con `cancel-in-progress: true`, agrupado por número de PR o rama) — solo importa el resultado del último push.
 
-Estos checks deben pasar antes de mergear cualquier cambio — hoy es responsabilidad de quien mergea correrlos localmente:
+### Gates obligatorios
+
+Estos checks deben pasar antes de mergear cualquier cambio:
 
 | Gate | Herramienta | Comando local |
 | --- | --- | --- |
 | Typecheck | `tsc --noEmit` | `npm run typecheck --workspaces` |
-| Build | `tsc` (por workspace) | `npm run build` (ver `Makefile`/`Justfile`) o `npm run build --workspaces` |
-| Lint | placeholder, sin linter configurado | `npm run lint --workspaces` (hoy solo imprime "No linter configurado todavía" en la mayoría de workspaces) |
-| Verificación end-to-end real | manual, sin herramienta | Ver regla derivada en `spec-native/TRACEABILITY.md` ("registrado no es probado") — ninguna integración se marca `done` sin al menos una ejecución real de punta a punta |
+| Build | `tsc` (+ `vite build` en portal) | `npm run build --workspaces` (no el script raíz `npm run build` — ver nota abajo) |
+| Lint | placeholder, sin linter configurado | `npm run lint --workspaces` (hoy solo imprime "No linter configurado todavía" en todos los workspaces — pasa siempre, pero corre en CI para que el día que se configure un linter real, ya esté en el gate) |
+| Verificación end-to-end real | manual, sin herramienta, no cubierto por CI | Ver regla derivada en `spec-native/TRACEABILITY.md` ("registrado no es probado") — ninguna integración se marca `done` sin al menos una ejecución real de punta a punta. CI valida que el código compile y tipe correctamente, no que el protocolo funcione de punta a punta con procesos reales — eso sigue siendo una verificación manual documentada en cada `DECISIONS.md`/`TASKS.md`.
+
+**Nota sobre `npm run build --workspaces` vs. `npm run build`:** el script raíz `build` (`package.json`) solo compila `packages/fhs-protocol` + `apps/navigator` + `apps/portal` — se le olvidó `apps/atlas` cuando Atlas se separó de Navigator en DEC-0035 (un gap real, encontrado al armar este CI). `ci.yml` usa `--workspaces` a propósito para que si alguien rompe la compilación de Atlas, el PR falle — con el script raíz no se habría detectado.
 
 ### Gates opcionales o informativos
 
@@ -53,9 +52,10 @@ Estos checks deben pasar antes de mergear cualquier cambio — hoy es responsabi
 
 ### Política de falla
 
-- Como no hay gates automatizados, no hay un "check rojo" de GitHub que bloquee un PR — el criterio de calidad depende de que quien revisa/mergea haya corrido `npm run typecheck --workspaces` y, si aplica, una verificación end-to-end real antes de aprobar.
-- Si se agrega CI automatizado en el futuro, actualizar esta sección con la plataforma real, el archivo de configuración y la política de falla correspondiente.
+- Si `ci.yml` falla en un PR, el check aparece en rojo en la pestaña de checks del PR — quien lo abrió es responsable de corregirlo antes de pedir review/merge.
+- **Nota:** este workflow define los checks, pero no hay *branch protection rule* configurada todavía en GitHub que los haga obligatorios para poder mergear (technically se puede mergear con el check en rojo). Configurar esa regla (Settings → Branches → protección de `main`, "Require status checks to pass") es un paso manual pendiente, fuera del alcance de un archivo de workflow.
+- No hay excepción/override documentado — si un gate falla legítimamente por algo fuera de control (ej. un servicio externo caído durante el build), se reintenta el run (`workflow_dispatch` o un nuevo push), no se saltea el check.
 
 ### Relación con tareas
 
-Un agente no debe marcar una tarea como `done` solo porque el build/typecheck local pasa — ver la regla derivada en `spec-native/TRACEABILITY.md` ("Lección de esta iniciativa: registrado no es probado"): se requiere al menos una ejecución end-to-end real antes de cerrar una tarea de integración nueva (provider, capability, modelo).
+Un agente no debe marcar una tarea como `done` solo porque `ci.yml` pasa en verde — ver la regla derivada en `spec-native/TRACEABILITY.md` ("Lección de esta iniciativa: registrado no es probado"): se requiere al menos una ejecución end-to-end real antes de cerrar una tarea de integración nueva (provider, capability, modelo). CI verifica que el código compile, no que el protocolo funcione con procesos reales.
