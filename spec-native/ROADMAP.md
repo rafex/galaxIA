@@ -35,6 +35,7 @@
 
 ## Después
 
+- **Tests reales, formato/estilo, y workflow de regresión continua (SPEC-QUALITY-0001, `proposed`, DEC-0043):** hoy no hay suite de tests automatizada ni linter/formatter real configurado — solo typecheck/build/lint-placeholder (DEC-0042). El usuario pidió explícitamente diferir esto a una spec futura, a retomar después de cerrar las definiciones/decisiones activas del proyecto — no implementar ahora.
 - **IPFS para artefactos:** subir archivos adjuntos a IPFS y pasar solo el hash a los servidores MCP. Esto protege la privacidad del origen, permite desacoplamiento temporal y deduplicación natural.
 - **Autenticación de usuarios:** retomar `SPEC-AUTH-0001` cuando el MVP esté estable.
 - **Modelo de confianza comunitaria:** reputación, vetos persistentes y políticas de privacidad más granulares. Primera aplicación concreta diseñada (DEC-0028): tags de comunidad para contrastar contra `capability.description`/`tags` autodeclarados de una KB — bloqueado hasta que `SPEC-AUTH-0001` (identidad de usuario) se retome.

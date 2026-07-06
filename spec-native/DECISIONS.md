@@ -658,3 +658,15 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - Nuevo: `.github/workflows/ci.yml`.
   - `spec-native/pipelines/CI.md`: reescrito de "sin CI automatizado" a documentar el pipeline real (plataforma, triggers, gates, política de falla).
   - Pendiente no bloqueante: configurar branch protection en GitHub para que los checks de `ci.yml` sean obligatorios; considerar agregar un linter real (ESLint) ahora que el gate ya existe pero no valida nada de estilo/calidad todavía.
+
+## DEC-0043 — Diferir tests reales, formato/estilo y workflow de regresión a una spec futura
+
+- **Fecha:** 2026-07-06
+- **Estado:** `proposed` (documentado, sin implementar — decisión explícita de no implementar todavía)
+- **Contexto:** al cerrar DEC-0042 (CI de typecheck/build/lint), el usuario señaló que faltan tres piezas reales — tests automatizados, un workflow que valide que el sistema sigue funcionando (no solo que compila), y control de formato/estilo con un linter/formatter real. Pidió explícitamente **no implementarlo ahora**: dejarlo como spec pendiente, a retomar después de cerrar las definiciones/decisiones activas del proyecto — para no interrumpir el hilo de trabajo en curso con una iniciativa nueva y más grande.
+- **Decisión:** se documenta como `spec-native/specs/quality-gates/SPEC.md` (SPEC-QUALITY-0001), estado `proposed`, sin código ni configuración de CI nuevos. La spec deja explícitamente sin decidir el framework de test, si empezar por unitarios o por integración end-to-end, la combinación de linter/formatter, y si el pipeline de regresión comparte `ci.yml` o vive aparte — todo eso queda para cuando se priorice.
+- **Por qué no se cierra en la misma sesión que DEC-0042:** el propio DEC-0042 ya fue una secuencia larga de iteración (tres bugs reales de infraestructura encontrados y corregidos en producción) — agregar tests + linter + un pipeline de regresión encima habría sido una iniciativa completa aparte, no una extensión menor. Corresponde a su propio ciclo de spec → decisión → implementación → verificación, no a un afterthought del CI que ya existe.
+- **Consecuencias:**
+  - Nuevo: `spec-native/specs/quality-gates/SPEC.md`.
+  - Sin cambios de código ni de workflows — este DEC es puramente de alcance/planeación.
+  - Pendiente (backlog, explícitamente no priorizado): implementar SPEC-QUALITY-0001 cuando el usuario decida retomarla.
