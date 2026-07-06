@@ -26,16 +26,26 @@ export async function setupWebSocket(app: FastifyInstance, registry: Registry) {
     // aplicación (LEASE_EXPIRE_SECONDS). Complementa, no reemplaza, el heartbeat
     // de aplicación (`ping`/`pong` JSON) ni dispatch.ack — no dice nada de si el
     // nodo está "atorado" procesando una Mission, solo si el socket responde.
-    let isAlive = true;
+    //
+    // Tolera MISSED_PONG_THRESHOLD ciclos sin `pong` (no 1) antes de terminar
+    // la conexión — con 1 ciclo, esta señal quedaba más estricta que el propio
+    // lease de aplicación (30s) que complementa, pudiendo desconectar a un nodo
+    // legítimamente ocupado en un cómputo bloqueante breve. Aun con esto,
+    // sigue sin distinguir "atorado" de "ocupado pero progresando" — esa
+    // garantía depende del dispatcher concurrente ("mosquito") que cada nodo
+    // debe implementar (DEC-0009/satelite-rating): asegura que en algún
+    // momento se responderá, no cuándo.
+    const MISSED_PONG_THRESHOLD = 3;
+    let missedPongs = 0;
     socket.on("pong", () => {
-      isAlive = true;
+      missedPongs = 0;
     });
     pingTimer = setInterval(() => {
-      if (!isAlive) {
+      if (missedPongs >= MISSED_PONG_THRESHOLD) {
         socket.terminate();
         return;
       }
-      isAlive = false;
+      missedPongs += 1;
       socket.ping();
     }, HEARTBEAT_INTERVAL_SECONDS * 1000);
 
