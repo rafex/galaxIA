@@ -18,6 +18,10 @@ dist/
 # nunca se versionan (contienen la clave privada).
 /certs/
 
+# Identidad Ed25519 por nodo (DEC-0030) — se genera al primer arranque de
+# cada provider, contiene la clave privada del did:key, nunca se versiona.
+.fhs-identity*.pem
+
 # opencode (local, no versionar)
 .opencode/sessions.db
 .opencode/sessions*db

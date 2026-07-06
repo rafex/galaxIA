@@ -7,6 +7,7 @@ import {
   type FhsMessage,
   HEARTBEAT_INTERVAL_SECONDS,
   FHS_ERROR_CODES,
+  verifySignature,
 } from "@galaxia/fhs-protocol";
 import { Registry } from "./registry.js";
 import { validateManifest } from "./manifest-validation.js";
@@ -71,6 +72,23 @@ export async function setupWebSocket(app: FastifyInstance, registry: Registry) {
       switch (msg.type) {
         case "hello": {
           const hello = msg as HelloMessage;
+          // DEC-0030: providerId es un did:key real (Ed25519) — la firma se
+          // verifica contra la clave pública derivada del propio identificador,
+          // sin directorio de claves aparte. Suplantar a otro nodo deja de ser
+          // posible con solo conectarse y reutilizar su providerId (DEC-0009
+          // ya lo mitigaba parcialmente a nivel de conexión activa; esto lo
+          // hace criptográficamente imposible sin la clave privada real).
+          const helloPayload = `${hello.providerId}:${hello.timestamp}`;
+          if (!hello.signature || !verifySignature(hello.providerId, helloPayload, hello.signature)) {
+            send({
+              type: "error",
+              data: {
+                code: FHS_ERROR_CODES.INVALID_SIGNATURE,
+                message: "Firma Ed25519 inválida o ausente para este providerId",
+              },
+            } as any);
+            return;
+          }
           if (registry.hasActiveConnection(hello.providerId)) {
             // DEC-0009: no sobrescribir una conexión activa en silencio.
             send({
@@ -96,6 +114,20 @@ export async function setupWebSocket(app: FastifyInstance, registry: Registry) {
           const register = msg as RegisterMessage;
           if (!providerId) {
             send({ type: "error", data: { code: FHS_ERROR_CODES.NOT_IDENTIFIED, message: "Send hello first" } } as any);
+            return;
+          }
+          // DEC-0030: register también viaja firmado — el hello ya probó la
+          // identidad, pero register lleva su propio timestamp y podría
+          // reenviarse/alterarse por separado.
+          const registerPayload = `${providerId}:${register.timestamp}`;
+          if (!register.signature || !verifySignature(providerId, registerPayload, register.signature)) {
+            send({
+              type: "error",
+              data: {
+                code: FHS_ERROR_CODES.INVALID_SIGNATURE,
+                message: "Firma Ed25519 inválida o ausente en register",
+              },
+            } as any);
             return;
           }
           // DEC-0013: rechazar manifiestos incompletos, no aceptarlos con

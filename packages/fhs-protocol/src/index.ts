@@ -8,3 +8,4 @@ export * from "./manifest.js";
 export * from "./messages.js";
 export * from "./sse.js";
 export * from "./llm.js";
+export * from "./identity.js";

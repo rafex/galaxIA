@@ -37,14 +37,13 @@ flowchart LR
 
 ### 1. Identidad verificable
 
-Todo nodo se identifica con un identificador único:
+Todo nodo se identifica con un `did:key` real (método W3C, Ed25519) — el identificador **es** la clave pública del nodo, codificada en multibase/base58:
 
 ```
-did:key:macmini-raul
-did:key:raspi-ocr-01
+did:key:z6MkiqnzSFKAqXxjRUNnEku2wD3Gzas28sqByzQYaqEjkZhF
 ```
 
-Para la prueba de concepto usamos nombres simples. En producción se usaría criptografía Ed25519 (ver `spec-native/DECISIONS.md` DEC-0004).
+`hello` y `register` viajan firmados con la clave privada correspondiente; el Registry verifica la firma contra la clave pública derivada del propio `providerId`, sin necesitar un directorio de claves separado (DEC-0030, reemplaza el DID simplificado sin firma de DEC-0004). Un nodo genera su identidad una sola vez y la persiste — el nombre legible para humanos vive aparte, en `provider.name`.
 
 ### 2. Registro por arrendamiento (lease)
 
@@ -143,10 +142,13 @@ Quien inicia una Mission o una conversación con una Star puede indicar `prefere
 ```json
 {
   "type": "hello",
-  "providerId": "did:key:macmini-raul",
-  "timestamp": 1719700000
+  "providerId": "did:key:z6MkiqnzSFKAqXxjRUNnEku2wD3Gzas28sqByzQYaqEjkZhF",
+  "timestamp": 1719700000,
+  "signature": "base64(firma Ed25519 de \"providerId:timestamp\" con la clave privada del nodo)"
 }
 ```
+
+Sin `signature` válida (verificable con la clave pública derivada del propio `providerId`), el Registry responde `error { code: "INVALID_SIGNATURE" }` (DEC-0030).
 
 Respuesta:
 
@@ -163,9 +165,10 @@ Respuesta:
 ```json
 {
   "type": "register",
-  "providerId": "did:key:macmini-raul",
+  "providerId": "did:key:z6MkiqnzSFKAqXxjRUNnEku2wD3Gzas28sqByzQYaqEjkZhF",
   "manifest": { /* ver manifiesto-llm.md o manifiesto-mcp.md */ },
-  "timestamp": 1719700000
+  "timestamp": 1719700000,
+  "signature": "base64(firma Ed25519 de \"providerId:timestamp\")"
 }
 ```
 

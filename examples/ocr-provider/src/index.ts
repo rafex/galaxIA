@@ -10,8 +10,9 @@ import type {
   ToolListResponseMessage,
   DispatchAckMessage,
 } from "@galaxia/fhs-protocol";
-import { FHS_ERROR_CODES } from "@galaxia/fhs-protocol";
+import { FHS_ERROR_CODES, signPayload } from "@galaxia/fhs-protocol";
 import { OcrBridge } from "./ocr-bridge.js";
+import { loadOrCreateIdentity } from "./identity-store.js";
 
 const REGISTRY_URL =
   process.env.REGISTRY_URL || "ws://localhost:8083/fhs/v1/ws";
@@ -31,8 +32,11 @@ const OCR_SERVICE_URL =
   process.env.OCR_SERVICE_URL || "http://localhost:9011";
 const OCR_API_KEY =
   process.env.OCR_API_KEY || "";
-const PROVIDER_ID =
-  process.env.PROVIDER_ID || "did:key:ocr-provider-01";
+// DEC-0030: el providerId es un did:key real (Ed25519) derivado de una
+// identidad persistida en disco — ya no es un nombre elegido a mano.
+const IDENTITY_KEY_PATH = process.env.IDENTITY_KEY_PATH || "./.fhs-identity-ocr.pem";
+const identity = loadOrCreateIdentity(IDENTITY_KEY_PATH);
+const PROVIDER_ID = identity.did;
 const PROVIDER_NAME =
   process.env.PROVIDER_NAME || "OCR FHS Provider";
 
@@ -97,11 +101,13 @@ function connectToRegistry() {
 
   ws.on("open", () => {
     log("Conectado al Registry, enviando hello...");
+    const helloTimestamp = Date.now();
     ws.send(
       JSON.stringify({
         type: "hello",
         providerId: PROVIDER_ID,
-        timestamp: Date.now(),
+        timestamp: helloTimestamp,
+        signature: signPayload(identity.privateKey, `${PROVIDER_ID}:${helloTimestamp}`),
       })
     );
   });
@@ -111,12 +117,14 @@ function connectToRegistry() {
 
     if (msg.type === "welcome") {
       log(`Registry dio welcome (lease: ${msg.leaseSeconds}s), registrando...`);
+      const registerTimestamp = Date.now();
       ws.send(
         JSON.stringify({
           type: "register",
           providerId: PROVIDER_ID,
           manifest,
-          timestamp: Date.now(),
+          timestamp: registerTimestamp,
+          signature: signPayload(identity.privateKey, `${PROVIDER_ID}:${registerTimestamp}`),
         })
       );
     }
@@ -150,12 +158,14 @@ function connectToRegistry() {
 
   const renewTimer = setInterval(() => {
     if (ws.readyState === WebSocket.OPEN) {
+      const renewTimestamp = Date.now();
       ws.send(
         JSON.stringify({
           type: "register",
           providerId: PROVIDER_ID,
           manifest,
-          timestamp: Date.now(),
+          timestamp: renewTimestamp,
+          signature: signPayload(identity.privateKey, `${PROVIDER_ID}:${renewTimestamp}`),
         })
       );
     }

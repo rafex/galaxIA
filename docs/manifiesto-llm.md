@@ -41,7 +41,7 @@ Un proveedor LLM se publica en el Registry enviando un manifiesto JSON por WebSo
 
 ## Campos importantes
 
-- `provider.id`: identificador único (`did:key:<nombre>`).
+- `provider.id`: identificador único — `did:key:z...` real derivado de una identidad Ed25519 (DEC-0030), no un nombre elegido a mano. `hello`/`register` deben firmarse con la clave privada correspondiente.
 - `provider.type`: siempre `"llm"`.
 - `endpoint.protocol`: `"openai-compatible"` para llama.cpp, Ollama, vLLM.
 - `endpoint.url`: URL base del servidor.

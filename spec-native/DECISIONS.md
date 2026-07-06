@@ -40,8 +40,8 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
 
 ## DEC-0004 — Identidad de nodos: DID simplificado para PoC, Ed25519 para producción
 
-- **Fecha:** 2026-06-30
-- **Estado:** `accepted`
+- **Fecha:** 2026-06-30 — **superada por DEC-0030 (2026-07-06)**, ver esa entrada para la implementación real
+- **Estado:** `superseded`
 - **Contexto:** El protocolo requiere identidad verificable de cada nodo. Ed25519 ofrece criptografía asimétrica robusta pero añade complejidad de configuración, gestión de claves y dependencias criptográficas que ralentizan el MVP.
 - **Decisión:** Para la PoC v0.1 usamos identificadores `did:key:<nombre-simple>` (ej. `did:key:macmini-raul`) **sin firma criptográfica**. La confianza es implícita en la red local/comunidad. Se documenta la migración obligatoria a Ed25519 antes de desplegar en redes no controladas.
 - **Consecuencias:**
@@ -426,3 +426,20 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   4. **Dispositivos compartidos o reinstalados** — una computadora comunitaria compartida por varias personas, o un dispositivo que se resetea, rompen la premisa "un dispositivo = una persona". ¿Hace falta expiración, revalidación, o aceptar la limitación?
   5. **Relación con `SPEC-AUTH-0001` cuando exista** — ¿el ID de dispositivo se vuelve un factor adicional ("dispositivo reconocido") una vez haya autenticación real, o se descarta por completo al implementarla?
 - **Consecuencias (ninguna todavía):** no se implementa nada como parte de esta entrada. Se documenta la premisa y las preguntas abiertas para retomar la discusión con más profundidad antes de decidir si se construye, se descarta, o se espera a `SPEC-AUTH-0001`.
+
+## DEC-0030 — Identidad Ed25519 real vía `did:key` (W3C), reemplaza el DID simplificado
+
+- **Fecha:** 2026-07-06
+- **Estado:** `accepted`
+- **Contexto:** DEC-0004 usaba `did:key:<nombre-simple>` (ej. `did:key:macmini-raul`) sin firma criptográfica — cualquiera podía suplantar un `providerId` con solo conectarse y reutilizarlo, mitigado solo parcialmente por DEC-0009 (rechazo de `hello` duplicado mientras la conexión original sigue activa, pero sin probar identidad real). Issue #11 pedía cerrar esta deuda técnica.
+- **Decisión:** Implementar el método `did:key` completo del W3C para Ed25519 — el identificador del nodo (`providerId`) **es** su clave pública codificada (multicodec `0xed01` + base58btc, prefijo `z`), no un nombre elegido a mano. No hace falta un directorio de claves separado: cualquiera puede derivar la clave pública del propio `did`.
+  - `packages/fhs-protocol/src/identity.ts` (nuevo) — `generateIdentity()`, `loadIdentity()`, `signPayload()`, `verifySignature()`, `publicKeyToDid()`/`didToPublicKeyRaw()`. Usa **`node:crypto` nativo** (soporta Ed25519 desde Node 12+) — sin agregar `tweetnacl`/`noble-ed25519` como sugería DEC-0004 originalmente. Base58 implementado localmente (sin dependencia nueva).
+  - `apps/agent-server/src/registry/ws-handler.ts` — verifica la firma de `hello` y `register` contra la clave pública derivada del `providerId` recibido, antes de aceptar. Sin firma válida: `error { code: "INVALID_SIGNATURE" }`. Nuevo código agregado a `FHS_ERROR_CODES` (DEC-0013) y al tipo `RegistryErrorMessage.code`.
+  - `examples/llm-provider`, `examples/ocr-provider` — cada uno genera una identidad Ed25519 al primer arranque y la persiste en un archivo local (`.fhs-identity-{llm,ocr}.pem`, gitignored) vía `identity-store.ts` (duplicado en ambos, mismo patrón ya aceptado de no compartir código entre providers de ejemplo). El `providerId` deja de ser un nombre configurado por env var — se deriva de la identidad persistida. `PROVIDER_NAME` (separado de `provider.id`) sigue siendo el nombre legible para humanos, sin cambios.
+- **Verificación real:** `llm-provider` se registra con un `did:key:z6Mk...` real, el mismo tras reiniciar el proceso (identidad persistida correctamente); un chat E2E completo funciona sin cambios visibles para el usuario; un ataque de suplantación simulado (nodo con clave propia anunciándose con el `providerId` de otro nodo) es rechazado con `INVALID_SIGNATURE` — confirmado con un script de prueba real, no solo revisión de código.
+- **Cómo un provider legítimo recupera su identidad si pierde conexión (pregunta del issue #11):** mientras conserve el mismo archivo de clave privada, reconectar es solo enviar un nuevo `hello` firmado — nada especial que "recuperar". **Si se pierde el archivo de clave** (disco no persistido entre recreaciones de contenedor, por ejemplo) no hay mecanismo de recuperación: se genera una identidad nueva, que el Atlas trata como un nodo distinto (pierde el historial de rating/reputación asociado al `did` anterior). Aceptado como limitación conocida para esta iteración — no hay autoridad raíz ni CA para reemitir/recuperar una identidad perdida.
+- **Consecuencias:**
+  - DEC-0009 (rechazo de `hello` duplicado por conexión activa) queda como defensa complementaria, no la principal — con firma verificada, suplantar el `providerId` de otro nodo ya es criptográficamente imposible sin su clave privada, no solo "quien se conecta primero gana".
+  - Los `providerId` ya no son legibles por humanos (`did:key:z6Mk...` en vez de `did:key:macmini-raul`) — el nombre legible vive en `provider.name`, sin cambios de diseño ahí.
+  - Migración real: cualquier despliegue existente (bastion, Raspberry Pi) necesita el código actualizado para generar su propia identidad la próxima vez que arranque — no hay compatibilidad hacia atrás con el DID simplificado (`hello` sin firma válida se rechaza siempre).
+  - Pendiente no bloqueante: rotación de claves, revocación, y expiración (mencionadas como parte de "Ed25519 completo" en DEC-0004) siguen sin implementarse — fuera de alcance de esta iteración.

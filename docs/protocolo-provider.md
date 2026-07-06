@@ -60,7 +60,7 @@ Independientemente del tipo (`llm` o `mcp`), todo manifiesto debe declarar:
 | Campo | Obligatorio | Motivo |
 |---|---|---|
 | `fhsVersion` | Sí | El Registry debe poder rechazar versiones incompatibles |
-| `provider.id` | Sí | Identidad única (`did:key:<nombre>`) |
+| `provider.id` | Sí | Identidad única — `did:key:z...` real (Ed25519, DEC-0030), no un nombre elegido a mano. `hello`/`register` deben viajar firmados con la clave privada correspondiente. |
 | `provider.type` | Sí | `llm` \| `mcp` \| `multi` |
 | `provider.visibility` | Sí | Determina en qué `scope` puede resolverse (ver `protocolo.md`) |
 | `endpoint` | Sí | Dónde conectarse para hablar el protocolo del tipo correspondiente |
@@ -104,6 +104,7 @@ requestId | conversationId (si viaja en el mensaje) | tipo (chat/tool) | resulta
 Un provider nuevo puede conectarse al Registry sin ningún cambio en `apps/agent-server` si cumple:
 
 - [ ] Implementa el ciclo de vida completo (`Connecting → Identifying → Registering → Ready`) del diagrama de arriba.
+- [ ] Genera (o carga) una identidad Ed25519 real, deriva su `providerId` como `did:key:z...`, y firma `hello`/`register` con la clave privada (DEC-0030) — persiste la clave privada entre reinicios, no la regenera en cada arranque.
 - [ ] El heartbeat corre en una tarea/timer independiente del procesamiento de peticiones (dispatcher concurrente).
 - [ ] Envía `dispatch.ack { requestId, queuedAt }` inmediatamente al encolar cada `chat.request`/`tool.call` en su dispatcher, antes de empezar a procesar (ver "Regla central: el dispatcher concurrente" arriba).
 - [ ] El manifiesto incluye todos los campos obligatorios de la tabla de arriba, incluidos los de privacidad.
@@ -125,5 +126,6 @@ Estos tres bugs se encontraron probando el pipeline OCR de punta a punta por pri
 ## Deuda técnica conocida
 
 - **DEC-0013 (validación de manifiesto + códigos de error) ya está cerrado** (2026-07-06) — ver `apps/agent-server/src/registry/manifest-validation.ts` y `FHS_ERROR_CODES` en `packages/fhs-protocol/src/constants.ts`. Ver `spec-native/DECISIONS.md` DEC-0009 para la validación de identidad en `hello` (aparte, ya resuelta).
+- **DEC-0030 (identidad Ed25519 real vía `did:key`) ya está cerrado** (2026-07-06) — ver `packages/fhs-protocol/src/identity.ts`, verificación de firma en `apps/agent-server/src/registry/ws-handler.ts`. Cualquier provider debe generar su identidad una sola vez y persistirla (ver `identity-store.ts` en `examples/llm-provider`/`examples/ocr-provider` como referencia) — perder el archivo de clave privada significa perder el `did` y el historial de rating asociado, sin mecanismo de recuperación todavía.
 - **DEC-0012 (trazabilidad) ya está cerrado del lado del Agent Server** (`apps/agent-server/src/observability/trace.ts`, ver `mcp-host.ts`/`llm-gateway.ts`) — sigue como deuda que los providers de ejemplo (`examples/llm-provider`, `examples/ocr-provider`) no loggeen todavía su propia metadata local por `requestId`, solo el Agent Server lo hace hoy.
 - `examples/llm-provider` y `examples/ocr-provider` no comparten código de dispatcher/heartbeat — cada uno lo reimplementa. Extraer un helper común (aunque sea solo para TypeScript) es la forma más directa de que el contrato de este documento deje de depender de que cada autor lo lea y lo siga a mano.

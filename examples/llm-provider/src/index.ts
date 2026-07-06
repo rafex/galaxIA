@@ -9,8 +9,9 @@ import type {
   ChatErrorMessage,
   DispatchAckMessage,
 } from "@galaxia/fhs-protocol";
-import { FHS_ERROR_CODES } from "@galaxia/fhs-protocol";
+import { FHS_ERROR_CODES, signPayload } from "@galaxia/fhs-protocol";
 import { LlmBridge } from "./llm-bridge.js";
+import { loadOrCreateIdentity } from "./identity-store.js";
 
 const REGISTRY_URL =
   process.env.REGISTRY_URL || "ws://localhost:8083/fhs/v1/ws";
@@ -30,8 +31,12 @@ function wsOptions(url: string) {
 }
 const LLAMA_CPP_URL =
   process.env.LLAMA_CPP_URL || "http://localhost:43110/v1";
-const PROVIDER_ID =
-  process.env.PROVIDER_ID || "did:key:macmini-raul";
+// DEC-0030: el providerId es un did:key real (Ed25519) derivado de una
+// identidad persistida en disco — ya no es un nombre elegido a mano. Se
+// genera la primera vez que arranca el provider y se reutiliza después.
+const IDENTITY_KEY_PATH = process.env.IDENTITY_KEY_PATH || "./.fhs-identity-llm.pem";
+const identity = loadOrCreateIdentity(IDENTITY_KEY_PATH);
+const PROVIDER_ID = identity.did;
 const PROVIDER_NAME =
   process.env.PROVIDER_NAME || "Mac mini de Ra\u00FAl";
 const MODEL_ID =
@@ -86,11 +91,13 @@ function connectToRegistry() {
 
   ws.on("open", () => {
     log("Conectado al Registry, enviando hello...");
+    const helloTimestamp = Date.now();
     ws.send(
       JSON.stringify({
         type: "hello",
         providerId: PROVIDER_ID,
-        timestamp: Date.now(),
+        timestamp: helloTimestamp,
+        signature: signPayload(identity.privateKey, `${PROVIDER_ID}:${helloTimestamp}`),
       })
     );
   });
@@ -100,12 +107,14 @@ function connectToRegistry() {
 
     if (msg.type === "welcome") {
       log(`Registry dio welcome (lease: ${msg.leaseSeconds}s), registrando...`);
+      const registerTimestamp = Date.now();
       ws.send(
         JSON.stringify({
           type: "register",
           providerId: PROVIDER_ID,
           manifest,
-          timestamp: Date.now(),
+          timestamp: registerTimestamp,
+          signature: signPayload(identity.privateKey, `${PROVIDER_ID}:${registerTimestamp}`),
         })
       );
     }
@@ -139,12 +148,14 @@ function connectToRegistry() {
 
   const renewTimer = setInterval(() => {
     if (ws.readyState === WebSocket.OPEN) {
+      const renewTimestamp = Date.now();
       ws.send(
         JSON.stringify({
           type: "register",
           providerId: PROVIDER_ID,
           manifest,
-          timestamp: Date.now(),
+          timestamp: renewTimestamp,
+          signature: signPayload(identity.privateKey, `${PROVIDER_ID}:${renewTimestamp}`),
         })
       );
     }
