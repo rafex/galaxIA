@@ -9,7 +9,7 @@ import {
   type ToolCall,
   type ToolDefinition,
   type UserMessage,
-} from "@galaxia/fhs-protocol";
+} from "@rafex/galaxia-fhs-protocol";
 import { AtlasClient } from "../atlas-client.js";
 import { EventBus } from "../sse/event-bus.js";
 import { LlmGateway } from "../providers/llm-gateway.js";

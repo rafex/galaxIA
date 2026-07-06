@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
-import type { UserMessage } from "@galaxia/fhs-protocol";
+import type { UserMessage } from "@rafex/galaxia-fhs-protocol";
 import { AtlasClient } from "../atlas-client.js";
 import { EventBus } from "../sse/event-bus.js";
 import { AgentRuntime } from "../agent/runtime.js";

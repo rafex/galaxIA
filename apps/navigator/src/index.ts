@@ -1,7 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import websocket from "@fastify/websocket";
 import { readFileSync } from "node:fs";
-import { FHS_VERSION } from "@galaxia/fhs-protocol";
+import { FHS_VERSION } from "@rafex/galaxia-fhs-protocol";
 import { AtlasClient } from "./atlas-client.js";
 import { setupChatApi } from "./api/chat.js";
 import { setupEventsApi } from "./api/events.js";

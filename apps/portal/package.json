@@ -16,6 +16,6 @@
     "vite": "^5.3.0"
   },
   "dependencies": {
-    "@galaxia/fhs-protocol": "^0.1.0"
+    "@rafex/galaxia-fhs-protocol": "^0.1.0"
   }
 }

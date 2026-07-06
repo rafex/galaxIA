@@ -11,7 +11,7 @@ import {
   type PublishedService,
   type NodeStatus,
   flattenManifest,
-} from "@galaxia/fhs-protocol";
+} from "@rafex/galaxia-fhs-protocol";
 
 export interface AtlasConnection {
   providerId: string;

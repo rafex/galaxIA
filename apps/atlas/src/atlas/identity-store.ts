@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { generateIdentity, loadIdentity, type NodeIdentity } from "@galaxia/fhs-protocol";
+import { generateIdentity, loadIdentity, type NodeIdentity } from "@rafex/galaxia-fhs-protocol";
 
 /**
  * Identidad Ed25519 del propio Registry (DEC-0032) — reutiliza el mismo

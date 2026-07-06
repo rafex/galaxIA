@@ -1,0 +1,68 @@
+name: Publish @rafex/galaxia-fhs-protocol to GitHub Packages
+
+# CD (entrega continua), no CI — ver spec-native/pipelines/CD.md.
+# Publica el SDK del protocolo (packages/fhs-protocol) a GitHub Packages en
+# cada push a main que lo modifique. No publica si la versión en
+# package.json ya existe en el registro (evita fallos ruidosos en pushes
+# que no tocan la versión).
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "packages/fhs-protocol/**"
+      - ".github/workflows/publish-fhs-protocol.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/fhs-protocol
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@rafex"
+
+      - name: Instalar dependencias del paquete
+        run: npm install
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        run: npm run build
+
+      - name: Verificar si la versión ya está publicada
+        id: check
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          if npm view "@rafex/galaxia-fhs-protocol@$PKG_VERSION" version \
+            --registry https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publicar a GitHub Packages
+        if: steps.check.outputs.exists == 'false'
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ya publicada, no se hace nada
+        if: steps.check.outputs.exists == 'true'
+        run: echo "Versión ${{ steps.check.outputs.version }} ya existe en GitHub Packages — sube el version en package.json para publicar una nueva."

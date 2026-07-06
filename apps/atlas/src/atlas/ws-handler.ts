@@ -8,7 +8,7 @@ import {
   HEARTBEAT_INTERVAL_SECONDS,
   FHS_ERROR_CODES,
   verifySignature,
-} from "@galaxia/fhs-protocol";
+} from "@rafex/galaxia-fhs-protocol";
 import { Atlas } from "./registry.js";
 import { validateManifest } from "./manifest-validation.js";
 

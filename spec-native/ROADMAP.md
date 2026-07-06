@@ -3,6 +3,7 @@
 ## Ahora
 
 - **Completado (DEC-0038):** separación de repos — `galaxIA` queda como protocolo/SDK/servicios core (Atlas, Navigator, Portal); las implementaciones de referencia de providers (`star-example`, `satellite-ocr-example`, `rag-provider`, `kb-provider`) se movieron a [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star) — 2026-07-06. `@galaxia/fhs-protocol` se consume ahí vía git (`github:rafex/galaxIA#fhs-protocol-dist`), no publicado a npm todavía.
+- **Completado (DEC-0039):** renombrado a `@rafex/galaxia-fhs-protocol` y publicado a GitHub Packages en cada push a `main` que lo modifique (`.github/workflows/publish-fhs-protocol.yml`) — 2026-07-06. `spec-native/pipelines/CI.md`/`CD.md` pasaron de templates vacíos a documentos reales; `CI.md` documenta honestamente que no hay validación automatizada de PRs todavía. **Pendiente (backlog, no bloqueante):** migrar `galaxIA-satellite-star` de la dependencia git a GitHub Packages (requiere resolver la fricción de autenticación para instalar paquetes públicos); agregar un workflow de CI real de typecheck/build por PR.
 - **Iniciativa activa:** `fhs-mvp` — MVP del protocolo FHS y chat comunitario para la ponencia.
   - Federar LLMs locales y tools MCP.
   - Frontend web vanilla con Vite.

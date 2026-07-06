@@ -1,7 +1,7 @@
 {
-  "name": "@galaxia/fhs-protocol",
+  "name": "@rafex/galaxia-fhs-protocol",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "description": "Contratos compartidos del protocolo FHS v0.1.",
   "main": "./dist/index.js",
@@ -11,6 +11,14 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rafex/galaxIA.git",
+    "directory": "packages/fhs-protocol"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
     "build": "tsc",

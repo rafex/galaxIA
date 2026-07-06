@@ -5,7 +5,7 @@ import type {
   PublishedService,
   ToolCallRequestMessage,
   ToolListRequestMessage,
-} from "@galaxia/fhs-protocol";
+} from "@rafex/galaxia-fhs-protocol";
 import { logTrace } from "../observability/trace.js";
 
 export interface LoadedTool {

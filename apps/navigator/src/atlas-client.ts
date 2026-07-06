@@ -1,4 +1,4 @@
-import type { PublishedService } from "@galaxia/fhs-protocol";
+import type { PublishedService } from "@rafex/galaxia-fhs-protocol";
 
 export interface ResolvedProvider {
   providerId: string;

@@ -4,7 +4,7 @@ import type {
   PublishedService,
   NodeType,
   RegisteredNode,
-} from "@galaxia/fhs-protocol";
+} from "@rafex/galaxia-fhs-protocol";
 
 export interface AtlasStore {
   upsertNode(node: {

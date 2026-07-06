@@ -1,6 +1,6 @@
-import type { AgentSSEEvent } from "@galaxia/fhs-protocol";
+import type { AgentSSEEvent } from "@rafex/galaxia-fhs-protocol";
 
-export * from "@galaxia/fhs-protocol";
+export * from "@rafex/galaxia-fhs-protocol";
 
 export type ChatMessage =
   | { role: "user"; content: string; attachmentName?: string; attachmentIsPdf?: boolean }

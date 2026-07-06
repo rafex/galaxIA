@@ -1,6 +1,6 @@
 # Proveedores FHS — Nodos que aportan recursos
 
-> **Las implementaciones de referencia de estos providers ya no viven en este repo.** Se movieron a [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star), que depende de `@galaxia/fhs-protocol` publicado desde aquí. Este documento describe el contrato del protocolo y el comportamiento determinístico del lado de Navigator (que sí vive aquí) — las rutas `examples/*-provider/` referidas abajo apuntan a ese otro repo.
+> **Las implementaciones de referencia de estos providers ya no viven en este repo.** Se movieron a [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star), que depende de `@rafex/galaxia-fhs-protocol` publicado desde aquí. Este documento describe el contrato del protocolo y el comportamiento determinístico del lado de Navigator (que sí vive aquí) — las rutas `examples/*-provider/` referidas abajo apuntan a ese otro repo.
 
 Los proveedores son nodos independientes que se registran en el Registry FHS y exponen capacidades (LLM, tools) a través del protocolo FHS WebSocket. **El Agent Server nunca llama directo a las APIs nativas de los servicios.** Todo pasa por el protocolo FHS.
 

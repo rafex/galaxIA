@@ -1,5 +1,5 @@
 import { Bonjour, type Service } from "bonjour-service";
-import { signPayload, type NodeIdentity } from "@galaxia/fhs-protocol";
+import { signPayload, type NodeIdentity } from "@rafex/galaxia-fhs-protocol";
 
 /**
  * Anuncio mDNS del Registry (SPEC-P2P-0001, fase 1) — fallback/conveniencia

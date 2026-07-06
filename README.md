@@ -21,7 +21,7 @@ GalaxIA (Galaxy + IA) tiene su propio vocabulario de producto — **Star** (nodo
 | `site/` | Portal web público ([galax-ia.rafex.io](https://galax-ia.rafex.io)), sitio Jekyll |
 | `containers/` | `compose.yaml` y overlays (TLS) para desplegar el core (Atlas/Navigator/Portal) con Podman/Docker |
 
-Este repo es **protocolo + SDK + servicios core** únicamente. Las implementaciones de referencia de nodos (Star/LLM, Satellite/OCR, RAG, KB) viven en el repo separado [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star), que depende de `@galaxia/fhs-protocol` publicado desde aquí (por ahora vía git, `github:rafex/galaxIA#fhs-protocol-dist` — ver `spec-native/DECISIONS.md`).
+Este repo es **protocolo + SDK + servicios core** únicamente. Las implementaciones de referencia de nodos (Star/LLM, Satellite/OCR, RAG, KB) viven en el repo separado [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star), que depende de `@rafex/galaxia-fhs-protocol` publicado desde aquí (hoy vía git, `github:rafex/galaxIA#fhs-protocol-dist`; también publicado a GitHub Packages en cada push a `main` — ver `spec-native/DECISIONS.md` y `spec-native/pipelines/CD.md`).
 
 ## Estado del proyecto
 

@@ -1,4 +1,4 @@
-import type { AgentSSEEvent } from "@galaxia/fhs-protocol";
+import type { AgentSSEEvent } from "@rafex/galaxia-fhs-protocol";
 
 export interface SSEClient {
   id: string;

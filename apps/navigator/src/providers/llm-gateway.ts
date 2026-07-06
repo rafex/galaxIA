@@ -10,7 +10,7 @@ import type {
   ChatDeltaMessage,
   ChatCompletedMessage,
   ChatErrorMessage,
-} from "@galaxia/fhs-protocol";
+} from "@rafex/galaxia-fhs-protocol";
 import { logTrace } from "../observability/trace.js";
 
 /** Contexto de trazabilidad (DEC-0012). */
