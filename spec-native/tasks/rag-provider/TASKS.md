@@ -5,31 +5,29 @@
 - Iniciativa: rag-provider
 - Spec relacionada: `spec-native/specs/rag-provider/SPEC.md` (SPEC-RAG-0001)
 - Owner: Raúl Fletes (rafex)
-- Estado general: `todo`
+- Estado general: `todo` — diseño cerrado (DEC-0025), lista para iniciar implementación cuando se priorice
 
 ## Tareas
 
 ### TASK-RAG-0001 - Resolver ciclo de vida del estado por conversación
 
 - ID: TASK-RAG-0001
-- State: `todo`
-- Owner:
+- State: `done`
+- Owner: rafex
 - Dependencies: ninguna
-- Expected files: `apps/agent-server/src/api/chat-ws.ts`, `apps/agent-server/src/agent/runtime.ts`
-- Close criteria: decisión documentada (como decisión en `spec-native/DECISIONS.md`) sobre dónde vive el estado "documento indexado para conversationId X" — en el `rag-provider` (recomendado en el SPEC) o en un store nuevo del agent-server.
-- Validation: revisión de diseño, sin código todavía.
+- Expected files: `spec-native/DECISIONS.md` (DEC-0025)
+- Close criteria: decisión documentada sobre dónde vive el estado "documento indexado para conversationId X".
+- Validation: resuelto en DEC-0025 (2026-07-05) — el flag vive en `apps/agent-server/src/api/chat-ws.ts`, mismo patrón que `pendingAttachments`, marcado en el momento de la confirmación de adjunto. La implementación real queda en TASK-RAG-0006.
 
-Bloqueante para las demás tareas — el SPEC señala esto como el riesgo de diseño principal antes de implementar.
-
-### TASK-RAG-0002 - Levantar `llama-server --embedding` para el modelo de embeddings
+### TASK-RAG-0002 - Levantar el motor de embeddings elegido para el nodo de referencia
 
 - ID: TASK-RAG-0002
 - State: `todo`
 - Owner:
 - Dependencies: ninguna
-- Expected files: script de arranque en el bastion (`/opt/llama.cpp/current/scripts/`), `containers/compose.yaml`
-- Close criteria: `curl` contra el endpoint de embeddings devuelve un vector para un texto de prueba.
-- Validation: prueba manual con `curl` antes de escribir código del provider — mismo principio que "Lecciones de integración" en `docs/protocolo-provider.md`.
+- Expected files: script de arranque en el bastion (`/opt/llama.cpp/current/scripts/` si se elige `llama-server --embedding`), `containers/compose.yaml`
+- Close criteria: una llamada de prueba (`curl` u otra) contra el motor elegido devuelve un vector para un texto de prueba.
+- Validation: prueba manual antes de escribir código del provider — mismo principio que "Lecciones de integración" en `docs/protocolo-provider.md`. Nota (DEC-0026): esta tarea documenta la elección concreta del nodo de referencia de esta PoC — no es un requisito de protocolo; otro operador podría elegir un motor distinto.
 
 ### TASK-RAG-0003 - Crear `examples/rag-provider/` (esqueleto FHS)
 
@@ -63,15 +61,15 @@ Seguir el mismo patrón que `examples/ocr-provider/` (ciclo de vida hello/regist
 - Close criteria: dada una pregunta relacionada con el texto indexado, devuelve los chunks más relevantes (verificar manualmente que el top-1 es semánticamente pertinente, no solo que la tool no falla).
 - Validation: prueba con un documento real de prueba y una pregunta cuya respuesta esté en un fragmento específico, no en todo el documento.
 
-### TASK-RAG-0006 - Integrar indexado/recuperación determinísticos en `AgentRuntime`
+### TASK-RAG-0006 - Integrar indexado/recuperación determinísticos en `chat-ws.ts`/`runtime.ts`
 
 - ID: TASK-RAG-0006
 - State: `todo`
 - Owner:
 - Dependencies: TASK-RAG-0001, TASK-RAG-0005
-- Expected files: `apps/agent-server/src/agent/runtime.ts`
-- Close criteria: al adjuntar un documento se indexa sin que el LLM lo decida (mismo patrón que `runOcrDeterministically`, DEC-0020); en mensajes siguientes de la misma conversación con documento indexado, se recupera contexto antes de llamar al LLM.
-- Validation: prueba end-to-end real contra el bastion — subir documento, hacer una pregunta específica sobre una parte del documento, confirmar que la respuesta es correcta y que `provenance` refleja el uso de RAG.
+- Expected files: `apps/agent-server/src/api/chat-ws.ts`, `apps/agent-server/src/agent/runtime.ts`
+- Close criteria: en el mismo punto donde `chat-ws.ts` resuelve `attachment.decision { use: true }`, se llama a `document_index` y se marca `conversationId` en el flag "RAG activo" (mismo patrón que `pendingAttachments`); en mensajes siguientes de una conversación marcada, `runtime.ts` llama a `document_query` antes de la llamada al LLM y antepone los chunks sin exponerlos en la UI. El indexado nunca ocurre antes de la confirmación del usuario.
+- Validation: prueba end-to-end real contra el bastion — subir documento, confirmar, hacer una pregunta específica sobre una parte del documento, confirmar que la respuesta es correcta, que `provenance` refleja el uso de RAG, y que una segunda conversación sin documento no dispara ninguna llamada a `document_query`.
 
 ### TASK-RAG-0007 - Declarar privacidad y actualizar documentación
 
@@ -79,6 +77,6 @@ Seguir el mismo patrón que `examples/ocr-provider/` (ciclo de vida hello/regist
 - State: `todo`
 - Owner:
 - Dependencies: TASK-RAG-0006
-- Expected files: `docs/proveedores.md`, `docs/protocolo.md` (si aplica), `spec-native/TRACEABILITY.md`
-- Close criteria: `rag-provider` documentado igual que `ocr-provider`/`llm-provider` en `docs/proveedores.md`; `privacy.retention: "session"` visible y explicado.
-- Validation: revisión de que el checklist de privacidad de `docs/protocolo.md` se cumple para este provider.
+- Expected files: `docs/proveedores.md`, `docs/protocolo.md`, `docs/protocolo-provider.md`, `spec-native/TRACEABILITY.md`
+- Close criteria: `rag-provider` documentado igual que `ocr-provider`/`llm-provider` en `docs/proveedores.md`; `privacy.retention` (formato generalizado, DEC-0025) y `privacy.warning` visibles y explicados; `docs/protocolo-provider.md` actualizado con ambos campos como parte del contrato de manifiesto.
+- Validation: revisión de que el checklist de privacidad de `docs/protocolo.md` se cumple para este provider, y que el `Portal` muestra `privacy.warning` antes de aceptar el primer adjunto contra un nodo con retención distinta de `"none"`.
