@@ -124,5 +124,6 @@ Estos tres bugs se encontraron probando el pipeline OCR de punta a punta por pri
 
 ## Deuda técnica conocida
 
-- El Registry (`apps/agent-server/src/registry/ws-handler.ts`) hoy **no valida** que el manifiesto traiga `privacy.retention` — lo acepta igual. Ver `spec-native/DECISIONS.md` DEC-0009 (validación de identidad en `hello`) y DEC-0012 (trazabilidad) para el resto de gaps conocidos entre este contrato y la implementación actual.
+- El Registry (`apps/agent-server/src/registry/ws-handler.ts`) hoy **no valida** que el manifiesto traiga `privacy.retention` — lo acepta igual. Ver `spec-native/DECISIONS.md` DEC-0009 (validación de identidad en `hello`) y DEC-0013 (validación de manifiesto, en spec) para este gap.
+- **DEC-0012 (trazabilidad) ya está cerrado del lado del Agent Server** (`apps/agent-server/src/observability/trace.ts`, ver `mcp-host.ts`/`llm-gateway.ts`) — sigue como deuda que los providers de ejemplo (`examples/llm-provider`, `examples/ocr-provider`) no loggeen todavía su propia metadata local por `requestId`, solo el Agent Server lo hace hoy.
 - `examples/llm-provider` y `examples/ocr-provider` no comparten código de dispatcher/heartbeat — cada uno lo reimplementa. Extraer un helper común (aunque sea solo para TypeScript) es la forma más directa de que el contrato de este documento deje de depender de que cada autor lo lea y lo siga a mano.

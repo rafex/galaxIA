@@ -6,6 +6,7 @@ import type {
   ToolCallRequestMessage,
   ToolListRequestMessage,
 } from "@galaxia/fhs-protocol";
+import { logTrace } from "../observability/trace.js";
 
 export interface LoadedTool {
   name: string;
@@ -22,11 +23,18 @@ export interface DispatchResult {
   dispatchMs: number | null;
 }
 
+/** Contexto de trazabilidad (DEC-0012) — ausente para llamadas internas de gestión (ej. tool.list). */
+export interface TraceContext {
+  conversationId: string;
+  capabilityId: string;
+}
+
 interface PendingCall {
   resolve: (result: DispatchResult) => void;
   reject: (err: Error) => void;
   startedAt: number;
   ackAt?: number;
+  trace?: TraceContext;
 }
 
 export interface McpProviderClient {
@@ -103,6 +111,19 @@ export class McpHost {
 
       pending.delete(msg.requestId);
       const dispatchMs = entry.ackAt ? entry.ackAt - entry.startedAt : null;
+      const success = msg.type !== "tool.error";
+      if (entry.trace) {
+        logTrace({
+          conversationId: entry.trace.conversationId,
+          requestId: msg.requestId,
+          providerId,
+          capability: entry.trace.capabilityId,
+          dispatchMs,
+          totalMs: Date.now() - entry.startedAt,
+          success,
+          errorCode: success ? undefined : msg.code,
+        });
+      }
       if (msg.type === "tool.error") {
         entry.reject(new Error(`${msg.code}: ${msg.message}`));
       } else {
@@ -112,7 +133,19 @@ export class McpHost {
 
     ws.on("close", () => {
       this.clients.delete(providerId);
-      for (const entry of pending.values()) {
+      for (const [requestId, entry] of pending.entries()) {
+        if (entry.trace) {
+          logTrace({
+            conversationId: entry.trace.conversationId,
+            requestId,
+            providerId,
+            capability: entry.trace.capabilityId,
+            dispatchMs: entry.ackAt ? entry.ackAt - entry.startedAt : null,
+            totalMs: Date.now() - entry.startedAt,
+            success: false,
+            errorCode: "CONNECTION_CLOSED",
+          });
+        }
         entry.reject(new Error(`Conexión FHS cerrada con provider ${providerId}`));
       }
       pending.clear();
@@ -163,7 +196,8 @@ export class McpHost {
     providerId: string,
     toolName: string,
     args: Record<string, any>,
-    timeoutMs?: number
+    timeoutMs?: number,
+    trace?: TraceContext
   ): Promise<DispatchResult> {
     const client = this.clients.get(providerId);
     if (!client || client.ws.readyState !== WebSocket.OPEN) {
@@ -171,7 +205,7 @@ export class McpHost {
     }
     const requestId = randomUUID();
     const msg: ToolCallRequestMessage = { type: "tool.call", requestId, toolName, arguments: args };
-    return this.sendAndWait(client, msg, requestId, timeoutMs);
+    return this.sendAndWait(client, msg, requestId, timeoutMs, trace);
   }
 
   disconnect(providerId: string) {
@@ -186,15 +220,31 @@ export class McpHost {
     client: McpProviderClient,
     msg: any,
     requestId: string,
-    timeoutMs?: number
+    timeoutMs?: number,
+    trace?: TraceContext
   ): Promise<DispatchResult> {
     return new Promise((resolve, reject) => {
+      const startedAt = Date.now();
       const timeout = setTimeout(() => {
+        const pendingEntry = client.pending.get(requestId);
         client.pending.delete(requestId);
+        if (trace) {
+          logTrace({
+            conversationId: trace.conversationId,
+            requestId,
+            providerId: client.providerId,
+            capability: trace.capabilityId,
+            dispatchMs: pendingEntry?.ackAt ? pendingEntry.ackAt - startedAt : null,
+            totalMs: Date.now() - startedAt,
+            success: false,
+            errorCode: "TIMEOUT",
+          });
+        }
         reject(new Error(`Timeout esperando respuesta FHS de ${client.providerId}`));
       }, timeoutMs ?? CALL_TIMEOUT_MS);
       client.pending.set(requestId, {
-        startedAt: Date.now(),
+        startedAt,
+        trace,
         resolve: (result) => {
           clearTimeout(timeout);
           resolve(result);

@@ -311,7 +311,8 @@ export class AgentRuntime {
         tool.providerId,
         tool.name,
         args,
-        maxWaitMs
+        maxWaitMs,
+        { conversationId: this.conversationId, capabilityId: tool.capabilityId }
       );
       const duration = Date.now() - startTime;
       const textResult = extractText(result);
@@ -399,7 +400,8 @@ export class AgentRuntime {
         tool.providerId,
         toolName,
         args,
-        maxWaitMs
+        maxWaitMs,
+        { conversationId: this.conversationId, capabilityId: tool.capabilityId }
       );
       const duration = Date.now() - startTime;
       const textResult = extractText(result);
@@ -452,7 +454,8 @@ export class AgentRuntime {
       dispatchResult = await this.llmGateway.generate(
         { nodeId: llm.nodeId, providerName: llm.providerName, service: llm.service, model: llm.model },
         request,
-        maxWaitMs
+        maxWaitMs,
+        { conversationId: this.conversationId, capability: llm.model.id }
       );
     } catch (err) {
       this.registry.recordSample(llm.nodeId, llm.model.id, {

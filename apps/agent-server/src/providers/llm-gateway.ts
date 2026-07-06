@@ -11,6 +11,13 @@ import type {
   ChatCompletedMessage,
   ChatErrorMessage,
 } from "@galaxia/fhs-protocol";
+import { logTrace } from "../observability/trace.js";
+
+/** Contexto de trazabilidad (DEC-0012). */
+export interface TraceContext {
+  conversationId: string;
+  capability: string;
+}
 
 // PoC: certificados autofirmados en wss:// — no hay CA de confianza que
 // verificar. Ver docs/tls-autofirmado.md. No usar rejectUnauthorized:false
@@ -42,9 +49,10 @@ export class LlmGateway {
   async generate(
     selection: LlmProviderSelection,
     request: GenerateRequest,
-    timeoutMs?: number
+    timeoutMs?: number,
+    trace?: TraceContext
   ): Promise<GenerateDispatchResult> {
-    return this.fhsGenerate(selection.service.endpoint.url, request, timeoutMs);
+    return this.fhsGenerate(selection.nodeId, selection.service.endpoint.url, request, timeoutMs, trace);
   }
 
   async *stream(
@@ -55,9 +63,11 @@ export class LlmGateway {
   }
 
   private fhsGenerate(
+    nodeId: string,
     url: string,
     request: GenerateRequest,
-    timeoutMs?: number
+    timeoutMs?: number,
+    trace?: TraceContext
   ): Promise<GenerateDispatchResult> {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(url, wsOptions(url));
@@ -66,8 +76,23 @@ export class LlmGateway {
       // Mosquito: null hasta que llegue dispatch.ack (SPEC-SATRATING-0001).
       let ackAt: number | null = null;
 
+      const emitTrace = (success: boolean, errorCode?: string) => {
+        if (!trace) return;
+        logTrace({
+          conversationId: trace.conversationId,
+          requestId,
+          providerId: nodeId,
+          capability: trace.capability,
+          dispatchMs: ackAt ? ackAt - startedAt : null,
+          totalMs: Date.now() - startedAt,
+          success,
+          errorCode,
+        });
+      };
+
       const timeout = setTimeout(() => {
         ws.close();
+        emitTrace(false, "TIMEOUT");
         reject(new Error("Timeout esperando respuesta del LLM vía FHS"));
       }, timeoutMs ?? 310_000);
 
@@ -94,10 +119,12 @@ export class LlmGateway {
             clearTimeout(timeout);
             ws.close();
             const dispatchMs = ackAt ? ackAt - startedAt : null;
+            emitTrace(true);
             resolve({ response: (msg as ChatCompletedMessage).response, dispatchMs });
           } else if (msg.type === "chat.error") {
             clearTimeout(timeout);
             ws.close();
+            emitTrace(false, (msg as ChatErrorMessage).code);
             reject(
               new Error(
                 `FHS LLM error: ${(msg as ChatErrorMessage).message}`
@@ -111,6 +138,7 @@ export class LlmGateway {
 
       ws.on("error", (err) => {
         clearTimeout(timeout);
+        emitTrace(false, "WEBSOCKET_ERROR");
         reject(new Error(`FHS WebSocket error: ${err.message}`));
       });
 

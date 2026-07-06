@@ -149,15 +149,20 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
 
 ## DEC-0012 — Trazabilidad operacional obligatoria, separada de la privacidad de contenido
 
-- **Fecha:** 2026-07-01
-- **Estado:** `proposed`
-- **Contexto:** El protocolo genera un `requestId` por cada `chat.request`/`tool.call` (ver `llm-gateway.ts`, `mcp-host.ts`), pero hoy no se loggea en ningún punto ni se correlaciona con el `conversationId` de la conversación que lo originó. Si un usuario reporta un fallo ("mi OCR falló ayer"), no hay forma de reconstruir qué pasó — no por la privacidad (que solo restringe contenido), sino porque nunca se guardó ni siquiera la metadata de la operación. Confundir "no retener contenido" con "no registrar nada" deja al sistema sin capacidad de diagnóstico.
+- **Fecha:** 2026-07-01 — implementada del lado del Agent Server 2026-07-05
+- **Estado:** `accepted`
+- **Contexto:** El protocolo genera un `requestId` por cada `chat.request`/`tool.call` (ver `llm-gateway.ts`, `mcp-host.ts`), pero hasta ahora no se loggeaba en ningún punto ni se correlacionaba con el `conversationId` de la conversación que lo originó. Si un usuario reporta un fallo ("mi OCR falló ayer"), no había forma de reconstruir qué pasó — no por la privacidad (que solo restringe contenido), sino porque nunca se guardaba ni siquiera la metadata de la operación. Confundir "no retener contenido" con "no registrar nada" deja al sistema sin capacidad de diagnóstico.
 - **Decisión:** Distinguir explícitamente dos capas: **contenido** (texto, archivos, respuestas — sujeto a `privacy.retention` de cada provider) y **metadata de trazabilidad** (`conversationId`, `requestId`, `providerId`, capability/modelo, timestamp, duración, resultado/código de error — siempre se registra, no es negociable). Documentado en `docs/protocolo.md` (sección Privacidad → Trazabilidad operacional) y `docs/protocolo-provider.md` (checklist plug-and-play).
+- **Implementado (2026-07-05):**
+  - `apps/agent-server/src/observability/trace.ts` — `logTrace(entry)`, una línea JSON estructurada por resolución de Mission/chat (`conversationId`, `requestId`, `providerId`, `capability`, `dispatchMs`, `totalMs`, `success`, `errorCode`).
+  - `apps/agent-server/src/providers/mcp-host.ts` — `TraceContext` (opcional, ausente para llamadas internas de gestión como `tool.list`) hilado desde `callTool()`/`sendAndWait()`; loggea en éxito, error del nodo (`tool.error`), timeout y cierre de conexión inesperado (`CONNECTION_CLOSED`).
+  - `apps/agent-server/src/providers/llm-gateway.ts` — mismo patrón (`TraceContext`) en `generate()`/`fhsGenerate()`; loggea en `chat.completed`, `chat.error`, timeout y error de WebSocket.
+  - `apps/agent-server/src/agent/runtime.ts` — pasa `{ conversationId: this.conversationId, capabilityId/capability }` en los 3 puntos de despacho (OCR determinístico, `executeToolCall`, `callLlm`) — ya tenía `conversationId` como campo privado, no fue necesario propagarlo desde más arriba.
+  - Verificado end-to-end con `agent-server` + `llm-provider` reales contra un LLM mock: línea de traza con `conversationId`/`requestId`/`providerId`/`capability`/`dispatchMs`/`totalMs`/`success` correctos, correlacionados con el `conversationId` real de la sesión de chat.
 - **Consecuencias:**
-  - Requiere propagar `conversationId` hacia `chat.request`/`tool.call` (hoy el `requestId` se genera aislado, sin relación con la conversación que lo originó) — pendiente de implementar en `apps/agent-server/src/agent/runtime.ts` y `providers/llm-gateway.ts`/`providers/mcp-host.ts`.
-  - Requiere que el Agent Server loggee esa metadata de forma estructurada (hoy solo hay `console.error` sueltos sin correlación).
-  - Cada provider (LLM, OCR, y futuros) también debe loggear su propia metadata local por `requestId`, sin loggear contenido salvo que su `retention` lo permita.
   - No cambia ninguna garantía de privacidad existente: el contenido sigue gobernado por `retention`. Solo agrega una capa de metadata que siempre existe.
+  - Pendiente no bloqueante: que cada provider de ejemplo (`llm-provider`, `ocr-provider`) también loggee su propia metadata local por `requestId` — hoy solo el Agent Server lo hace, que es donde vive la correlación con `conversationId`.
+  - Se usa `console.log(JSON.stringify(...))` directo, no el logger de Fastify (`app.log`/pino) — evita tener que inyectar el logger en `McpHost`/`LlmGateway`/`AgentRuntime`, que hoy se instancian sin acceso a la instancia de Fastify. Aceptable para el volumen de esta PoC; si se necesita niveles/transportes de log más adelante, migrar a pino es un cambio aislado.
 
 ## DEC-0013 — Contrato formal de provider ("protocolo-provider") para plug-and-play
 

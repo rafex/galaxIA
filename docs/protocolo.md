@@ -405,7 +405,7 @@ Se distinguen dos capas:
 
 Un provider FHS-compatible debe loggear la capa de metadata (mínimo: `requestId`, resultado, duración) en cada `chat.request`/`tool.call` que procesa, **sin loggear el contenido** salvo que su `retention` declarada lo permita explícitamente. Esto permite reconstruir la cadena `conversationId → requestId → providerId → resultado` para depurar un fallo, sin violar la promesa de privacidad.
 
-Ver [`spec-native/DECISIONS.md`](../spec-native/DECISIONS.md) DEC-0012 para el estado de esta garantía en la implementación actual (hoy es un gap: el `requestId` se genera pero no se loggea ni se correlaciona con `conversationId`).
+**Cerrado del lado del Agent Server** (2026-07-05, DEC-0012): `apps/agent-server/src/observability/trace.ts` expone `logTrace(entry)`, llamado en los tres puntos donde el Navigator despacha una Mission o una llamada a una Star (`mcp-host.ts`, `llm-gateway.ts`) — cubre éxito, timeout, error del nodo y cierre de conexión inesperado. Cada línea es JSON estructurado (`conversationId`, `requestId`, `providerId`, `capability`, `dispatchMs`, `totalMs`, `success`, `errorCode`), nunca contenido. Pendiente (no bloqueante): que cada provider de ejemplo (`llm-provider`, `ocr-provider`) también loggee su propia metadata local por `requestId` — hoy solo el Agent Server lo hace.
 
 ### Checklist de privacidad y trazabilidad para implementar un provider FHS
 
