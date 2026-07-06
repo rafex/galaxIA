@@ -25,6 +25,14 @@ permissions:
   contents: write
   packages: write
 
+# Evita que dos runs concurrentes (ej. un push que toca este workflow +
+# un workflow_dispatch manual casi simultáneo) compitan por el mismo push
+# del commit de bump de versión — visto en vivo el 2026-07-06: el segundo
+# run perdía la carrera con "! [rejected] main -> main (fetch first)".
+concurrency:
+  group: publish-fhs-protocol
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
