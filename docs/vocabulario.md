@@ -32,7 +32,7 @@ No hay subtipos de Star reservados todavía — un solo tipo de razonamiento por
 
 ## Star vs. Satellite: por qué no son sinónimos
 
-Un **Star** razona: recibe un mensaje y genera una respuesta (hoy, un LLM vía `llm-provider`). Un **Satellite** ejecuta una capacidad puntual y determinada: OCR, búsqueda, en el futuro RAG o una base de conocimiento. Cuando algo aplica a cualquiera de los dos por igual (el ciclo de vida de conexión, el heartbeat, el descubrimiento por mDNS), se usa **"nodo"** como término neutro — nunca "satélite" como paraguas genérico, que fue el uso inicial descartado en DEC-0024.
+Un **Star** razona: recibe un mensaje y genera una respuesta (hoy, un LLM vía `star-example`). Un **Satellite** ejecuta una capacidad puntual y determinada: OCR, búsqueda, en el futuro RAG o una base de conocimiento. Cuando algo aplica a cualquiera de los dos por igual (el ciclo de vida de conexión, el heartbeat, el descubrimiento por mDNS), se usa **"nodo"** como término neutro — nunca "satélite" como paraguas genérico, que fue el uso inicial descartado en DEC-0024.
 
 ## Frase de posicionamiento
 

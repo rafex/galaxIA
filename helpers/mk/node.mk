@@ -11,7 +11,7 @@ install:
 	$(call ok,Dependencias instaladas)
 
 .PHONY: build
-build: build-protocol build-agent build-web
+build: build-protocol build-atlas build-agent build-web
 	$(call section,Build de ejemplos)
 	npm run build -w $(WS_LLM_EX)
 	npm run build -w $(WS_OCR_EX)
@@ -23,26 +23,32 @@ build-protocol:
 	npm run build -w $(WS_PROTOCOL)
 	$(call ok,fhs-protocol compilado)
 
+.PHONY: build-atlas
+build-atlas: build-protocol
+	$(call info,Compilando atlas)
+	npm run build -w $(WS_ATLAS)
+	$(call ok,atlas compilado)
+
 .PHONY: build-agent
 build-agent: build-protocol
-	$(call info,Compilando agent-server)
+	$(call info,Compilando navigator)
 	npm run build -w $(WS_AGENT)
-	$(call ok,agent-server compilado)
+	$(call ok,navigator compilado)
 
 .PHONY: build-web
 build-web: build-protocol
-	$(call info,Compilando web)
+	$(call info,Compilando portal)
 	npm run build -w $(WS_WEB)
-	$(call ok,web compilado)
+	$(call ok,portal compilado)
 
 .PHONY: build-examples
 build-examples: build-protocol
-	$(call info,Compilando llm-provider)
+	$(call info,Compilando star-example)
 	npm run build -w $(WS_LLM_EX)
-	$(call ok,llm-provider compilado)
-	$(call info,Compilando ocr-provider)
+	$(call ok,star-example compilado)
+	$(call info,Compilando satellite-ocr-example)
 	npm run build -w $(WS_OCR_EX)
-	$(call ok,ocr-provider compilado)
+	$(call ok,satellite-ocr-example compilado)
 
 .PHONY: typecheck
 typecheck:

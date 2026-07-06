@@ -6,17 +6,18 @@ Implementa **FHS (Federation of Sovereign Horizons)**, un protocolo JSON sobre W
 
 ## Vocabulario
 
-GalaxIA (Galaxy + IA) tiene su propio vocabulario de producto — **Star** (nodo LLM), **Satellite** (nodo de herramientas), **Atlas** (Registry), **Portal** (chat web), **Navigator** (orquestador), **Beacon** (manifiesto), **Pulse** (heartbeat), **Mission** (ejecución de una tool), **Flight Log** (procedencia/auditoría), **Orbit** (conexión activa), **Signal** (capacidad anunciada). Este vocabulario vive en documentación e interfaz — el protocolo y el código (`provider`, `capability`, `manifest`, `registry`) no cambian de nombre. Tabla completa en [`docs/vocabulario.md`](docs/vocabulario.md).
+GalaxIA (Galaxy + IA) tiene su propio vocabulario de producto — **Star** (nodo LLM), **Satellite** (nodo de herramientas), **Atlas** (Registry), **Portal** (chat web), **Navigator** (orquestador), **Beacon** (manifiesto), **Pulse** (heartbeat), **Mission** (ejecución de una tool), **Flight Log** (procedencia/auditoría), **Orbit** (conexión activa), **Signal** (capacidad anunciada). Desde DEC-0033/DEC-0034/DEC-0035 este vocabulario también nombra identificadores de código, archivos, paquetes npm y contenedores (`Atlas`, `Signal`, `Beacon`, `apps/atlas`, `apps/navigator`...) — lo único que **no** cambia es el protocolo JSON en el cable (nombres de campo como `providerId`, tipos de mensaje `hello`/`register`). Tabla completa en [`docs/vocabulario.md`](docs/vocabulario.md).
 
 ## Estructura del repo
 
 | Carpeta | Qué es |
 |---|---|
-| `apps/agent-server/` | Navigator — Registry (Atlas) + Runtime + API de chat, en Fastify |
-| `apps/web/` | Portal — chat web vanilla con Vite |
+| `apps/atlas/` | Atlas — Registry (catálogo de nodos), servicio independiente desde DEC-0035 |
+| `apps/navigator/` | Navigator — Agent Runtime + API de chat, habla con Atlas por HTTP |
+| `apps/portal/` | Portal — chat web vanilla con Vite |
 | `packages/fhs-protocol/` | Tipos y constantes del protocolo FHS — fuente de verdad, no dependencia obligatoria |
-| `examples/llm-provider/` | Star de referencia sobre `llama.cpp`, con tool calling |
-| `examples/ocr-provider/` | Satellite de referencia para extracción de texto (OCR) |
+| `examples/star-example/` | Star de referencia sobre `llama.cpp`, con tool calling |
+| `examples/satellite-ocr-example/` | Satellite de referencia para extracción de texto (OCR) |
 | `docs/` | Documentación para humanos — protocolo, despliegue, vocabulario, contenedores |
 | `spec-native/` | Contexto técnico para agentes de IA — specs, decisiones (`DECISIONS.md`), roadmap, trazabilidad |
 | `site/` | Portal web público ([galax-ia.rafex.io](https://galax-ia.rafex.io)), sitio Jekyll |

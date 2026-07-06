@@ -6,11 +6,12 @@ galaxIA se despliega con Podman o Docker. Cada componente tiene su propio conten
 
 ```
 containers/
-├── agent-server/     # Backend Fastify (Registry + Runtime + Chat API)
-├── web/               # Frontend con Nginx
-├── llm-provider/       # Wrapper FHS hacia llama.cpp
-├── ocr-provider/       # Wrapper FHS hacia ether-ocr-api
-└── compose.yaml       # Orquestación
+├── atlas/              # Registry — catálogo de nodos (DEC-0035)
+├── navigator/          # Agent Runtime + Chat API (DEC-0035, habla con atlas por HTTP)
+├── portal/             # Frontend con Nginx
+├── star/               # Wrapper FHS hacia llama.cpp
+├── satellite-ocr/      # Wrapper FHS hacia ether-ocr-api
+└── compose.yaml        # Orquestación
 ```
 
 `ether-ocr-api` (el servicio REST de OCR real) y `llama-server` (el motor de inferencia) **no** tienen contenedor propio en este repositorio — corren por separado. Ver `docs/despliegue.md` para el detalle.
@@ -33,26 +34,28 @@ just container-up
 
 | Servicio | Puerto | Descripción |
 |---|---|---|
-| `fhs-web` | 3000 | Chat web |
-| `fhs-agent-server` | 8081 | API REST + WebSocket + Registry |
-| `fhs-llm-provider` | 43111 | Wrapper FHS de chat |
-| `fhs-ocr-provider` | 43112 | Wrapper FHS de tools |
+| `fhs-portal` | 3000 | Chat web |
+| `fhs-atlas` | 8081 | Registro de nodos (WebSocket) + catálogo (REST) |
+| `fhs-navigator` | 8090 (sin publicar al host) | API REST + WebSocket de chat — solo Docker DNS interno |
+| `fhs-star` | 43111 | Wrapper FHS de chat |
+| `fhs-satellite-ocr` | 43112 | Wrapper FHS de tools |
 
 En el bastion los puertos externos son distintos — ver la tabla de mapeo en `docs/despliegue.md`.
 
 ## Red entre contenedores
 
-Los contenedores se comunican a través de la red `fhs` (Docker DNS): `agent-server`, `fhs-web`, `llm-provider`, `ocr-provider`.
+Los contenedores se comunican a través de la red `fhs` (Docker DNS): `atlas`, `navigator`, `portal`, `star`, `satellite-ocr`.
 
 ## Construir imágenes individualmente
 
 ```bash
-podman build -t fhs-agent-server -f containers/agent-server/Containerfile .
-podman build -t fhs-web -f containers/web/Containerfile .
-podman build -t fhs-llm-provider -f containers/llm-provider/Containerfile .
-podman build -t fhs-ocr-provider -f containers/ocr-provider/Containerfile .
+podman build -t fhs-atlas -f containers/atlas/Containerfile .
+podman build -t fhs-navigator -f containers/navigator/Containerfile .
+podman build -t fhs-portal -f containers/portal/Containerfile .
+podman build -t fhs-star -f containers/star/Containerfile .
+podman build -t fhs-satellite-ocr -f containers/satellite-ocr/Containerfile .
 ```
 
 ## Modelo LLM y variables de entorno
 
-El modelo publicado por `llm-provider` (id, nombre, soporte de tool calling) se configura por variables de entorno en `compose.yaml` — no está hardcodeado en el código. Ver `docs/proveedores.md` y `spec-native/DECISIONS.md` DEC-0019.
+El modelo publicado por `star` (id, nombre, soporte de tool calling) se configura por variables de entorno en `compose.yaml` — no está hardcodeado en el código. Ver `docs/proveedores.md` y `spec-native/DECISIONS.md` DEC-0019.

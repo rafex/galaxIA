@@ -1,6 +1,6 @@
 # Implementar FHS en otros lenguajes
 
-FHS no es una librería, es un **protocolo de mensajes JSON sobre WebSocket**. La implementación de referencia (`packages/fhs-protocol`, `examples/llm-provider`, `examples/ocr-provider`) está en TypeScript/Node.js porque es el stack del MVP (ver `spec-native/STACK.md` y `spec-native/DECISIONS.md` DEC-0002), pero **nada en el protocolo depende de TypeScript**. Cualquier lenguaje con cliente WebSocket y serialización JSON puede implementar un provider o un cliente FHS.
+FHS no es una librería, es un **protocolo de mensajes JSON sobre WebSocket**. La implementación de referencia (`packages/fhs-protocol`, `examples/star-example`, `examples/satellite-ocr-example`) está en TypeScript/Node.js porque es el stack del MVP (ver `spec-native/STACK.md` y `spec-native/DECISIONS.md` DEC-0002), pero **nada en el protocolo depende de TypeScript**. Cualquier lenguaje con cliente WebSocket y serialización JSON puede implementar un provider o un cliente FHS.
 
 ## Lenguajes soportados (orden de prioridad)
 
@@ -48,7 +48,7 @@ async def register():
         # enviar "register" con el manifiesto, luego "ping" cada 10s
 ```
 
-Caso de uso natural: providers que envuelven modelos de Python (Whisper para transcripción, HuggingFace Transformers, Tesseract vía `pytesseract`) — el mismo patrón que hoy usa `examples/ocr-provider` en Node.js, pero hablando FHS desde Python en vez de traducir a Node.
+Caso de uso natural: providers que envuelven modelos de Python (Whisper para transcripción, HuggingFace Transformers, Tesseract vía `pytesseract`) — el mismo patrón que hoy usa `examples/satellite-ocr-example` en Node.js, pero hablando FHS desde Python en vez de traducir a Node.
 
 ### Rust
 
@@ -90,13 +90,13 @@ Caso de uso natural: integrar FHS con sistemas ya existentes en organizaciones/c
 
 ### TypeScript / JavaScript (referencia)
 
-Ver implementación completa en `examples/llm-provider/src/` y `examples/ocr-provider/src/`. Usa `ws` para el cliente WebSocket y los tipos de `packages/fhs-protocol` para los mensajes.
+Ver implementación completa en `examples/star-example/src/` y `examples/satellite-ocr-example/src/`. Usa `ws` para el cliente WebSocket y los tipos de `packages/fhs-protocol` para los mensajes.
 
 ## Qué NO cambia entre lenguajes
 
 - El **formato de los mensajes** (`hello`, `register`, `ping`/`pong`, `chat.request`, `tool.call`, etc.) es idéntico en todos los lenguajes — es JSON, no un binding específico de un runtime.
 - Los **campos de privacidad** (`scope`, `retention`, `trainingUse`, `provenance`) son obligatorios en todos los lenguajes por igual.
-- El **Registry** (hoy embebido en `apps/agent-server`, TypeScript) no necesita saber en qué lenguaje está escrito un provider — solo ve mensajes JSON por WebSocket.
+- El **Registry** (hoy embebido en `apps/navigator`, TypeScript) no necesita saber en qué lenguaje está escrito un provider — solo ve mensajes JSON por WebSocket.
 
 ## Cómo proponer un nuevo provider en otro lenguaje
 

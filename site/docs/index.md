@@ -28,8 +28,12 @@ repositorio.
     <p>Guía para implementar providers en Python, Rust o Java.</p>
   </li>
   <li>
-    <a href="https://github.com/{{ site.repository }}/blob/main/docs/agent-server.md">Agent Server</a>
-    <p>Registry, Runtime y API de chat.</p>
+    <a href="https://github.com/{{ site.repository }}/blob/main/docs/atlas.md">Atlas</a>
+    <p>El catálogo (Registry): registro de nodos y endpoints REST.</p>
+  </li>
+  <li>
+    <a href="https://github.com/{{ site.repository }}/blob/main/docs/navigator.md">Navigator</a>
+    <p>El orquestador: Agent Runtime y API de chat.</p>
   </li>
   <li>
     <a href="https://github.com/{{ site.repository }}/blob/main/docs/proveedores.md">Proveedores</a>

@@ -141,19 +141,19 @@ title: galaxIA — IA federada y soberana
   <h2>Piezas del proyecto</h2>
   <div class="grid">
     <div class="card">
-      <h3>agent-server</h3>
-      <p>Registry + Runtime + API de chat, en Fastify. El núcleo que federa providers y conversaciones.</p>
+      <h3>navigator</h3>
+      <p>Registry/Atlas + Runtime + API de chat, en Fastify. El núcleo que federa providers y conversaciones.</p>
     </div>
     <div class="card">
-      <h3>web</h3>
+      <h3>portal</h3>
       <p>Chat web vanilla con Vite. Adjunta documentos, confirma el uso de OCR, conversa con el LLM.</p>
     </div>
     <div class="card">
-      <h3>llm-provider</h3>
+      <h3>star-example</h3>
       <p>Provider de referencia sobre <code>llama.cpp</code>, con soporte de tool calling.</p>
     </div>
     <div class="card">
-      <h3>ocr-provider</h3>
+      <h3>satellite-ocr-example</h3>
       <p>Provider de referencia para extracción de texto de documentos vía OCR.</p>
     </div>
   </div>

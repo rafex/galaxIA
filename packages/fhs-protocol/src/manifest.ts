@@ -4,63 +4,63 @@
 
 import type {
   AuthenticationInfo,
-  Capability,
+  Signal,
   EndpointInfo,
   ModelInfo,
   PrivacyPolicy,
-  ProviderIdentity,
+  NodeProfile,
   SignatureInfo,
-  ProviderType,
+  NodeType,
 } from "./types.js";
 
-export interface BaseProviderManifest {
+export interface BaseBeacon {
   fhsVersion: string;
-  provider: ProviderIdentity;
+  provider: NodeProfile;
   endpoint?: EndpointInfo;
   privacy?: PrivacyPolicy;
   authentication?: AuthenticationInfo;
   signature?: SignatureInfo;
 }
 
-export interface LlmProviderManifest extends BaseProviderManifest {
-  provider: ProviderIdentity & { type: Extract<ProviderType, "llm"> };
+export interface StarBeacon extends BaseBeacon {
+  provider: NodeProfile & { type: Extract<NodeType, "llm"> };
   endpoint: EndpointInfo;
   models: ModelInfo[];
 }
 
-export interface McpProviderManifest extends BaseProviderManifest {
-  provider: ProviderIdentity & { type: Extract<ProviderType, "mcp"> };
+export interface SatelliteBeacon extends BaseBeacon {
+  provider: NodeProfile & { type: Extract<NodeType, "mcp"> };
   endpoint: EndpointInfo;
-  capabilities: Capability[];
+  capabilities: Signal[];
 }
 
 export interface MultiServiceEntry {
   kind: "llm" | "mcp";
   endpoint: EndpointInfo;
-  capabilities?: Capability[];
+  capabilities?: Signal[];
   models?: ModelInfo[];
 }
 
-export interface MultiProviderManifest extends BaseProviderManifest {
-  provider: ProviderIdentity & { type: Extract<ProviderType, "multi"> };
+export interface MultiBeacon extends BaseBeacon {
+  provider: NodeProfile & { type: Extract<NodeType, "multi"> };
   services: MultiServiceEntry[];
 }
 
-export type ProviderManifest =
-  | LlmProviderManifest
-  | McpProviderManifest
-  | MultiProviderManifest;
+export type Beacon =
+  | StarBeacon
+  | SatelliteBeacon
+  | MultiBeacon;
 
 /**
  * Normaliza un manifiesto multi-proveedor en servicios individuales.
  */
 export function* flattenManifest(
-  manifest: ProviderManifest
-): Generator<{ provider: ProviderIdentity; kind: "llm" | "mcp"; endpoint: EndpointInfo; models?: ModelInfo[]; capabilities?: Capability[] }> {
+  manifest: Beacon
+): Generator<{ provider: NodeProfile; kind: "llm" | "mcp"; endpoint: EndpointInfo; models?: ModelInfo[]; capabilities?: Signal[] }> {
   if (manifest.provider.type === "multi") {
     const base = { ...manifest.provider, type: "multi" as const };
-    for (const service of (manifest as MultiProviderManifest).services) {
-      const provider: ProviderIdentity = {
+    for (const service of (manifest as MultiBeacon).services) {
+      const provider: NodeProfile = {
         ...base,
         type: service.kind,
         id: `${base.id}/${service.kind}`,
@@ -76,12 +76,12 @@ export function* flattenManifest(
     return;
   }
 
-  const m = manifest as LlmProviderManifest | McpProviderManifest;
+  const m = manifest as StarBeacon | SatelliteBeacon;
   yield {
     provider: m.provider,
     kind: m.provider.type,
     endpoint: m.endpoint,
-    models: (m as LlmProviderManifest).models,
-    capabilities: (m as McpProviderManifest).capabilities,
+    models: (m as StarBeacon).models,
+    capabilities: (m as SatelliteBeacon).capabilities,
   };
 }

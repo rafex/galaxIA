@@ -3,18 +3,23 @@
 
 # ── Workspaces ─────────────────────────────────────────────────────────────
 WS_PROTOCOL := "packages/fhs-protocol"
-WS_AGENT    := "apps/agent-server"
-WS_WEB      := "apps/web"
-WS_LLM_EX   := "examples/llm-provider"
-WS_OCR_EX   := "examples/ocr-provider"
+WS_ATLAS    := "apps/atlas"
+WS_AGENT    := "apps/navigator"
+WS_WEB      := "apps/portal"
+WS_LLM_EX   := "examples/star-example"
+WS_OCR_EX   := "examples/satellite-ocr-example"
 
 # ── Puerto defaults (se pueden sobrescribir en .env) ───────────────────────
+# DEC-0035: ATLAS_PORT (Registry, antes era el mismo AGENT_PORT) y AGENT_PORT
+# (chat de Navigator) son procesos separados en desarrollo local también.
+ATLAS_PORT     := env_var_or_default("ATLAS_PORT", "8081")
 AGENT_PORT     := env_var_or_default("AGENT_SERVER_PORT", "8083")
 WEB_PORT       := env_var_or_default("WEB_PORT", "3000")
 LLM_PORT       := env_var_or_default("LLM_PROVIDER_PORT", "43111")
 OCR_PORT       := env_var_or_default("OCR_PROVIDER_PORT", "43112")
 MOCK_LLM_PORT  := env_var_or_default("MOCK_LLM_PORT", "43110")
-REGISTRY_URL   := env_var_or_default("REGISTRY_URL", "ws://localhost:" + AGENT_PORT + "/fhs/v1/ws")
+ATLAS_URL      := env_var_or_default("ATLAS_URL", "http://localhost:" + ATLAS_PORT)
+REGISTRY_URL   := env_var_or_default("REGISTRY_URL", "ws://localhost:" + ATLAS_PORT + "/fhs/v1/ws")
 LLAMA_CPP_URL  := env_var_or_default("LLAMA_CPP_URL", "http://localhost:" + MOCK_LLM_PORT + "/v1")
 OCR_SVC_URL    := env_var_or_default("OCR_SERVICE_URL", "http://localhost:8082")
 

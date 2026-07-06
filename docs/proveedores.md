@@ -17,7 +17,7 @@ Agent Server         Provider FHS          Servicio real
      │◄── chat.completed ─┤                     │
 ```
 
-## LLM Provider (`examples/llm-provider/`)
+## LLM Provider (`examples/star-example/`)
 
 ### Qué es
 
@@ -25,7 +25,7 @@ Un nodo FHS que envuelve un motor de inferencia (llama.cpp). Corre en Node.js, s
 
 ### Cómo funciona
 
-1. **Registro**: se conecta al Registry (`ws://agent-server:8081/fhs/v1/ws`) y envía `hello` + `register` con un manifiesto `LlmProviderManifest`
+1. **Registro**: se conecta al Registry (`ws://navigator:8081/fhs/v1/ws`) y envía `hello` + `register` con un manifiesto `LlmProviderManifest`
 2. **Chat FHS**: expone un servidor WebSocket en `:43111`. Cuando el Agent Server se conecta:
    - Recibe `chat.request` con el `GenerateRequest` (modelo, mensajes, tools)
    - Llama a llama.cpp vía `curl` (child_process, evita bug de Undici + ws en Node.js)
@@ -39,7 +39,7 @@ Un nodo FHS que envuelve un motor de inferencia (llama.cpp). Corre en Node.js, s
 {
   "fhsVersion": "0.1",
   "provider": { "id": "did:key:macmini-raul", "type": "llm", "visibility": "community" },
-  "endpoint": { "protocol": "fhs", "url": "ws://llm-provider:43111/fhs/v1/chat" },
+  "endpoint": { "protocol": "fhs", "url": "ws://star:43111/fhs/v1/chat" },
   "models": [{ "id": "qwen2.5-coder-3b-instruct", "capabilities": ["chat", "tool.calling"], "contextWindow": 4096, "toolCalling": { "supported": true } }]
 }
 ```
@@ -58,7 +58,7 @@ const stdout = await this.curlPost("http://llama:43110/v1/chat/completions", bod
 | Variable | Default | Descripción |
 |---|---|---|
 | `LLM_PROVIDER_PORT` | `43111` | Puerto del WebSocket FHS de chat |
-| `LLM_PROVIDER_HOST` | `localhost` | Hostname para el manifiesto (en contenedores: `llm-provider`) |
+| `LLM_PROVIDER_HOST` | `localhost` | Hostname para el manifiesto (en contenedores: `star`) |
 | `REGISTRY_URL` | `ws://localhost:8083/fhs/v1/ws` | URL del Registry |
 | `LLAMA_CPP_URL` | `http://localhost:43110/v1` | URL del servidor llama.cpp (en el bastion: `:8080`, ver `docs/despliegue.md`) |
 | `PROVIDER_ID` | `did:key:macmini-raul` | Identidad del proveedor |
@@ -69,7 +69,7 @@ const stdout = await this.curlPost("http://llama:43110/v1/chat/completions", bod
 
 ---
 
-## OCR Provider (`examples/ocr-provider/`)
+## OCR Provider (`examples/satellite-ocr-example/`)
 
 ### Qué es
 
@@ -108,7 +108,7 @@ Cliente              OCR Provider FHS        ether-ocr-api          Tesseract
 
 ### Ejecución determinística, no vía tool calling del LLM
 
-El Agent Runtime (`apps/agent-server/src/agent/runtime.ts`) **no espera a que el LLM decida invocar `ocr_extract`**. Cuando el usuario adjunta un archivo, la intención ya es inequívoca — el runtime llama a la tool directamente antes de involucrar al LLM. Esto se adoptó porque modelos pequeños/locales no son confiables tomando esa decisión (ver `spec-native/DECISIONS.md` DEC-0016, DEC-0017, DEC-0020).
+El Agent Runtime (`apps/navigator/src/agent/runtime.ts`) **no espera a que el LLM decida invocar `ocr_extract`**. Cuando el usuario adjunta un archivo, la intención ya es inequívoca — el runtime llama a la tool directamente antes de involucrar al LLM. Esto se adoptó porque modelos pequeños/locales no son confiables tomando esa decisión (ver `spec-native/DECISIONS.md` DEC-0016, DEC-0017, DEC-0020).
 
 Además, el frontend muestra el texto extraído en una burbuja colapsada con botones "Usar documento"/"Descartar" **antes** de llamar al LLM — el usuario confirma explícitamente si quiere gastar una llamada (lenta en hardware comunitario) con ese contexto. Ver `spec-native/specs/ocr-confirmacion/SPEC.md`.
 
@@ -121,11 +121,11 @@ Usa `curl` con `multipart/form-data` hacia la API REST de ether-ocr (`POST /api/
 | Variable | Default | Descripción |
 |---|---|---|
 | `OCR_PROVIDER_PORT` | `43112` | Puerto del WebSocket FHS de tools |
-| `OCR_PROVIDER_HOST` | `localhost` | Hostname para el manifiesto (en contenedores: `ocr-provider`) |
+| `OCR_PROVIDER_HOST` | `localhost` | Hostname para el manifiesto (en contenedores: `satellite-ocr`) |
 | `REGISTRY_URL` | `ws://localhost:8083/fhs/v1/ws` | URL del Registry |
 | `OCR_SERVICE_URL` | `http://ether-ocr-api:8000` | URL base de la API REST de OCR |
 | `OCR_API_KEY` | `dev-key-ether-ocr` | API key para autenticación |
-| `PROVIDER_ID` | `did:key:ocr-provider-01` | Identidad del proveedor |
+| `PROVIDER_ID` | `did:key:satellite-ocr-01` | Identidad del proveedor |
 
 ---
 

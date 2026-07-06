@@ -2,7 +2,7 @@
 
 ## Estado
 
-`done` — implementado y verificado end-to-end localmente (2026-07-05). Pendiente (no bloqueante) repetir la verificación contra los 3 equipos reales de la demo (laptop + bastion + Raspberry Pi) cuando la red del sitio esté disponible — mismo código, sin cambios esperados.
+`done` — implementado y verificado end-to-end localmente (2026-07-05). Pendiente (no bloqueante) repetir la verificación contra los 3 equipos reales de la demo (laptop + bastion + Raspberry Pi) cuando la red del sitio esté disponible — mismo código, sin cambios esperados. **Actualización (2026-07-06, DEC-0036):** el historial de rating ya persiste en SQLite+WAL — sobrevive un reinicio de Atlas, ver `apps/atlas/src/atlas/metrics.ts`.
 
 ## Owner
 
@@ -67,9 +67,10 @@ Raspberry Pi):
   de "el heartbeat no debe bloquearse" (regla implícita) a un requisito
   verificable con un mensaje concreto en el protocolo — el checklist
   "plug and play" agrega el envío de `dispatch.ack` como paso obligatorio.
-- **Registry con historial de métricas por nodo**: un store en memoria
-  (mismo patrón que `MemoryRegistryStore`, sin persistencia entre
-  reinicios — ver Fuera de alcance) que guarda, por `providerId` +
+- **Registry con historial de métricas por nodo**: originalmente un store
+  en memoria (mismo patrón que `MemoryRegistryStore`, sin persistencia
+  entre reinicios — ver Fuera de alcance); **persistido en SQLite+WAL desde
+  DEC-0036** (2026-07-06) — sobrevive un reinicio de Atlas. Guarda, por `providerId` +
   capability/modelo, una ventana de las últimas N muestras de:
   - latencia de despacho (`dispatch.ack` - envío de la petición),
   - latencia total (resultado final - envío de la petición),

@@ -2,7 +2,7 @@
 # generate-dev-cert.sh — genera un certificado autofirmado para la PoC de galaxIA.
 #
 # NO usar en producción. Un solo certificado autofirmado se comparte entre
-# agent-server, llm-provider, ocr-provider y nginx — todos los clientes FHS
+# navigator, star, satellite-ocr y nginx — todos los clientes FHS
 # lo aceptan con rejectUnauthorized:false (ver docs/tls-autofirmado.md).
 #
 # Uso:

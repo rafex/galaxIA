@@ -22,6 +22,12 @@ dist/
 # cada provider, contiene la clave privada del did:key, nunca se versiona.
 .fhs-identity*.pem
 
+# Rating de Atlas persistido en SQLite (SPEC-SATRATING-0001) — datos locales,
+# se regenera con el uso, nunca se versiona.
+apps/atlas/data/
+*.db-wal
+*.db-shm
+
 # opencode (local, no versionar)
 .opencode/sessions.db
 .opencode/sessions*db

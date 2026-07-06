@@ -11,14 +11,14 @@ flowchart TB
     subgraph Laptop["💻 Laptop"]
         Browser["Navegador"]
         Nginx["nginx :8443<br/>(TLS termina aquí)"]
-        Agent["agent-server<br/>Fastify HTTPS"]
+        Agent["navigator<br/>Fastify HTTPS"]
         Browser -->|"HTTPS"| Nginx
         Nginx -->|"HTTPS (proxy_ssl_verify off)"| Agent
     end
 
     subgraph Bastion["🖥️ Bastion"]
-        LlmProvider["llm-provider<br/>wss:// servidor propio"]
-        OcrProvider["ocr-provider<br/>wss:// servidor propio"]
+        LlmProvider["star<br/>wss:// servidor propio"]
+        OcrProvider["satellite-ocr<br/>wss:// servidor propio"]
     end
 
     Agent -.->|"wss:// (rejectUnauthorized: false)"| LlmProvider
@@ -27,7 +27,7 @@ flowchart TB
     OcrProvider -.->|"wss:// hello/register/ping"| Agent
 ```
 
-Todo el tráfico FHS (Registry, chat, tools) queda cifrado. Lo que **no** se cifra a propósito (tráfico interno del mismo host, no cruza la LAN): `llm-provider → llama-server` y `ocr-provider → ether-ocr-api` (ambos vía `curl` local dentro del bastion).
+Todo el tráfico FHS (Registry, chat, tools) queda cifrado. Lo que **no** se cifra a propósito (tráfico interno del mismo host, no cruza la LAN): `star → llama-server` y `satellite-ocr → ether-ocr-api` (ambos vía `curl` local dentro del bastion).
 
 ## Generar el certificado
 
@@ -48,7 +48,7 @@ scp certs/dev.crt certs/dev.key laptop:~/repositorys/github/galaxIA/certs/
 scp certs/dev.crt certs/dev.key bastion:~/certs/
 ```
 
-**Si el bastion se administra vía conexión remota de podman** (sin un checkout del repo ahí — el caso de esta PoC), la ruta del certificado usada en el bind-mount debe ser una ruta absoluta *en el host que ejecuta el contenedor* (el bastion), no en la máquina desde la que se corre `podman-compose`. Por eso `containers/compose.tls.yaml` usa `${CERTS_DIR:-../certs}` — exportar `CERTS_DIR=/home/<usuario>/certs` (la ruta real en el bastion) antes de levantar `llm-provider`/`ocr-provider` ahí. En la laptop, con checkout local, el default relativo (`../certs`) ya funciona sin tocar nada.
+**Si el bastion se administra vía conexión remota de podman** (sin un checkout del repo ahí — el caso de esta PoC), la ruta del certificado usada en el bind-mount debe ser una ruta absoluta *en el host que ejecuta el contenedor* (el bastion), no en la máquina desde la que se corre `podman-compose`. Por eso `containers/compose.tls.yaml` usa `${CERTS_DIR:-../certs}` — exportar `CERTS_DIR=/home/<usuario>/certs` (la ruta real en el bastion) antes de levantar `star`/`satellite-ocr` ahí. En la laptop, con checkout local, el default relativo (`../certs`) ya funciona sin tocar nada.
 
 ## Activar TLS
 
@@ -90,11 +90,11 @@ Abrir el chat en `https://<ip-laptop>:8443` — el navegador mostrará la advert
 
 ## Cómo funciona en el código
 
-- **`apps/agent-server`**: `TLS_CERT_PATH`/`TLS_KEY_PATH` (env) activan `https` en la configuración de Fastify — cubre `/fhs/v1/ws` (Registry) y `/api/chat/ws` (chat) con el mismo servidor, sin cambios en el código de esas rutas.
-- **`examples/llm-provider`, `examples/ocr-provider`**: mismas variables activan un `https.createServer` interno para su propio servidor de chat/tools, y cambian el esquema anunciado en el manifiesto (`wss://` en vez de `ws://`). El cliente que se conecta al Registry también usa `wss://` cuando `REGISTRY_URL` lo especifica.
+- **`apps/navigator`**: `TLS_CERT_PATH`/`TLS_KEY_PATH` (env) activan `https` en la configuración de Fastify — cubre `/fhs/v1/ws` (Registry) y `/api/chat/ws` (chat) con el mismo servidor, sin cambios en el código de esas rutas.
+- **`examples/star-example`, `examples/satellite-ocr-example`**: mismas variables activan un `https.createServer` interno para su propio servidor de chat/tools, y cambian el esquema anunciado en el manifiesto (`wss://` en vez de `ws://`). El cliente que se conecta al Registry también usa `wss://` cuando `REGISTRY_URL` lo especifica.
 - **Clientes WebSocket** (`llm-gateway.ts`, `mcp-host.ts`, y los clientes de Registry en ambos providers): pasan `{ rejectUnauthorized: false }` cuando la URL empieza con `wss://` — sin esto, Node rechazaría el certificado autofirmado por no tener una CA reconocida.
-- **`apps/web` (nginx)**: `containers/web/nginx-tls.conf` termina TLS para el navegador y reenvía a `agent-server` por `https://` con `proxy_ssl_verify off` (mismo motivo: cert autofirmado).
-- **Frontend (`apps/web/src/services/api.ts`)**: ya elegía `wss://` automáticamente cuando `location.protocol === "https:"` — no necesitó ningún cambio.
+- **`apps/portal` (nginx)**: `containers/portal/nginx-tls.conf` termina TLS para el navegador y reenvía a `navigator` por `https://` con `proxy_ssl_verify off` (mismo motivo: cert autofirmado).
+- **Frontend (`apps/portal/src/services/api.ts`)**: ya elegía `wss://` automáticamente cuando `location.protocol === "https:"` — no necesitó ningún cambio.
 
 ## Riesgos y alcance deliberadamente limitado
 

@@ -12,12 +12,13 @@ C_CYAN    := \033[36m
 
 # ── Workspaces ─────────────────────────────────────────────────────────────
 WS_PROTOCOL := packages/fhs-protocol
-WS_AGENT    := apps/agent-server
-WS_WEB      := apps/web
-WS_LLM_EX   := examples/llm-provider
-WS_OCR_EX   := examples/ocr-provider
+WS_ATLAS    := apps/atlas
+WS_AGENT    := apps/navigator
+WS_WEB      := apps/portal
+WS_LLM_EX   := examples/star-example
+WS_OCR_EX   := examples/satellite-ocr-example
 
-WS_ALL      := $(WS_PROTOCOL) $(WS_AGENT) $(WS_WEB) $(WS_LLM_EX) $(WS_OCR_EX)
+WS_ALL      := $(WS_PROTOCOL) $(WS_ATLAS) $(WS_AGENT) $(WS_WEB) $(WS_LLM_EX) $(WS_OCR_EX)
 
 # ── Contenedores ───────────────────────────────────────────────────────────
 CONTAINER_DIR := containers

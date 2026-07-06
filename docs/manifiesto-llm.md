@@ -74,7 +74,7 @@ Conecta al Registry por WebSocket y envía:
   --ctx-size 4096
 ```
 
-El flag `--jinja` activa el parseo del chat template real del modelo (incluye el formato de tool calls) — sin él, `llama-server` no expone `tool_calls` correctamente en la respuesta OpenAI-compatible. Aun con `--jinja`, algunos modelos/versiones no llenan ese campo de forma confiable — `examples/llm-provider/src/llm-bridge.ts` tiene un fallback que parsea la llamada desde el texto de respuesta cuando esto pasa (ver `spec-native/DECISIONS.md` DEC-0017).
+El flag `--jinja` activa el parseo del chat template real del modelo (incluye el formato de tool calls) — sin él, `llama-server` no expone `tool_calls` correctamente en la respuesta OpenAI-compatible. Aun con `--jinja`, algunos modelos/versiones no llenan ese campo de forma confiable — `examples/star-example/src/llm-bridge.ts` tiene un fallback que parsea la llamada desde el texto de respuesta cuando esto pasa (ver `spec-native/DECISIONS.md` DEC-0017).
 
 La API OpenAI-compatible estará en:
 
@@ -82,4 +82,4 @@ La API OpenAI-compatible estará en:
 http://<ip>:8080/v1/chat/completions
 ```
 
-El puerto y el modelo son configurables — no hardcodear el modelo en el manifiesto del provider. `examples/llm-provider` lee `MODEL_ID`, `MODEL_DISPLAY_NAME`, `MODEL_CONTEXT_WINDOW` y `MODEL_TOOL_CALLING_SUPPORTED` de variables de entorno (DEC-0019). Antes de declarar `MODEL_TOOL_CALLING_SUPPORTED=true`, verificar con una llamada `curl` real que el modelo efectivamente invoca tools — ver `docs/protocolo-provider.md`, sección "Lecciones de integración".
+El puerto y el modelo son configurables — no hardcodear el modelo en el manifiesto del provider. `examples/star-example` lee `MODEL_ID`, `MODEL_DISPLAY_NAME`, `MODEL_CONTEXT_WINDOW` y `MODEL_TOOL_CALLING_SUPPORTED` de variables de entorno (DEC-0019). Antes de declarar `MODEL_TOOL_CALLING_SUPPORTED=true`, verificar con una llamada `curl` real que el modelo efectivamente invoca tools — ver `docs/protocolo-provider.md`, sección "Lecciones de integración".

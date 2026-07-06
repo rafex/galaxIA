@@ -1,13 +1,19 @@
 # galaxIA — Docker Compose, pensado para desplegarse en dos máquinas distintas
 # (ver docs/despliegue-multi-host.md):
-#   - laptop: servicios "agent-server" + "web" (el core)
-#   - bastion: servicios "llm-provider" + "ocr-provider" (los providers pesados)
+#   - laptop: servicios "atlas" + "navigator" + "portal" (el core)
+#   - bastion: servicios "star" + "satellite-ocr" (los providers pesados)
+#
+# DEC-0035: Atlas (Registry) y Navigator (Agent Runtime) son servicios
+# separados desde esta versión — antes vivían en un solo proceso. Navigator
+# habla con Atlas por HTTP (ATLAS_URL); Star/Satellite siguen registrándose
+# directamente contra Atlas por WebSocket (REGISTRY_URL), sin cambios en su
+# protocolo.
 #
 # En un solo host (todo en el bastion, como antes), los defaults de
 # PROVIDER_REGISTRY_URL/LLM_PROVIDER_HOST/OCR_PROVIDER_HOST siguen funcionando
 # sin tocar nada — asumen Docker DNS dentro del mismo host. Para separar en
 # dos máquinas, exportar esas variables (shell env, tiene precedencia sobre
-# .env) con la IP real de la laptop antes de levantar llm-provider/ocr-provider
+# .env) con la IP real de la laptop antes de levantar star/satellite-ocr
 # (ver docs/despliegue-multi-host.md).
 #
 # Nota: se usa PROVIDER_REGISTRY_URL (no REGISTRY_URL) a propósito — el .env
@@ -17,42 +23,66 @@
 # solo host.
 
 services:
-  agent-server:
+  atlas:
     build:
       context: ..
-      dockerfile: containers/agent-server/Containerfile
-    container_name: fhs-agent-server
+      dockerfile: containers/atlas/Containerfile
+    container_name: fhs-atlas
+    # Mismo mapeo externo que tenía "navigator" antes de DEC-0035 — no hace
+    # falta abrir una regla UFW nueva en el bastion/laptop ya desplegados,
+    # Atlas hereda el puerto bien conocido.
     ports:
       - "30083:8081"
     environment:
       - PORT=8081
       - HOST=0.0.0.0
+    # Volumen nombrado para que el rating (SQLite, SPEC-SATRATING-0001)
+    # sobreviva a `podman-compose down`/recrear el contenedor — sin esto el
+    # archivo vive en la capa efímera del contenedor y se pierde igual.
+    volumes:
+      - atlas-data:/app/apps/atlas/data
     networks:
       - fhs
     restart: unless-stopped
 
-  web:
+  navigator:
     build:
       context: ..
-      dockerfile: containers/web/Containerfile
-    container_name: fhs-web
+      dockerfile: containers/navigator/Containerfile
+    container_name: fhs-navigator
+    environment:
+      - PORT=8090
+      - HOST=0.0.0.0
+      - ATLAS_URL=http://atlas:8081
+    depends_on:
+      - atlas
+    networks:
+      - fhs
+    restart: unless-stopped
+
+  portal:
+    build:
+      context: ..
+      dockerfile: containers/portal/Containerfile
+    container_name: fhs-portal
     ports:
       - "3000:80"
     depends_on:
-      - agent-server
+      - navigator
+      - atlas
     networks:
       - fhs
     restart: unless-stopped
 
-  llm-provider:
+  star:
     build:
       context: ..
-      dockerfile: containers/llm-provider/Containerfile
-    container_name: fhs-llm-provider
+      dockerfile: containers/star/Containerfile
+    container_name: fhs-star
     # Sin remapeo a propósito: el manifiesto que este provider anuncia usa
     # LLM_PROVIDER_PORT (43111) tanto para escuchar como para el endpoint
     # publicado — si el puerto externo fuera distinto (ej. 30084:43111),
-    # un agent-server en otra máquina intentaría conectarse al puerto
+    # un navigator en otra máquina intentaría conectarse al puerto
     # equivocado. En un solo host esto no importaba (Docker DNS iba directo
     # al puerto interno, sin pasar por el mapeo de host); entre dos hosts sí.
     ports:
@@ -60,12 +90,14 @@ services:
     environment:
       - LLM_PROVIDER_PORT=43111
       # Hostname que este provider anuncia en su manifiesto — debe ser
-      # alcanzable por el agent-server (Registry). En un solo host, el nombre
-      # de servicio Docker basta; separado en otra máquina, usar su IP LAN.
-      - LLM_PROVIDER_HOST=${LLM_PROVIDER_HOST:-llm-provider}
-      # A dónde se conecta este provider a registrarse. En un solo host,
-      # Docker DNS del agent-server local; separado, la IP LAN de la laptop.
-      - REGISTRY_URL=${PROVIDER_REGISTRY_URL:-ws://agent-server:8081/fhs/v1/ws}
+      # alcanzable por Navigator al ejecutar chat.request. En un solo host,
+      # el nombre de servicio Docker basta; separado en otra máquina, usar
+      # su IP LAN.
+      - LLM_PROVIDER_HOST=${LLM_PROVIDER_HOST:-star}
+      # A dónde se registra este provider — Atlas, no Navigator (DEC-0035).
+      # En un solo host, Docker DNS de "atlas" local; separado, la IP LAN
+      # de la laptop.
+      - REGISTRY_URL=${PROVIDER_REGISTRY_URL:-ws://atlas:8081/fhs/v1/ws}
       - LLAMA_CPP_URL=http://host.containers.internal:8080/v1
       - PROVIDER_ID=did:key:macmini-raul
       - PROVIDER_NAME=Mac mini de Raul
@@ -79,18 +111,18 @@ services:
       - fhs
     restart: unless-stopped
 
-  ocr-provider:
+  satellite-ocr:
     build:
       context: ..
-      dockerfile: containers/ocr-provider/Containerfile
-    container_name: fhs-ocr-provider
-    # Sin remapeo — mismo motivo que llm-provider (ver arriba).
+      dockerfile: containers/satellite-ocr/Containerfile
+    container_name: fhs-satellite-ocr
+    # Sin remapeo — mismo motivo que star (ver arriba).
     ports:
       - "43112:43112"
     environment:
       - OCR_PROVIDER_PORT=43112
-      - OCR_PROVIDER_HOST=${OCR_PROVIDER_HOST:-ocr-provider}
-      - REGISTRY_URL=${PROVIDER_REGISTRY_URL:-ws://agent-server:8081/fhs/v1/ws}
+      - OCR_PROVIDER_HOST=${OCR_PROVIDER_HOST:-satellite-ocr}
+      - REGISTRY_URL=${PROVIDER_REGISTRY_URL:-ws://atlas:8081/fhs/v1/ws}
       - OCR_SERVICE_URL=http://ether-ocr-api:8000
       - OCR_API_KEY=dev-key-ether-ocr
       - PROVIDER_ID=did:key:ocr-provider-01
@@ -103,3 +135,6 @@ networks:
   fhs:
     name: fhs
     driver: bridge
+
+volumes:
+  atlas-data:

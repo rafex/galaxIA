@@ -17,17 +17,18 @@ Este es el flujo real usado durante el desarrollo (ver `docs/despliegue.md` para
 # Con una conexión podman remota ya configurada (podman system connection list)
 just container-up           # stack completo
 # o por partes:
-just container-up-core      # web + agent-server
+just container-up-core      # atlas + navigator + portal
 just container-up-llm       # wrapper FHS de llama.cpp
 just container-up-ocr       # wrapper FHS de ether-ocr
 ```
 
 Esto levanta (puertos del bastion, ver `docs/despliegue.md` para el mapeo completo):
 
-- `fhs-web` — frontend del chat
-- `fhs-agent-server` — Registry + Runtime + Chat API
-- `fhs-llm-provider` — wrapper FHS hacia `llama-server`
-- `fhs-ocr-provider` — wrapper FHS hacia `ether-ocr-api`
+- `fhs-portal` — frontend del chat
+- `fhs-atlas` — Registry (catálogo de nodos)
+- `fhs-navigator` — Agent Runtime + Chat API (habla con `fhs-atlas` por HTTP, DEC-0035)
+- `fhs-star` — wrapper FHS hacia `llama-server`
+- `fhs-satellite-ocr` — wrapper FHS hacia `ether-ocr-api`
 
 `ether-ocr-api` y `llama-server` **no** están en `containers/compose.yaml` — corren por separado (ether-ocr-api como su propio contenedor, llama-server como proceso nativo en el host). Ver `docs/despliegue.md`.
 
@@ -46,20 +47,27 @@ Ver `spec-native/specs/ocr-confirmacion/SPEC.md` para el diseño completo de est
 
 ## Opción de desarrollo: sin contenedores
 
-### Terminal 1 — Backend
+### Terminal 1 — Atlas (Registry)
 
 ```bash
 npm install
+just dev-atlas
+```
+
+### Terminal 2 — Navigator (Agent Runtime)
+
+```bash
+# Requiere atlas corriendo (Terminal 1)
 just dev-agent
 ```
 
-### Terminal 2 — Frontend
+### Terminal 3 — Frontend
 
 ```bash
 just dev-web
 ```
 
-### Terminal 3 — LLM Provider (o mock)
+### Terminal 4 — LLM Provider (o mock)
 
 ```bash
 # Con llama.cpp real corriendo en LLAMA_CPP_URL
@@ -69,7 +77,7 @@ just dev-llm-provider
 just dev-mock-llm
 ```
 
-### Terminal 4 — OCR Provider
+### Terminal 5 — OCR Provider
 
 ```bash
 # Requiere OCR_SERVICE_URL apuntando a un servicio real compatible con ether-ocr-api
@@ -84,10 +92,11 @@ Ver `docs/proveedores.md` y `docs/despliegue.md` para la tabla completa por serv
 
 | Variable | Servicio | Descripción |
 |---|---|---|
-| `MODEL_ID` / `MODEL_TOOL_CALLING_SUPPORTED` | llm-provider | Qué modelo se publica y si soporta tool calling (DEC-0019) — verificar con `curl` antes de cambiar |
-| `LLAMA_CPP_URL` | llm-provider | URL del `llama-server` real |
-| `OCR_SERVICE_URL` | ocr-provider | URL del servicio OCR compatible con ether-ocr-api |
-| `AGENT_SERVER_PORT` | agent-server | Puerto HTTP/WebSocket |
+| `MODEL_ID` / `MODEL_TOOL_CALLING_SUPPORTED` | star | Qué modelo se publica y si soporta tool calling (DEC-0019) — verificar con `curl` antes de cambiar |
+| `LLAMA_CPP_URL` | star | URL del `llama-server` real |
+| `OCR_SERVICE_URL` | satellite-ocr | URL del servicio OCR compatible con ether-ocr-api |
+| `AGENT_SERVER_PORT` | navigator | Puerto HTTP/WebSocket |
+| `ATLAS_URL` | navigator | Dónde vive Atlas (DEC-0035) |
 
 ## Comandos útiles
 
@@ -96,9 +105,10 @@ Ver `docs/proveedores.md` y `docs/despliegue.md` para la tabla completa por serv
 podman ps
 
 # Ver logs
-just container-logs agent-server
-just container-logs llm-provider
-just container-logs ocr-provider
+just container-logs atlas
+just container-logs navigator
+just container-logs star
+just container-logs satellite-ocr
 
 # Detener todo
 just container-down

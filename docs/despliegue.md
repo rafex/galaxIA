@@ -12,16 +12,21 @@ Guía para desplegar el stack completo de galaxIA en el bastion (`192.168.3.173`
 
 ## Servicios
 
+DEC-0035: Atlas (Registry) y Navigator (Agent Runtime) son contenedores
+separados. Navigator no tiene puerto publicado al host — el Portal le habla
+por Docker DNS internamente, nadie más lo necesita.
+
 | Servicio | Puerto host | Puerto container | Red interna |
 |---|---|---|---|
-| **fhs-web** | `3000` | `80` | `fhs` |
-| **fhs-agent-server** | `30083` | `8081` | `fhs` |
-| **fhs-llm-provider** | `43111` | `43111` | `fhs` |
-| **fhs-ocr-provider** | `43112` | `43112` | `fhs` |
+| **fhs-portal** | `3000` | `80` | `fhs` |
+| **fhs-atlas** | `30083` | `8081` | `fhs` |
+| **fhs-navigator** | — (sin publicar) | `8090` | `fhs` |
+| **fhs-star** | `43111` | `43111` | `fhs` |
+| **fhs-satellite-ocr** | `43112` | `43112` | `fhs` |
 | **llama.cpp** | `8080` | — | host |
 | **ether-ocr-api** | `8001→8000, 9011→9001` | — | `containers_default` |
 
-`llm-provider`/`ocr-provider` ya no remapean puerto (antes `30084`/`30085` → `43111`/`43112`) — el manifiesto que cada provider anuncia usa el mismo puerto en el que escucha internamente, así que host y contenedor deben coincidir para que un despliegue en otra máquina (ver `docs/despliegue-multi-host.md`) no intente conectarse al puerto equivocado.
+`star`/`satellite-ocr` ya no remapean puerto (antes `30084`/`30085` → `43111`/`43112`) — el manifiesto que cada provider anuncia usa el mismo puerto en el que escucha internamente, así que host y contenedor deben coincidir para que un despliegue en otra máquina (ver `docs/despliegue-multi-host.md`) no intente conectarse al puerto equivocado.
 
 ## Redes
 
@@ -31,7 +36,7 @@ Los servicios de galaxIA usan la red `fhs` (bridge). El `ether-ocr-api` está en
 podman network connect fhs ether-ocr-api
 ```
 
-Esto permite que el `ocr-provider` llegue a `ether-ocr-api:8000` por Docker DNS.
+Esto permite que el `satellite-ocr` llegue a `ether-ocr-api:8000` por Docker DNS.
 
 ## Levantar el stack
 
@@ -43,7 +48,8 @@ cd /path/to/galaxIA
 just container-up
 
 # O por partes
-just container-up-core    # web + agent-server
+just container-up-core    # atlas + navigator + portal
+just container-up-atlas   # solo atlas
 just container-up-llm     # wrapper FHS de llama.cpp
 just container-up-ocr     # wrapper FHS de ether-ocr
 ```
@@ -56,7 +62,7 @@ just container-up-ocr     # wrapper FHS de ether-ocr
 # Estado de contenedores
 podman ps
 
-# Health del agent-server
+# Health de atlas
 curl http://192.168.3.173:30083/health
 # {"ok":true,"fhsVersion":"0.1","version":"abc1234","buildDate":"..."}
 
@@ -77,13 +83,14 @@ curl -s http://192.168.3.173:30083/api/fhs/providers
 just container-logs
 
 # Un servicio específico
-just container-logs agent-server
-just container-logs llm-provider
-just container-logs ocr-provider
+just container-logs atlas
+just container-logs navigator
+just container-logs star
+just container-logs satellite-ocr
 
 # O directo con podman
-podman logs fhs-agent-server --tail 20
-podman logs fhs-llm-provider -f
+podman logs fhs-atlas --tail 20
+podman logs fhs-star -f
 ```
 
 ## Actualizar un servicio
@@ -120,9 +127,9 @@ MODEL_CONTEXT_WINDOW=4096
 MODEL_TOOL_CALLING_SUPPORTED=true
 ```
 
-`MODEL_*` controla qué modelo se publica en el manifiesto del `llm-provider` (DEC-0019) — cambiar de modelo ya no requiere editar código ni reconstruir la imagen, solo estas variables. `LLAMA_CPP_URL` debe apuntar al puerto real donde corre `llama-server` en el bastion (gestionado fuera de este repo, en `/opt/llama.cpp/current/scripts/start-server.sh` con `--jinja` — ver `docs/manifiesto-llm.md`).
+`MODEL_*` controla qué modelo se publica en el manifiesto del `star` (DEC-0019) — cambiar de modelo ya no requiere editar código ni reconstruir la imagen, solo estas variables. `LLAMA_CPP_URL` debe apuntar al puerto real donde corre `llama-server` en el bastion (gestionado fuera de este repo, en `/opt/llama.cpp/current/scripts/start-server.sh` con `--jinja` — ver `docs/manifiesto-llm.md`).
 
-Para desarrollo local, cambiar los hostnames a `localhost`. Para contenedores, usar Docker DNS (`agent-server`, `llm-provider`, `ether-ocr-api`).
+Para desarrollo local, cambiar los hostnames a `localhost`. Para contenedores, usar Docker DNS (`atlas`, `navigator`, `star`, `ether-ocr-api`).
 
 ## Firewall (UFW en el bastion)
 
@@ -131,8 +138,8 @@ Los puertos externos deben estar en la whitelist de UFW:
 ```bash
 sudo ufw allow 3000/tcp    # Web frontend
 sudo ufw allow 8080/tcp    # llama.cpp
-# 30083 (agent-server) ya está en el rango 30000-30099 (Podman Web)
-# 43111/43112 (llm-provider/ocr-provider) necesitan regla explícita —
+# 30083 (atlas) ya está en el rango 30000-30099 (Podman Web)
+# 43111/43112 (star/satellite-ocr) necesitan regla explícita —
 # ya no van remapeados dentro del rango 30000-30099. Ver docs/despliegue-multi-host.md
 # para el caso de despliegue en dos máquinas, donde esto se confirmó necesario
 # (UFW con policy DROP bloqueaba todo lo que no fuera SSH).

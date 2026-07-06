@@ -83,13 +83,13 @@ Pasos:
    incluyendo un `tools` array** antes de asumir que funciona — algunos
    motores deciden llamar una tool pero no llenan el campo estructurado
    `tool_calls`, y hay que parsear la respuesta como fallback (así lo
-   resuelve `examples/llm-provider/src/llm-bridge.ts`).
+   resuelve `examples/star-example/src/llm-bridge.ts`).
 4. Declara en el manifiesto, sin excepción: `privacy.retention` y
    `privacy.trainingUse` (booleano — si tu modelo usa las conversaciones
    para entrenar, debe decirlo explícitamente).
 
 El ejemplo de referencia completo está en
-[`examples/llm-provider`](https://github.com/{{ site.repository }}/tree/main/examples/llm-provider)
+[`examples/star-example`](https://github.com/{{ site.repository }}/tree/main/examples/star-example)
 — hoy envuelve `llama-server` (`llama.cpp`) sirviendo Qwen2.5-Coder con
 tool calling.
 
@@ -112,7 +112,7 @@ Pasos:
 4. Declara `privacy.retention` en el manifiesto.
 
 El ejemplo de referencia es
-[`examples/ocr-provider`](https://github.com/{{ site.repository }}/tree/main/examples/ocr-provider),
+[`examples/satellite-ocr-example`](https://github.com/{{ site.repository }}/tree/main/examples/satellite-ocr-example),
 que envuelve un servicio de OCR externo.
 
 ## Manifiesto — campos obligatorios
@@ -145,7 +145,7 @@ provider, informar al usuario) sin parsear el mensaje humano:
 
 ## Checklist "plug and play"
 
-Tu provider puede conectarse sin ningún cambio en `apps/agent-server` si:
+Tu provider puede conectarse sin ningún cambio en `apps/navigator` si:
 
 - [ ] Implementa el ciclo de vida completo (`Connecting → Identifying → Registering → Ready`).
 - [ ] El heartbeat corre en una tarea/timer independiente del procesamiento de peticiones.

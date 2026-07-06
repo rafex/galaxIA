@@ -24,7 +24,8 @@ El objetivo es demostrar que no hace falta depender de la nube para tener IA út
 | [`protocolo-provider.md`](./protocolo-provider.md) | Contrato plug-and-play que todo provider debe cumplir |
 | [`implementacion-multilenguaje.md`](./implementacion-multilenguaje.md) | Cómo implementar FHS en Python, Rust, Java y TypeScript |
 | [`arquitectura.md`](./arquitectura.md) | Cómo están organizados los componentes |
-| [`agent-server.md`](./agent-server.md) | El orquestador central: Registry, Runtime y Chat API |
+| [`atlas.md`](./atlas.md) | El catálogo (Atlas/Registry): registro de nodos, endpoints REST, métricas |
+| [`navigator.md`](./navigator.md) | El orquestador (Navigator): Agent Runtime y Chat API — servicio separado de Atlas desde DEC-0035 |
 | [`proveedores.md`](./proveedores.md) | Nodos FHS: LLM Provider + OCR Provider |
 | [`despliegue.md`](./despliegue.md) | Cómo desplegar el stack en un solo host (bastion) |
 | [`despliegue-multi-host.md`](./despliegue-multi-host.md) | Cómo desplegar el core en una laptop y los providers pesados (LLM/OCR) en el bastion, dos máquinas reales en la misma LAN |

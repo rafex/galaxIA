@@ -5,9 +5,9 @@ import 'common.just'
 
 # ── Smoke Test ─────────────────────────────────────────────────────────────
 
-# Verifica que el agent-server esté respondiendo en /health
+# Verifica que el navigator esté respondiendo en /health
 test-smoke:
-    @echo "→ Smoke test: verificando agent-server..."
+    @echo "→ Smoke test: verificando navigator..."
     curl -sfS http://localhost:{{AGENT_PORT}}/health && echo "  OK" || { echo "  FAIL"; exit 1; }
 
 # ── Chat Test ──────────────────────────────────────────────────────────────

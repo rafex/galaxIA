@@ -40,25 +40,32 @@ container-restart: container-down container-up
 # ── Contenedores individuales ──────────────────────────────────────────────
 
 container-up-core:
-    @echo "→ Levantando agent-server + web..."
+    @echo "→ Levantando atlas + navigator + portal..."
     {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build \
       --build-arg COMMIT_HASH={{commit-hash}} \
       --build-arg BUILD_DATE={{build-date}} \
-      agent-server web
+      atlas navigator portal
+
+container-up-atlas:
+    @echo "→ Levantando atlas (Registry)..."
+    {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build \
+      --build-arg COMMIT_HASH={{commit-hash}} \
+      --build-arg BUILD_DATE={{build-date}} \
+      atlas
 
 container-up-llm:
-    @echo "→ Levantando llm-provider (wrapper FHS)..."
+    @echo "→ Levantando star (Star/LLM provider FHS)..."
     {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build \
       --build-arg COMMIT_HASH={{commit-hash}} \
       --build-arg BUILD_DATE={{build-date}} \
-      llm-provider
+      star
 
 container-up-ocr:
-    @echo "→ Levantando ocr-provider (wrapper FHS)..."
+    @echo "→ Levantando satellite-ocr (Satellite/OCR provider FHS)..."
     {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build \
       --build-arg COMMIT_HASH={{commit-hash}} \
       --build-arg BUILD_DATE={{build-date}} \
-      ocr-provider
+      satellite-ocr
 
 # Detiene y elimina un contenedor específico
 container-rm service:
@@ -78,26 +85,26 @@ TLS_COMPOSE_FILE := justfile_directory() + "/containers/compose.tls.yaml"
 tls-gen-cert ip_laptop="127.0.0.1" ip_bastion="127.0.0.1":
     helpers/scripts/shell/generate-dev-cert.sh {{ip_laptop}} {{ip_bastion}}
 
-# Levanta agent-server + web con TLS (requiere tls-gen-cert antes)
+# Levanta atlas + navigator + portal con TLS (requiere tls-gen-cert antes)
 container-up-core-tls:
-    @echo "→ Levantando agent-server + web (TLS)..."
+    @echo "→ Levantando atlas + navigator + portal (TLS)..."
     {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} -f {{TLS_COMPOSE_FILE}} up -d --build \
       --build-arg COMMIT_HASH={{commit-hash}} \
       --build-arg BUILD_DATE={{build-date}} \
-      agent-server web
+      atlas navigator portal
 
-# Levanta llm-provider con TLS
+# Levanta star (Star/LLM provider) con TLS
 container-up-llm-tls:
-    @echo "→ Levantando llm-provider con TLS..."
+    @echo "→ Levantando star con TLS..."
     {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} -f {{TLS_COMPOSE_FILE}} up -d --build \
       --build-arg COMMIT_HASH={{commit-hash}} \
       --build-arg BUILD_DATE={{build-date}} \
-      llm-provider
+      star
 
-# Levanta ocr-provider con TLS
+# Levanta satellite-ocr (Satellite/OCR provider) con TLS
 container-up-ocr-tls:
-    @echo "→ Levantando ocr-provider con TLS..."
+    @echo "→ Levantando satellite-ocr con TLS..."
     {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} -f {{TLS_COMPOSE_FILE}} up -d --build \
       --build-arg COMMIT_HASH={{commit-hash}} \
       --build-arg BUILD_DATE={{build-date}} \
-      ocr-provider
+      satellite-ocr

@@ -9,7 +9,7 @@ de forma que encajen con la forma de trabajar del proyecto.
 - Lee [`docs/arquitectura.md`](docs/arquitectura.md),
   [`docs/protocolo.md`](docs/protocolo.md) y
   [`docs/protocolo-provider.md`](docs/protocolo-provider.md) para entender
-  el protocolo FHS, cómo se relacionan `agent-server`, `web` y los
+  el protocolo FHS, cómo se relacionan `navigator`, `portal` y los
   providers, y el contrato plug-and-play que debe cumplir cualquier
   provider nuevo (registro, Pulse, manifiesto, códigos de error).
 - Revisa [`docs/vocabulario.md`](docs/vocabulario.md) — galaxIA usa un
@@ -36,8 +36,8 @@ Abre un issue describiendo:
 - Qué esperabas que pasara y qué pasó en realidad.
 - Pasos para reproducirlo (incluye si fue en un solo host o en topología
   multi-host, y si TLS estaba activo).
-- Logs relevantes de `agent-server`, `llm-provider` u `ocr-provider` según
-  corresponda.
+- Logs relevantes de `navigator`, `star` (Star/LLM) u `satellite-ocr`
+  (Satellite/OCR) según corresponda.
 
 ## Cómo proponer un cambio
 

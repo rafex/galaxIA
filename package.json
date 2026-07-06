@@ -10,9 +10,9 @@
     "examples/*"
   ],
   "scripts": {
-    "dev:web": "npm run dev -w apps/web",
-    "dev:agent": "npm run dev -w apps/agent-server",
-    "build": "npm run build -w packages/fhs-protocol && npm run build -w apps/agent-server && npm run build -w apps/web",
+    "dev:web": "npm run dev -w apps/portal",
+    "dev:agent": "npm run dev -w apps/navigator",
+    "build": "npm run build -w packages/fhs-protocol && npm run build -w apps/navigator && npm run build -w apps/portal",
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces"
   },
@@ -24,5 +24,8 @@
     "tsx": "^4.15.0",
     "typescript": "^5.5.0",
     "ws": "^8.18.0"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true
   }
 }

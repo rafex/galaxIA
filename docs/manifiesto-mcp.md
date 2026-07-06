@@ -93,4 +93,4 @@ Ejemplo de tool:
 
 ## Implementación de referencia
 
-Revisa `examples/ocr-provider/` para ver la implementación de referencia en TypeScript — es un wrapper FHS, no un servidor MCP nativo (ver `docs/protocolo-provider.md`). Traduce `tool.call` (FHS WebSocket) a una petición REST contra `ether-ocr-api` (Tesseract por debajo), no implementa OCR propio.
+Revisa `examples/satellite-ocr-example/` para ver la implementación de referencia en TypeScript — es un wrapper FHS, no un servidor MCP nativo (ver `docs/protocolo-provider.md`). Traduce `tool.call` (FHS WebSocket) a una petición REST contra `ether-ocr-api` (Tesseract por debajo), no implementa OCR propio.

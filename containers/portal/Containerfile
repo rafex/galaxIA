@@ -1,0 +1,33 @@
+# Contenedor del frontend FHS Chat Web
+# Sirve la aplicación compilada con Nginx y proxya /api al navigator.
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+ARG COMMIT_HASH=unknown
+ARG BUILD_DATE=unknown
+
+COPY package*.json ./
+COPY packages/fhs-protocol/package.json ./packages/fhs-protocol/
+COPY apps/navigator/package.json ./apps/navigator/
+COPY apps/portal/package.json ./apps/portal/
+
+RUN npm ci
+
+COPY packages/fhs-protocol ./packages/fhs-protocol
+COPY apps/portal ./apps/portal
+
+# Generar version.json para el frontend
+RUN printf '{"commit":"%s","date":"%s"}\n' "$COMMIT_HASH" "$BUILD_DATE" \
+      > apps/portal/public/version.json
+
+RUN npm run build -w packages/fhs-protocol && \
+    npm run build -w apps/portal
+
+FROM docker.io/library/nginx:alpine
+COPY --from=builder /app/apps/portal/dist /usr/share/nginx/html
+COPY containers/portal/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

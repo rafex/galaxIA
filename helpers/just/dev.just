@@ -3,14 +3,22 @@
 
 import 'common.just'
 
-# ── Agent Server ───────────────────────────────────────────────────────────
+# ── Atlas (Registry) ───────────────────────────────────────────────────────
 
-# Levanta el agent-server en modo dev (hot reload)
+# Levanta atlas en modo dev (hot reload) — DEC-0035
+dev-atlas:
+    @echo "→ Atlas en http://localhost:{{ATLAS_PORT}}"
+    @echo "  Registro de nodos: ws://localhost:{{ATLAS_PORT}}/fhs/v1/ws"
+    PORT={{ATLAS_PORT}} npx tsx {{WS_ATLAS}}/src/index.ts
+
+# ── Agent Server (Navigator) ───────────────────────────────────────────────
+
+# Levanta el navigator en modo dev (hot reload) — requiere atlas corriendo
 dev-agent:
-    @echo "→ Agent Server en http://localhost:{{AGENT_PORT}}"
-    @echo "  Registry: ws://localhost:{{AGENT_PORT}}/fhs/v1/ws"
+    @echo "→ Navigator en http://localhost:{{AGENT_PORT}}"
+    @echo "  Atlas: {{ATLAS_URL}}"
     @echo "  Chat API: ws://localhost:{{AGENT_PORT}}/api/chat/ws"
-    PORT={{AGENT_PORT}} npx tsx {{WS_AGENT}}/src/index.ts
+    PORT={{AGENT_PORT}} ATLAS_URL={{ATLAS_URL}} npx tsx {{WS_AGENT}}/src/index.ts
 
 # ── Frontend Web ───────────────────────────────────────────────────────────
 
@@ -61,4 +69,5 @@ dev-mock-providers:
 
 # TODO: en versiones futuras de just, usar varios comandos concurrentes.
 # Por ahora se arranca cada servicio en su propia terminal con las recetas
-# individuales: just dev-agent, just dev-mock-llm, just dev-llm-provider, etc.
+# individuales: just dev-atlas, just dev-agent, just dev-mock-llm,
+# just dev-llm-provider, etc.
