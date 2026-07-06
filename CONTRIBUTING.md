@@ -6,15 +6,28 @@ de forma que encajen con la forma de trabajar del proyecto.
 
 ## Antes de empezar
 
-- Lee [`docs/arquitectura.md`](docs/arquitectura.md) y
-  [`docs/protocolo.md`](docs/protocolo.md) para entender el protocolo FHS y
-  cómo se relacionan `agent-server`, `web` y los providers.
+- Lee [`docs/arquitectura.md`](docs/arquitectura.md),
+  [`docs/protocolo.md`](docs/protocolo.md) y
+  [`docs/protocolo-provider.md`](docs/protocolo-provider.md) para entender
+  el protocolo FHS, cómo se relacionan `agent-server`, `web` y los
+  providers, y el contrato plug-and-play que debe cumplir cualquier
+  provider nuevo (registro, Pulse, manifiesto, códigos de error).
+- Revisa [`docs/vocabulario.md`](docs/vocabulario.md) — galaxIA usa un
+  vocabulario de producto propio (Star, Satellite, Atlas, Portal,
+  Navigator, Pulse, Mission...) en documentación e interfaz. El protocolo
+  y el código (`provider`, `capability`, `manifest`, `registry`) no
+  cambian de nombre — usa el término técnico en código, el de producto en
+  documentación de cara al usuario.
 - Este proyecto usa **SpecNative**: las decisiones de diseño relevantes se
   documentan como entradas numeradas en
   [`spec-native/DECISIONS.md`](spec-native/DECISIONS.md), y el estado general
   del trabajo vive en [`spec-native/ROADMAP.md`](spec-native/ROADMAP.md).
   Antes de proponer un cambio de diseño, revisa si ya hay una decisión
   relacionada.
+- El roadmap público, con objetivos y fechas, vive en
+  [Issues](https://github.com/rafex/galaxIA/issues) y en el
+  [Project — galaxIA Roadmap](https://github.com/users/rafex/projects/9).
+  Es un buen punto de partida para encontrar en qué ayudar.
 
 ## Cómo reportar un bug
 
@@ -29,7 +42,7 @@ Abre un issue describiendo:
 ## Cómo proponer un cambio
 
 1. Haz un fork del repositorio y crea una rama descriptiva a partir de
-   `main` (ej. `fix/matching-capabilities`, `feat/rag-provider`).
+   `main` (ej. `fix/matching-capabilities`, `feat/kb-provider`).
 2. Si el cambio afecta el protocolo, el contrato de un provider, o una
    decisión de arquitectura ya documentada, agrega o actualiza la entrada
    correspondiente en `spec-native/DECISIONS.md` como parte del PR.
