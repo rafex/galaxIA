@@ -29,10 +29,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
 
       - name: Instalar dependencias
-        run: npm ci
+        # "npm install", no "npm ci" — bug conocido de npm (npm/cli#4828):
+        # con "npm ci", el binario nativo específico de plataforma de Rollup
+        # (@rollup/rollup-linux-x64-gnu) a veces no se instala en el runner
+        # aunque el lockfile sí lo liste, y `vite build` (apps/portal) falla
+        # con "Cannot find module @rollup/rollup-linux-x64-gnu". Encontrado
+        # en la segunda corrida real de este workflow — ver
+        # spec-native/DECISIONS.md DEC-0042. "npm install" no tiene este bug.
+        run: npm install
 
       - name: Compilar fhs-protocol
         # Requisito para el typecheck de las demás workspaces: main/types en
