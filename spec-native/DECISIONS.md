@@ -670,3 +670,19 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - Nuevo: `spec-native/specs/quality-gates/SPEC.md`.
   - Sin cambios de código ni de workflows — este DEC es puramente de alcance/planeación.
   - Pendiente (backlog, explícitamente no priorizado): implementar SPEC-QUALITY-0001 cuando el usuario decida retomarla.
+
+## DEC-0044 — Diseño de IPFS para adjuntos: transporte configurable, no obligatorio; retención default de 3 horas
+
+- **Fecha:** 2026-07-06
+- **Estado:** `accepted` (diseño) — sin implementar
+- **Contexto:** Issue #12 (IPFS para adjuntos) solo tenía una línea de concepto en `ROADMAP.md` ("subir archivos adjuntos a IPFS y pasar solo el hash... protege la privacidad del origen, permite desacoplamiento temporal y deduplicación natural") sin diseño real. El usuario debatió y cerró el diseño en esta sesión.
+- **Decisión — dos modos de transporte, elegibles por el usuario en el Portal, no un reemplazo obligatorio:**
+  1. **Transmisión directa (default, sin cambios respecto a hoy)** — el archivo viaja completo en el payload FHS (`file_base64`). Problema de fondo identificado por el usuario: la entrega depende de que el backend esté disponible y recibiendo en el instante exacto, sin cortes — es una entrega síncrona y frágil por construcción.
+  2. **Vía IPFS (opt-in)** — el Portal sube el archivo, obtiene un CID, y el protocolo transporta solo el CID. El provider descarga el blob por su cuenta, en su propio momento — puede tratarlo como proceso batch/asíncrono en vez de recepción síncrona en tiempo real. Beneficio adicional señalado por el usuario: anonimiza el origen del binario frente al provider — el provider nunca ve el archivo llegar directamente desde la conexión del usuario, solo pide un CID a la red IPFS.
+- **Decisión — retención default 3 horas, ampliable explícitamente:** `privacy.retention: { ttl: "PT3H" }` (mismo formato generalizado de DEC-0025). Quien sube el archivo puede pedir ampliar la ventana si planea reutilizarlo — la ampliación es una acción explícita, no un default más largo por si acaso.
+- **Bug/gap de encuadre corregido durante el debate:** una respuesta previa de este mismo hilo había catalogado "IPFS para adjuntos" como "diseño ya cerrado, falta implementar" — impreciso, solo existía la línea de concepto del ROADMAP. El diseño real (dos modos configurables, mecánica de desacople, retención) se cerró recién en esta sesión, documentado aquí por primera vez.
+- **Explícitamente no resuelto (preguntas abiertas para cuando se priorice implementar):** red IPFS pública vs. nodo privado del operador (afecta directamente si "anonimizar el origen" implica también que el contenido sea privado, o solo que no se correlacione con la conexión del usuario); si la elección de transporte es por conversación o por adjunto individual; quién sube el archivo a IPFS (Portal directo vs. a través de Navigator); mecanismo técnico para "ampliar la retención"; quién ejecuta el unpin al expirar el TTL.
+- **Consecuencias:**
+  - Nuevo: `spec-native/specs/ipfs-adjuntos/SPEC.md` (SPEC-IPFS-0001).
+  - Sin cambios de código — este DEC cierra el diseño, no implementa.
+  - Pendiente (backlog): escribir `spec-native/tasks/ipfs-adjuntos/TASKS.md` e implementar cuando se priorice; issue #12 sigue abierto en GitHub, ahora con el diseño real enlazado.
