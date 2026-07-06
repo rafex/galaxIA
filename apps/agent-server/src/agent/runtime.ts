@@ -26,6 +26,14 @@ export interface ModelPreferences {
    * una sola llamada, sin pedir confirmación. Más rápido, menos control.
    */
   ocrMode?: "confirm" | "auto";
+  /**
+   * "Kill" configurable de la espera de una Mission/Star (DEC-0010): cuánto
+   * tiempo (ms) espera el Agent Server una respuesta antes de abandonar y
+   * liberar la conversación, en vez del default fijo del stack (~300s). Es
+   * responsabilidad del nodo (Star/Satellite) resolver internamente si se
+   * atoró — esto solo controla la paciencia del lado del Portal.
+   */
+  maxWaitMs?: number;
 }
 
 interface ResolvedLlm {
@@ -127,7 +135,7 @@ export class AgentRuntime {
 
       if (ocrToolIndex >= 0) {
         const ocrTool = loadedTools[ocrToolIndex];
-        const ocrText = await this.runOcrDeterministically(ocrTool);
+        const ocrText = await this.runOcrDeterministically(ocrTool, preferences.maxWaitMs);
         loadedTools.splice(ocrToolIndex, 1); // ya se ejecutó; no ofrecerla también al LLM
         userContent = ocrText
           ? `[Texto extraído automáticamente del archivo adjunto mediante OCR]\n${ocrText}\n\n[Pregunta del usuario]\n${message.content}`
@@ -151,7 +159,7 @@ export class AgentRuntime {
     ];
 
     // Primera llamada: permite que el LLM solicite tools
-    let response = await this.callLlm(llm, messages, toolDefinitions);
+    let response = await this.callLlm(llm, messages, toolDefinitions, preferences.maxWaitMs);
     messages.push(response.message);
 
     // Ejecutar tools solicitadas (una sola ronda)
@@ -161,11 +169,11 @@ export class AgentRuntime {
         const key = `${toolCall.function.name}:${toolCall.function.arguments}`;
         if (executed.has(key)) continue;
         executed.add(key);
-        await this.executeToolCall(toolCall, loadedTools, preferences.scope, messages);
+        await this.executeToolCall(toolCall, loadedTools, preferences.scope, messages, preferences.maxWaitMs);
       }
 
       // Segunda llamada: genera respuesta final SIN tools
-      response = await this.callLlm(llm, messages, undefined);
+      response = await this.callLlm(llm, messages, undefined, preferences.maxWaitMs);
       messages.push(response.message);
     }
 
@@ -272,7 +280,7 @@ export class AgentRuntime {
       return null;
     }
 
-    const text = await this.runOcrDeterministically(ocrTool);
+    const text = await this.runOcrDeterministically(ocrTool, preferences.maxWaitMs);
     if (text) {
       this.emit({ type: "ocr.extracted", data: { filename, text } });
     }
@@ -285,7 +293,7 @@ export class AgentRuntime {
    * el frontend muestre la misma actividad (tool.selected/running/completed).
    * Devuelve el texto extraído, o null si falla (degradación graceful).
    */
-  private async runOcrDeterministically(tool: LoadedTool): Promise<string | null> {
+  private async runOcrDeterministically(tool: LoadedTool, maxWaitMs?: number): Promise<string | null> {
     const artifact = this.artifacts[0];
     if (!artifact) return null;
 
@@ -299,7 +307,12 @@ export class AgentRuntime {
     try {
       const parsed = parseDataUrl(artifact);
       const args = { file_base64: parsed.base64, filename: `upload-${Date.now()}.${parsed.extension}` };
-      const { message: result, dispatchMs } = await this.mcpHost.callTool(tool.providerId, tool.name, args);
+      const { message: result, dispatchMs } = await this.mcpHost.callTool(
+        tool.providerId,
+        tool.name,
+        args,
+        maxWaitMs
+      );
       const duration = Date.now() - startTime;
       const textResult = extractText(result);
 
@@ -334,7 +347,8 @@ export class AgentRuntime {
     toolCall: ToolCall,
     loadedTools: LoadedTool[],
     scope?: PrivacyScope,
-    messages?: LlmMessage[]
+    messages?: LlmMessage[],
+    maxWaitMs?: number
   ) {
     const toolName = toolCall.function.name;
     let tool = loadedTools.find((t) => t.name === toolName);
@@ -381,7 +395,12 @@ export class AgentRuntime {
         args.filename = args.filename || `upload-${Date.now()}.${parsed.extension}`;
       }
 
-      const { message: result, dispatchMs } = await this.mcpHost.callTool(tool.providerId, toolName, args);
+      const { message: result, dispatchMs } = await this.mcpHost.callTool(
+        tool.providerId,
+        toolName,
+        args,
+        maxWaitMs
+      );
       const duration = Date.now() - startTime;
       const textResult = extractText(result);
 
@@ -416,7 +435,8 @@ export class AgentRuntime {
   private async callLlm(
     llm: ResolvedLlm,
     messages: LlmMessage[],
-    tools?: ToolDefinition[]
+    tools?: ToolDefinition[],
+    maxWaitMs?: number
   ): Promise<{ message: LlmMessage; toolCalls: ToolCall[] }> {
     const request: GenerateRequest = {
       model: llm.model.id,
@@ -431,7 +451,8 @@ export class AgentRuntime {
     try {
       dispatchResult = await this.llmGateway.generate(
         { nodeId: llm.nodeId, providerName: llm.providerName, service: llm.service, model: llm.model },
-        request
+        request,
+        maxWaitMs
       );
     } catch (err) {
       this.registry.recordSample(llm.nodeId, llm.model.id, {

@@ -124,6 +124,16 @@ sequenceDiagram
     R->>R: broadcast node.lost a runtimes activos
 ```
 
+### Pulse de transporte (DEC-0010) — complementa, no reemplaza, el heartbeat de arriba
+
+Además del heartbeat de aplicación (`ping`/`pong` JSON de arriba), el Registry envía un ping/pong **nativo de WebSocket** (RFC 6455, no un mensaje FHS) hacia cada nodo conectado, cada `HEARTBEAT_INTERVAL_SECONDS`. Si un nodo no responde, el Registry cierra la conexión de inmediato — más rápido que esperar los 30s del lease de aplicación, y sin agregar ningún mensaje ni tipo nuevo al protocolo.
+
+Esto solo detecta **si el socket sigue vivo** (proceso caído, red partida) — no dice nada sobre si el nodo está atendiendo correctamente una Mission en curso. Esa es responsabilidad exclusiva del propio nodo: si se atora procesando algo, debe resolverlo internamente (o dejar que el cliente abandone por timeout, ver siguiente sección) — el protocolo no ofrece ni ofrecerá una señal de "progreso" intermedia por diseño, para no aumentar la complejidad del Registry (DEC-0005).
+
+### Timeout configurable del lado del cliente (DEC-0010)
+
+Quien inicia una Mission o una conversación con una Star puede indicar `preferences.maxWaitMs` — cuánto tiempo está dispuesto a esperar antes de abandonar, en vez del default fijo del stack (~300s, pensado para hardware comunitario lento). Es un límite de paciencia del cliente, no una señal de salud del nodo: si se cumple, el Agent Server simplemente deja de esperar esa respuesta y libera la conversación, sin importar si el nodo sigue procesando o no.
+
 ### Mensajes de registro
 
 **Registro de nodo**

@@ -16,6 +16,7 @@
 - **Completado:** `ocr-confirmacion` — confirmación explícita (burbuja colapsada + botones) antes de que el LLM use el texto OCR (SPEC-OCRCONFIRM-0001, `spec-native/specs/ocr-confirmacion/SPEC.md`). Verificado end-to-end contra el bastion real. Sienta la base de estado por conversación que `rag-provider` también necesita (TASK-RAG-0001).
 - **Completado y verificado:** topología multi-host — core (`web`+`agent-server`) en laptop (`192.168.3.137`), providers pesados (LLM/OCR) en bastion (`192.168.3.173`) (DEC-0022, `docs/despliegue-multi-host.md`). Desplegado y validado end-to-end con tráfico real cruzando ambas máquinas: chat simple y flujo completo de OCR con confirmación. Requirió además ajustar el mapeo de puertos de los providers (sin remapeo, para que coincida con lo anunciado en el manifiesto) y abrir reglas UFW en ambas máquinas, acotadas a la LAN.
 - **Completado y verificado:** TLS/WSS con certificado autofirmado para todo el protocolo FHS (DEC-0023, `docs/tls-autofirmado.md`). Opt-in vía overlay `containers/compose.tls.yaml` — no afecta el despliegue sin TLS. Aplicado y validado end-to-end sobre la topología multi-host real (laptop + bastion): chat simple y flujo completo de OCR funcionando sobre el canal cifrado. Requirió tres ajustes de infraestructura (bind-mount con ruta absoluta configurable, puerto 8443 en vez de 443 por restricción de podman rootless, y recrear el túnel SSH del socket de podman) — ninguno del código TLS en sí.
+- **Completado:** Pulse de transporte + timeout configurable del cliente (DEC-0010). El Registry sondea a cada nodo con ping/pong **nativo de WebSocket** (no un mensaje FHS) para detectar conexiones rotas más rápido que el lease de 30s (`apps/agent-server/src/registry/ws-handler.ts`); se descarta explícitamente un mensaje de "progreso" de Mission (mantiene el Registry simple, DEC-0005) — es responsabilidad del nodo resolver internamente si se atoró; y se agrega `preferences.maxWaitMs` en `ModelPreferences` para que quien inicia la conversación pueda pedir esperar menos que el default fijo del stack. Typecheck OK. Pendiente no bloqueante: exponer `maxWaitMs` como control visible en el `Portal` (mismo patrón que `ocrMode`, DEC-0021).
 
 ## Después
 
@@ -25,7 +26,6 @@
 - **Autenticación de usuarios:** retomar `SPEC-AUTH-0001` cuando el MVP esté estable.
 - **Modelo de confianza comunitaria:** reputación, vetos persistentes y políticas de privacidad más granulares.
 - **Dispatcher/heartbeat concurrente en providers:** cada provider debe gestionar peticiones entrantes sin bloquear su propio `ping` (DEC-0009) — ahora en spec como `satelite-rating` (SPEC-SATRATING-0001), ver arriba.
-- **Definir dirección del heartbeat:** decidir si el servidor también emite `ping` a los providers o el heartbeat queda unidireccional (DEC-0010).
 - **SDK/provider de referencia en Python:** primer lenguaje no-TypeScript soportado (DEC-0011); caso de uso natural para providers de IA/OCR.
 - **SDK/provider de referencia en Rust:** para hardware con recursos limitados (DEC-0011).
 - **SDK/provider de referencia en Java:** para integración con sistemas comunitarios existentes (DEC-0011).

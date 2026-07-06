@@ -152,14 +152,26 @@ export class McpHost {
     return allTools;
   }
 
-  async callTool(providerId: string, toolName: string, args: Record<string, any>): Promise<DispatchResult> {
+  /**
+   * `timeoutMs` (opcional): "kill" configurable de la espera de una Mission
+   * (DEC-0010) — el usuario del Portal puede pedir esperar menos que el
+   * default de `CALL_TIMEOUT_MS`. Es responsabilidad del nodo (Star/Satellite)
+   * resolver internamente si se atoró; esto solo controla cuánto espera el
+   * Agent Server antes de abandonar y liberar la conversación.
+   */
+  async callTool(
+    providerId: string,
+    toolName: string,
+    args: Record<string, any>,
+    timeoutMs?: number
+  ): Promise<DispatchResult> {
     const client = this.clients.get(providerId);
     if (!client || client.ws.readyState !== WebSocket.OPEN) {
       throw new Error(`FHS tool provider no conectado: ${providerId}`);
     }
     const requestId = randomUUID();
     const msg: ToolCallRequestMessage = { type: "tool.call", requestId, toolName, arguments: args };
-    return this.sendAndWait(client, msg, requestId);
+    return this.sendAndWait(client, msg, requestId, timeoutMs);
   }
 
   disconnect(providerId: string) {
@@ -170,12 +182,17 @@ export class McpHost {
     }
   }
 
-  private sendAndWait(client: McpProviderClient, msg: any, requestId: string): Promise<DispatchResult> {
+  private sendAndWait(
+    client: McpProviderClient,
+    msg: any,
+    requestId: string,
+    timeoutMs?: number
+  ): Promise<DispatchResult> {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         client.pending.delete(requestId);
         reject(new Error(`Timeout esperando respuesta FHS de ${client.providerId}`));
-      }, CALL_TIMEOUT_MS);
+      }, timeoutMs ?? CALL_TIMEOUT_MS);
       client.pending.set(requestId, {
         startedAt: Date.now(),
         resolve: (result) => {

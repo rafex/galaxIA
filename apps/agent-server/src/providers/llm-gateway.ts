@@ -33,11 +33,18 @@ export interface GenerateDispatchResult {
 }
 
 export class LlmGateway {
+  /**
+   * `timeoutMs` (opcional): "kill" configurable de la espera (DEC-0010) — el
+   * usuario del Portal puede pedir esperar menos que el default. Es
+   * responsabilidad del nodo (Star) resolver internamente si se atoró; esto
+   * solo controla cuánto espera el Agent Server antes de abandonar.
+   */
   async generate(
     selection: LlmProviderSelection,
-    request: GenerateRequest
+    request: GenerateRequest,
+    timeoutMs?: number
   ): Promise<GenerateDispatchResult> {
-    return this.fhsGenerate(selection.service.endpoint.url, request);
+    return this.fhsGenerate(selection.service.endpoint.url, request, timeoutMs);
   }
 
   async *stream(
@@ -49,7 +56,8 @@ export class LlmGateway {
 
   private fhsGenerate(
     url: string,
-    request: GenerateRequest
+    request: GenerateRequest,
+    timeoutMs?: number
   ): Promise<GenerateDispatchResult> {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(url, wsOptions(url));
@@ -61,7 +69,7 @@ export class LlmGateway {
       const timeout = setTimeout(() => {
         ws.close();
         reject(new Error("Timeout esperando respuesta del LLM vía FHS"));
-      }, 310_000);
+      }, timeoutMs ?? 310_000);
 
       ws.on("open", () => {
         const msg: ChatRequestMessage = {

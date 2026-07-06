@@ -5,6 +5,7 @@ import {
   type RegisterMessage,
   type PingMessage,
   type FhsMessage,
+  HEARTBEAT_INTERVAL_SECONDS,
 } from "@galaxia/fhs-protocol";
 import { Registry } from "./registry.js";
 
@@ -18,6 +19,25 @@ export async function setupWebSocket(app: FastifyInstance, registry: Registry) {
         socket.send(JSON.stringify(msg));
       }
     };
+
+    // Pulse de transporte (DEC-0010): ping/pong nativo de WebSocket (RFC 6455),
+    // no un mensaje FHS — el Registry sondea a cada nodo conectado para detectar
+    // conexiones rotas (proceso caído, red partida) más rápido que el lease de
+    // aplicación (LEASE_EXPIRE_SECONDS). Complementa, no reemplaza, el heartbeat
+    // de aplicación (`ping`/`pong` JSON) ni dispatch.ack — no dice nada de si el
+    // nodo está "atorado" procesando una Mission, solo si el socket responde.
+    let isAlive = true;
+    socket.on("pong", () => {
+      isAlive = true;
+    });
+    pingTimer = setInterval(() => {
+      if (!isAlive) {
+        socket.terminate();
+        return;
+      }
+      isAlive = false;
+      socket.ping();
+    }, HEARTBEAT_INTERVAL_SECONDS * 1000);
 
     socket.on("message", (raw: any) => {
       try {
