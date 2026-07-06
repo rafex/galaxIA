@@ -29,4 +29,16 @@
 - Close criteria: decisión documentada sobre cómo el operador puebla una KB (CLI, script, endpoint separado) — fuera del flujo de chat de un usuario final.
 - Validation: revisión de diseño, sin código todavía.
 
+### TASK-KB-0003 - Agregar `capability.tags` autodeclarados al protocolo
+
+- ID: TASK-KB-0003
+- State: `todo`
+- Owner:
+- Dependencies: ninguna — sin bloqueos, puede implementarse antes que el resto de `kb-provider`
+- Expected files: `packages/fhs-protocol/src/types.ts` (`Capability.tags?: string[]`), `docs/protocolo-provider.md`, `docs/manifiesto-mcp.md`
+- Close criteria: `Capability` acepta un campo `tags` opcional; documentado como autodeclarado (mismo nivel de confianza que `description`, no verificado); usado como señal adicional en el matching del modo "recomendada" de `kb-provider` (TASK-KB-0001).
+- Validation: `npm run typecheck -w packages/fhs-protocol` — sin romper providers existentes (campo opcional).
+
+Ver DEC-0028 para el diseño completo (incluye la parte de tags de comunidad, bloqueada — no crear tarea de implementación para esa parte hasta que `SPEC-AUTH-0001` se retome).
+
 Las tareas de implementación (`examples/kb-provider/`, tool `kb_query`, manifiesto, integración con `runtime.ts`) se agregan cuando TASK-KB-0001 y TASK-KB-0002 estén resueltas.

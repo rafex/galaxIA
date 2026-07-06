@@ -393,3 +393,21 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - `TASK-KB-0001` pasa de bloqueante a `done` — ya no bloquea el resto de tareas de implementación de `kb-provider`.
   - Nuevo campo de preferencias sugerido para la fase de implementación: `preferences.kbMode?: "manual" | "recommend"`, `preferences.kb?: string` (id de la KB elegida en modo manual), `preferences.kbMaxPerQuestion?: number` (default 1) — mismo patrón ya usado por `ocrMode` (DEC-0021) y `maxWaitMs` (DEC-0010).
   - Sin importar el modo, `provenance` debe declarar qué KB(s) se consultaron (o que no se consultó ninguna) — la regla 7 del protocolo (transparencia obligatoria) no se relaja por el modo elegido.
+
+## DEC-0028 — Tags de capability: autodeclarados (diseñado) y de comunidad (diseñado, bloqueado por auth)
+
+- **Fecha:** 2026-07-06
+- **Estado:** `proposed` (diseño documentado, sin implementar ninguna de las dos partes todavía)
+- **Contexto:** El modo "recomendada" de `kb-provider` (DEC-0027) hace matching determinístico contra `capability.description` — un texto libre, más ambiguo de comparar que palabras clave cortas. Además, `description` es autodeclarada por quien opera el nodo, sin ninguna forma de que otros usuarios contrasten esa afirmación con su propia experiencia — el mismo riesgo ya señalado en los riesgos de `SPEC-KB-0001` ("`capability.description` es autodeclarada, nadie la verifica").
+- **Decisión — dos partes, ninguna implementada todavía:**
+  1. **Tags autodeclarados por el proveedor** (`Capability.tags?: string[]`, `packages/fhs-protocol/src/types.ts`) — mismo nivel de confianza que `description` (autodeclarado, no verificado), pero en formato de palabras clave cortas. Sirve como señal adicional (no reemplazo de `description`) para el matching del modo "recomendada" de KB, y en general para cualquier capability (Star o Satellite) que quiera describirse con keywords además de una descripción larga. **Sin bloqueos** — listo para implementar cuando se priorice.
+  2. **Tags de comunidad** — agregados por el Atlas (Registry) a partir de retroalimentación de usuarios reales, mostrados junto a los tags del proveedor para contrastar "qué dice ofrecer" vs "qué ha confirmado la comunidad". **Bloqueado explícitamente por falta de identidad de usuario** (`SPEC-AUTH-0001`, pausado en `spec-native/ROADMAP.md`) — sin poder distinguir usuarios reales distintos, este campo sería trivialmente manipulable por el propio operador del nodo (autoenviarse tags favorables), dando una falsa sensación de verificación independiente. Se descarta explícitamente cualquier mitigación intermedia sin auth real (rate-limiting por conexión, cookies, etc.) — daría una garantía débil disfrazada de señal confiable, peor que no tener el campo.
+- **Diseño de referencia para cuando se retome `SPEC-AUTH-0001`** (no implementar antes):
+  - Mecanismo de **confirmar/objetar tags ya propuestos por el proveedor** (`agree: boolean`), no tags libres nuevos — acota la superficie de spam/moderación frente a permitir cualquier texto.
+  - Un voto por usuario autenticado por tag por nodo (evita que un mismo usuario infle un conteo).
+  - El conteo agregado debe ser visible (ej. "3 personas opinaron esto" vs "300"), no solo el tag "ganador" — para que quien elige pueda juzgar la fuerza real del consenso, no solo su dirección.
+  - Mensaje de protocolo tentativo (a definir con precisión cuando se implemente): algo como `capability.tag.feedback { capabilityId, providerId, tag, agree }`, requiere sesión autenticada.
+- **Consecuencias:**
+  - `spec-native/specs/kb-provider/SPEC.md` se actualiza para mencionar `tags` del proveedor como señal adicional para el modo "recomendada", y enlaza aquí para la parte de comunidad (bloqueada).
+  - Esta decisión no depende de que `rag-provider` o `kb-provider` se implementen primero — aplica a cualquier `Capability` del protocolo, aunque la motivación inmediata sea KB.
+  - Ninguna de las dos partes se implementa como consecuencia directa de esta decisión — es diseño de referencia, a implementar cuando se priorice (la parte 1 no tiene bloqueos; la parte 2 depende de que `SPEC-AUTH-0001` deje de estar pausado).
