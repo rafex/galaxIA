@@ -12,6 +12,21 @@ import {
 import { Atlas } from "./registry.js";
 import { validateManifest } from "./manifest-validation.js";
 
+const MAX_REPLAY_AGE_SECONDS = 30;
+const MAX_CLOCK_SKEW_SECONDS = 5;
+
+function validateTimestamp(ts: number): true | string {
+  const now = Math.floor(Date.now() / 1000);
+  const age = now - ts;
+  if (age > MAX_REPLAY_AGE_SECONDS) {
+    return `Timestamp demasiado antiguo (${age}s > ${MAX_REPLAY_AGE_SECONDS}s) — posible reenvío`;
+  }
+  if (age < -MAX_CLOCK_SKEW_SECONDS) {
+    return `Timestamp en el futuro (${-age}s > ${MAX_CLOCK_SKEW_SECONDS}s) — reloj desincronizado`;
+  }
+  return true;
+}
+
 export async function setupWebSocket(app: FastifyInstance, registry: Atlas) {
   app.get("/fhs/v1/ws", { websocket: true }, (socket: WebSocket, req: FastifyRequest) => {
     let providerId: string | null = null;
@@ -52,12 +67,12 @@ export async function setupWebSocket(app: FastifyInstance, registry: Atlas) {
       socket.ping();
     }, HEARTBEAT_INTERVAL_SECONDS * 1000);
 
-    socket.on("message", (raw: any) => {
+    socket.on("message", (raw: Buffer) => {
       try {
         const msg = JSON.parse(raw.toString()) as FhsMessage;
         handleMessage(msg);
-      } catch (err) {
-        send({ type: "error", data: { code: FHS_ERROR_CODES.PARSE_ERROR, message: "Invalid JSON" } } as any);
+      } catch (_err) {
+        send({ type: "error", data: { code: FHS_ERROR_CODES.PARSE_ERROR, message: "Invalid JSON" } });
       }
     });
 
@@ -86,7 +101,18 @@ export async function setupWebSocket(app: FastifyInstance, registry: Atlas) {
                 code: FHS_ERROR_CODES.INVALID_SIGNATURE,
                 message: "Firma Ed25519 inválida o ausente para este providerId",
               },
-            } as any);
+            });
+            return;
+          }
+          const replayCheck = validateTimestamp(hello.timestamp);
+          if (replayCheck !== true) {
+            send({
+              type: "error",
+              data: {
+                code: FHS_ERROR_CODES.INVALID_SIGNATURE,
+                message: replayCheck,
+              },
+            });
             return;
           }
           if (registry.hasActiveConnection(hello.providerId)) {
@@ -97,12 +123,12 @@ export async function setupWebSocket(app: FastifyInstance, registry: Atlas) {
                 code: FHS_ERROR_CODES.ALREADY_REGISTERED,
                 message: `providerId ${hello.providerId} ya tiene una conexión activa`,
               },
-            } as any);
+            });
             socket.close(4009, "already-registered");
             return;
           }
           providerId = hello.providerId;
-          registry.registerConnection(providerId, socket as any);
+          registry.registerConnection(providerId, socket);
           send({
             type: "welcome",
             registryId: "registry-001",
@@ -113,7 +139,7 @@ export async function setupWebSocket(app: FastifyInstance, registry: Atlas) {
         case "register": {
           const register = msg as RegisterMessage;
           if (!providerId) {
-            send({ type: "error", data: { code: FHS_ERROR_CODES.NOT_IDENTIFIED, message: "Send hello first" } } as any);
+            send({ type: "error", data: { code: FHS_ERROR_CODES.NOT_IDENTIFIED, message: "Send hello first" } });
             return;
           }
           // DEC-0030: register también viaja firmado — el hello ya probó la
@@ -127,7 +153,18 @@ export async function setupWebSocket(app: FastifyInstance, registry: Atlas) {
                 code: FHS_ERROR_CODES.INVALID_SIGNATURE,
                 message: "Firma Ed25519 inválida o ausente en register",
               },
-            } as any);
+            });
+            return;
+          }
+          const replayCheck = validateTimestamp(register.timestamp);
+          if (replayCheck !== true) {
+            send({
+              type: "error",
+              data: {
+                code: FHS_ERROR_CODES.INVALID_SIGNATURE,
+                message: replayCheck,
+              },
+            });
             return;
           }
           // DEC-0013: rechazar manifiestos incompletos, no aceptarlos con
@@ -141,7 +178,7 @@ export async function setupWebSocket(app: FastifyInstance, registry: Atlas) {
                 code: FHS_ERROR_CODES.INVALID_MANIFEST,
                 message: `Manifiesto incompleto, faltan campos obligatorios: ${validation.missing.join(", ")}`,
               },
-            } as any);
+            });
             return;
           }
           const accepted = registry.registerOrUpdate(providerId, register.manifest);

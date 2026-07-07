@@ -12,6 +12,8 @@
     "dev:web": "npm run dev -w apps/portal",
     "dev:agent": "npm run dev -w apps/navigator",
     "build": "npm run build -w packages/fhs-protocol && npm run build -w apps/navigator && npm run build -w apps/portal",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces"
   },
@@ -20,11 +22,14 @@
   },
   "devDependencies": {
     "@types/ws": "^8.5.10",
+    "@typescript-eslint/eslint-plugin": "^8.63.0",
+    "@typescript-eslint/parser": "^8.63.0",
+    "eslint": "^10.6.0",
     "tsx": "^4.15.0",
     "typescript": "^5.5.0",
+    "typescript-eslint": "^8.63.0",
+    "vitest": "^4.1.10",
     "ws": "^8.18.0"
   },
-  "allowScripts": {
-    "better-sqlite3@12.11.1": true
-  }
+  "allowScripts": {}
 }

@@ -6,7 +6,7 @@ import type { UserMessage } from "./types.js";
 
 export interface ToolParameterSchema {
   type: string;
-  properties?: Record<string, any>;
+  properties?: Record<string, unknown>;
   required?: string[];
 }
 

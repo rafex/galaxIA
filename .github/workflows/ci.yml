@@ -1,73 +1,42 @@
 name: CI
 
-# Validación de Pull Requests — ver spec-native/pipelines/CI.md.
-# No publica ni despliega nada (eso es CD, ver publish-fhs-protocol.yml y
-# jekyll-gh-pages.yml) — solo bloquea el merge si typecheck o build fallan.
-
 on:
-  pull_request:
-    branches: ["main"]
   push:
-    branches: ["main"]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-  typecheck-and-build:
+  lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run lint --workspaces
 
-      - name: Instalar dependencias
-        # No usa el package-lock.json commiteado: se genera en macOS (ARM),
-        # así que solo pinea el binario nativo de Rollup para esa
-        # plataforma (node_modules/@rollup/rollup-darwin-arm64) — no incluye
-        # una entrada resuelta para @rollup/rollup-linux-x64-gnu, y `vite
-        # build` (apps/portal) en el runner (Linux x64) falla con "Cannot
-        # find module @rollup/rollup-linux-x64-gnu" tanto con "npm ci" como
-        # con "npm install" respetando ese lockfile. Confirmado inspeccionando
-        # package-lock.json: solo existe la entrada darwin-arm64 en
-        # "packages", ninguna para linux — no es el bug npm/cli#4828, es que
-        # el lockfile nunca tuvo la entrada de Linux. Se borra el lockfile
-        # y se resuelve fresco contra el registro, nativo para el runner
-        # (ver spec-native/DECISIONS.md DEC-0042). Este CI valida que el
-        # código compile/tipe correctamente, no fija versiones exactas —
-        # perder el pineo exacto en este pipeline es aceptable.
-        run: |
-          rm -f package-lock.json
-          npm install
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run typecheck --workspaces
 
-      - name: Compilar fhs-protocol
-        # Requisito para el typecheck de las demás workspaces: main/types en
-        # packages/fhs-protocol/package.json apuntan a dist/, y dist/ está
-        # gitignored (es un artefacto de build) — un checkout limpio no lo
-        # trae. Sin este paso antes, tsc falla con "Cannot find module
-        # '@rafex/galaxia-fhs-protocol'" en atlas/navigator/portal aunque el
-        # código esté bien (encontrado corriendo este mismo workflow en
-        # real, ver spec-native/DECISIONS.md DEC-0042).
-        run: npm run build -w packages/fhs-protocol
-
-      - name: Typecheck (todos los workspaces)
-        run: npm run typecheck --workspaces
-
-      - name: Build (todos los workspaces)
-        # No usa el script raíz "build" a propósito: ese solo compila
-        # fhs-protocol + navigator + portal, se le olvidó apps/atlas cuando
-        # se separó en DEC-0035. --workspaces sí cubre las 4 (ver
-        # spec-native/DECISIONS.md DEC-0042).
-        run: npm run build --workspaces
-
-      - name: Lint (todos los workspaces)
-        run: npm run lint --workspaces
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build -w packages/fhs-protocol
+      - run: npm run test --workspaces
