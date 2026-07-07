@@ -537,9 +537,13 @@ export class AgentRuntime {
     this.emit({ type: "tool.running", data: { name: tool.name, providerId: tool.providerId } });
     const startTime = Date.now();
 
-    const { file, ipfsCid, ipfsRetention } = await this.buildFileArtifact(artifact, preferences);
+    let ipfsCid: string | undefined;
+    let ipfsRetention: "ephemeral" | "reuse" | undefined;
     try {
-      const args = { file };
+      const built = await this.buildFileArtifact(artifact, preferences);
+      ipfsCid = built.ipfsCid;
+      ipfsRetention = built.ipfsRetention;
+      const args = { file: built.file };
       const { message: result, dispatchMs } = await this.mcpHost.callTool(
         tool.providerId,
         tool.name,
