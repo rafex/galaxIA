@@ -79,6 +79,8 @@ La promoción de un documento de RAG a KB (por ejemplo, porque el operador nota 
 - DEC-0028 — Tags de capability: autodeclarados (diseño listo) y de comunidad (diseño listo, bloqueado por `SPEC-AUTH-0001`).
 - `spec-native/specs/rag-provider/SPEC.md` (SPEC-RAG-0001) — capability hermana para contenido privado por conversación.
 - `docs/protocolo-provider.md` — contrato base que debe cumplir cualquier nodo `mcp`.
+- `spec-native/specs/kb-multi-consulta/SPEC.md` (SPEC-KB-0002, DEC-0048) — consulta de múltiples KBs por pregunta.
+- `spec-native/specs/kb-citacion/SPEC.md` (SPEC-KB-0003, DEC-0049) — metadata de citación (`KbCitation`) y fuente primaria en resultados de `kb.query`.
 
 ## Tareas relacionadas
 

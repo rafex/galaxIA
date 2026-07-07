@@ -748,3 +748,30 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - Nuevo: `spec-native/specs/kb-multi-consulta/SPEC.md` (SPEC-KB-0002).
   - Sin cambios de código — este DEC cierra el diseño, no implementa.
   - Pendiente (backlog): escribir `spec-native/tasks/kb-multi-consulta/TASKS.md` e implementar cuando se priorice; issue #21 sigue abierto en GitHub, ahora con el diseño real enlazado. Preguntas abiertas explícitas antes de implementar: umbral numérico exacto, diseño del campo `source` en RAG, si la elección del LLM en el caso límite pasa por tool-calling (con el mismo riesgo de confiabilidad de DEC-0016/DEC-0017) o se resuelve de otra forma, mecánica de calificación, y herencia de retención al copiar contenido de KB al RAG de la conversación.
+
+## DEC-0049 — `KbCitation`: metadata de citación y fuente primaria en resultados de `kb.query`
+
+- **Fecha:** 2026-07-06
+- **Estado:** `accepted` (diseño) — sin implementar
+- **Contexto:** el usuario pidió documentar "cómo esperamos se cree una KB para galaxIA", con una propuesta detallada de pipeline de curaduría (PDF → extracción → artículos normalizados → JSONL → SQLite+FTS5 → embeddings → Satellite API). Esto chocaba directamente con DEC-0026/DEC-0037/TASK-KB-0002 — decisiones ya cerradas, reafirmadas explícitamente por el propio usuario en esa sesión, de que `galaxIA` nunca define el motor/proceso interno de curaduría de un provider. Se señaló la tensión antes de escribir nada; el usuario aclaró que la intención real era otra: **no es definir cómo se crea una KB, es definir qué debe poder *soportar* el protocolo** (qué formas de contenido/metadata — PDF, Markdown, links, SQL, embeddings — un resultado de KB puede necesitar transportar para ser citable) — si el protocolo no lo soporta, esa KB no es explotable a través de él, sin importar cuán bien curada esté internamente.
+- **Decisión:** nuevo tipo de protocolo `KbCitation` (junto a `ArtifactRef`, DEC-0046, en `packages/fhs-protocol/src/types.ts`):
+  ```ts
+  export interface KbCitation {
+    documentTitle: string;
+    sourceArtifact?: ArtifactRef;
+    sourceUrl?: string;
+    versionDate?: string;
+    pageStart?: number;
+    pageEnd?: number;
+    tags?: string[];
+    metadata?: Record<string, string>;
+  }
+  ```
+  El resultado de `kb.query` pasa de `{ text, score }` a `{ text, score, citation?: KbCitation }` — campo opcional, no rompe providers existentes que no lo implementen (`examples/kb-provider` de referencia sigue funcionando sin cambios).
+- **Decisión — `metadata` es un bag libre (`Record<string, string>`), no campos de dominio fijos:** los campos de primera clase (`documentTitle`, `sourceArtifact`/`sourceUrl`, `versionDate`, páginas, `tags`) aplican a cualquier KB sin importar el dominio. Campos específicos (`jurisdiction`, `legalLevel`, `articleNumber` para una KB jurídica; lo que sea para una técnica/médica/etc.) viven en `metadata`, libre — evita que el protocolo se comprometa con vocabulario de un solo tipo de contenido. Subir un campo de `metadata` a primera clase, si se vuelve común entre KBs con el tiempo, queda como decisión futura, no resuelta aquí.
+- **Por qué esto no reabre TASK-KB-0002:** el spec resultante (`SPEC-KB-0003`) es explícito en que no define el pipeline de curaduría de ningún provider — solo la forma que la metadata puede tener SI un provider decide exponerla. Cómo se genera esa metadata (a mano, con un pipeline de extracción de PDF, con SQLite+FTS5, con lo que sea) sigue siendo responsabilidad exclusiva del operador.
+- **Relación con DEC-0048 (SPEC-KB-0002):** esa spec ya había identificado la necesidad de un campo `source`/procedencia para atribución al fusionar resultados de varias KBs vía RAG. `KbCitation` es la forma completa y general de esa necesidad — no limitada al caso de fusión multi-KB, aplica a cualquier resultado de `kb.query`, con o sin fan-out.
+- **Consecuencias:**
+  - Nuevo: `spec-native/specs/kb-citacion/SPEC.md` (SPEC-KB-0003).
+  - Sin cambios de código — sigue siendo diseño, no implementación.
+  - Pendiente (backlog): escribir `spec-native/tasks/kb-citacion/TASKS.md` e implementar cuando se priorice; cuando se implemente, `queryKb()`/`recommendKb()` en `apps/navigator/src/agent/runtime.ts` y el `kb-provider` de referencia en `galaxIA-satellite-star` necesitarán actualizarse para poblar/consumir `citation`.
