@@ -699,3 +699,24 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
 - **Consecuencias:**
   - `spec-native/specs/ipfs-adjuntos/SPEC.md` actualizado: nueva sección "Red pública vs. privada" y "Dirección inversa" en Propuesta; tabla de Riesgos y Preguntas abiertas actualizadas (pregunta #1 original marcada resuelta, 2 preguntas nuevas agregadas).
   - Sin cambios de código — sigue siendo diseño, no implementación.
+
+## DEC-0046 — `ArtifactRef`: tipo de protocolo compartido para referenciar binarios (inline o IPFS), en vez de campos ad hoc por tool
+
+- **Fecha:** 2026-07-06
+- **Estado:** `accepted` (diseño) — sin implementar, cierra la pregunta arquitectónica que quedó abierta en DEC-0045
+- **Contexto:** DEC-0045 resolvió que la red IPFS (pública/privada) es elección de quien sube el archivo y que el protocolo debe transportar el CID junto con dónde resolverlo. Quedó pendiente una pregunta de coherencia: ¿dónde vive esa información dentro del protocolo, para que no termine siendo un puñado de campos redefinidos a mano en cada tool?
+- **Aclaración previa a la decisión de diseño:** los "datos de conexión" de IPFS no son un solo concepto — leer (descargar un CID) y escribir (subir/pinear contenido) son operaciones distintas con requisitos distintos. Leer necesita un **gateway URL** (normalmente sin auth en público). Escribir necesita un **API endpoint** distinto del gateway, casi siempre con credenciales. El endpoint de escritura es responsabilidad exclusivamente local de quien sube — nunca necesita cruzar el protocolo FHS; solo el endpoint de lectura (el gateway) es lo que la otra parte necesita, y por lo tanto es lo único que el protocolo transporta. Esto también resuelve de raíz la pregunta abierta #7 de DEC-0045 (¿subir y descargar necesitan URLs distintas?) — sí, siempre, porque son dos endpoints distintos por naturaleza, no un caso especial a cubrir.
+- **Decisión:** nuevo tipo compartido en `packages/fhs-protocol/src/types.ts`, mismo patrón que `RetentionPolicy` (DEC-0025) y `Signal.tags` (DEC-0028) — un concepto de protocolo reutilizable, no campos sueltos duplicados por cada tool:
+  ```ts
+  export type ArtifactRef =
+    | { transport: "inline"; base64: string; filename?: string }
+    | { transport: "ipfs"; cid: string; network: "public" | "private"; gatewayUrl?: string; filename?: string };
+  ```
+  `gatewayUrl` obligatorio si `network` es `"private"`, opcional si `"public"` (gateway default, ver preguntas abiertas de la spec).
+- **Decisión — dónde entra en los mensajes existentes (`packages/fhs-protocol/src/messages.ts`):**
+  - `ToolCallRequestMessage.arguments`: el parámetro `file_base64: string` de cada tool (hoy específico de OCR/RAG) se reemplaza por un solo campo `file: ArtifactRef` — el `transport` decide inline vs. IPFS, ya no hace falta un nombre de parámetro distinto por modo.
+  - `ToolCallResultMessage.content` (hoy `Array<{ type: "text"; text: string }>`): gana un nuevo tipo de item, `{ type: "artifact"; artifact: ArtifactRef }` — necesario para la simetría bidireccional que ya exigía DEC-0045 (un provider devolviendo un resultado vía IPFS necesita la misma forma con la que recibió uno, y hoy `content` no tiene ningún lugar para eso).
+- **Por qué un tipo compartido y no campos por tool:** la necesidad ya existe simultáneamente en dos formas de mensaje completamente distintas (`arguments` de entrada, `content` de salida) — definir el concepto dos veces (una por tool, otra por cada tipo de resultado) habría duplicado la misma información con el riesgo real de que diverjan con el tiempo. Un tipo único, definido en el protocolo base, es la misma disciplina que ya se sigue para `RetentionPolicy`/`Signal`.
+- **Consecuencias:**
+  - `spec-native/specs/ipfs-adjuntos/SPEC.md`: nueva sección "`ArtifactRef` — tipo de protocolo compartido"; "Alcance", tabla de Riesgos y Preguntas abiertas actualizadas (pregunta #7 de DEC-0045 marcada resuelta, nueva pregunta #8 sobre si `file_base64` se reemplaza de golpe o convive durante una transición).
+  - Sin cambios de código — sigue siendo diseño, no implementación. Cuando se implemente, toca `packages/fhs-protocol/src/types.ts` y `messages.ts`, y cualquier provider existente que use `file_base64` (`galaxIA-satellite-star`) necesitará actualizarse en coordinación — pregunta #8 de la spec queda abierta justo por esto.
