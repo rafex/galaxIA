@@ -2,7 +2,15 @@
  * Tipos base del protocolo FHS v0.1.
  */
 
-export type NodeType = "llm" | "mcp" | "multi";
+/**
+ * "agent" (Nova, DEC-0055) — nodo de razonamiento con loop propio (varias
+ * rondas internas antes de responder), a diferencia de "llm" (Star), que es
+ * una sola llamada de completions sin estado ni loop. El protocolo solo
+ * declara que el tipo existe y transporta la sugerencia de cuántos pasos
+ * usar (`GenerateRequest.maxReasoningSteps`) — cómo un Nova implementa su
+ * loop internamente es responsabilidad exclusiva del provider (DEC-0026).
+ */
+export type NodeType = "llm" | "mcp" | "multi" | "agent";
 
 export type NodeVisibility = "local" | "network" | "community" | "external";
 

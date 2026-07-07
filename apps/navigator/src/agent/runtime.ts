@@ -166,17 +166,23 @@ export class AgentRuntime {
       // la tool disponible, el LLM puede igual decidir invocarla sin adjunto
       // y fallar (ver bug encontrado en la demo multi-host: el modelo llamaba
       // ocr_extract sobre un /tmp/ocr.png inexistente tras confirmar el uso).
-      const ocrToolIndex = loadedTools.findIndex((t) => t.capabilityId === "document.ocr");
-      if (ocrToolIndex >= 0) loadedTools.splice(ocrToolIndex, 1);
+      for (let i = loadedTools.length - 1; i >= 0; i--) {
+        if (loadedTools[i].capabilityId === "document.ocr") {
+          loadedTools.splice(i, 1);
+        }
+      }
     } else {
-      const ocrToolIndex = this.artifacts.length > 0
-        ? loadedTools.findIndex((t) => t.capabilityId === "document.ocr")
-        : -1;
+      const ocrTools = this.artifacts.length > 0
+        ? loadedTools.filter((t) => t.capabilityId === "document.ocr")
+        : [];
 
-      if (ocrToolIndex >= 0) {
-        const ocrTool = loadedTools[ocrToolIndex];
-        const ocrText = await this.runOcrDeterministically(ocrTool, preferences);
-        loadedTools.splice(ocrToolIndex, 1); // ya se ejecutó; no ofrecerla también al LLM
+      if (ocrTools.length > 0) {
+        const ocrText = await this.runOcrDeterministically(ocrTools, preferences);
+        for (let i = loadedTools.length - 1; i >= 0; i--) {
+          if (loadedTools[i].capabilityId === "document.ocr") {
+            loadedTools.splice(i, 1);
+          }
+        }
         userContent = ocrText
           ? `[Texto extraído automáticamente del archivo adjunto mediante OCR]\n${ocrText}\n\n[Pregunta del usuario]\n${message.content}`
           : `${message.content}\n\n(No se pudo extraer texto del archivo adjunto.)`;
@@ -306,15 +312,14 @@ export class AgentRuntime {
       for (const p of providers) {
         if (scope && !matchesScope(p.service, scope)) continue;
         const capability = p.service.capabilities.find((c) => c.id === cap);
-        if (capability && !seen.has(`${p.providerId}:${cap}`)) {
-          seen.add(`${p.providerId}:${cap}`);
+        if (capability && !seen.has(`${p.providerId}:${capability.id}`)) {
+          seen.add(`${p.providerId}:${capability.id}`);
           result.push({
             capability,
             providerId: p.providerId,
             providerName: p.name,
             service: p.service,
           });
-          break;
         }
       }
     }
@@ -337,13 +342,13 @@ export class AgentRuntime {
     const loadedTools = await this.mcpHost.loadToolsForCapabilities(
       toolProviders.map((t) => ({ providerId: t.providerId, providerName: t.providerName, service: t.service }))
     );
-    const ocrTool = loadedTools.find((t) => t.capabilityId === "document.ocr");
-    if (!ocrTool) {
+    const ocrTools = loadedTools.filter((t) => t.capabilityId === "document.ocr");
+    if (ocrTools.length === 0) {
       this.emitError("NO_OCR_PROVIDER", "No hay proveedores de OCR disponibles en tu scope");
       return null;
     }
 
-    const text = await this.runOcrDeterministically(ocrTool, preferences);
+    const text = await this.runOcrDeterministically(ocrTools, preferences);
     if (text) {
       this.emit({ type: "ocr.extracted", data: { filename, text } });
     }
@@ -672,64 +677,89 @@ export class AgentRuntime {
   }
 
   /**
-   * Ejecuta document.ocr directamente contra el provider, sin pasar por una
+   * Ejecuta document.ocr directamente contra los providers, sin pasar por una
    * decisión del LLM. Emite los mismos eventos que executeToolCall para que
    * el frontend muestre la misma actividad (tool.selected/running/completed).
-   * Devuelve el texto extraído, o null si falla (degradación graceful).
+   * Itera sobre la lista de tools en orden — si una falla, intenta la
+   * siguiente automáticamente (failover), emitiendo `provider.failover`.
+   * Devuelve el texto extraído, o null si todas fallan (degradación graceful).
    */
-  private async runOcrDeterministically(tool: LoadedTool, preferences: ModelPreferences): Promise<string | null> {
+  private async runOcrDeterministically(
+    tools: LoadedTool[],
+    preferences: ModelPreferences
+  ): Promise<string | null> {
+    if (tools.length === 0) return null;
     const artifact = this.artifacts[0];
     if (!artifact) return null;
 
-    this.emit({
-      type: "tool.selected",
-      data: { capability: tool.capabilityId, providerId: tool.providerId, providerName: tool.providerName },
-    });
-    this.emit({ type: "tool.running", data: { name: tool.name, providerId: tool.providerId } });
-    const startTime = Date.now();
+    for (let i = 0; i < tools.length; i++) {
+      const tool = tools[i];
 
-    let ipfsCid: string | undefined;
-    let ipfsRetention: "ephemeral" | "reuse" | undefined;
-    try {
-      const built = await this.buildFileArtifact(artifact, preferences);
-      ipfsCid = built.ipfsCid;
-      ipfsRetention = built.ipfsRetention;
-      const args = { file: built.file };
-      const { message: result, dispatchMs } = await this.mcpHost.callTool(
-        tool.providerId,
-        tool.name,
-        args,
-        preferences.maxWaitMs,
-        { conversationId: this.conversationId, capabilityId: tool.capabilityId }
-      );
-      const duration = Date.now() - startTime;
-      const textResult = extractText(result);
+      this.emit({
+        type: "tool.selected",
+        data: { capability: tool.capabilityId, providerId: tool.providerId, providerName: tool.providerName },
+      });
+      this.emit({ type: "tool.running", data: { name: tool.name, providerId: tool.providerId } });
+      const startTime = Date.now();
 
-      this.emit({ type: "tool.completed", data: { name: tool.name, duration, success: true } });
-      this.atlasClient.recordSample({
-        providerId: tool.providerId,
-        capability: tool.capabilityId,
-        sample: { dispatchMs, totalMs: duration, success: true, at: Date.now() },
-      });
-      this.usedTools.push({
-        capability: tool.capabilityId,
-        providerId: tool.providerId,
-        providerName: tool.providerName,
-        toolName: tool.name,
-      });
-      if (ipfsCid && ipfsRetention !== "reuse") unpinFromIpfs(ipfsCid);
-      return textResult;
-    } catch (err: any) {
-      const duration = Date.now() - startTime;
-      this.emit({ type: "tool.error", data: { name: tool.name, error: err.message } });
-      this.atlasClient.recordSample({
-        providerId: tool.providerId,
-        capability: tool.capabilityId,
-        sample: { dispatchMs: null, totalMs: duration, success: false, at: Date.now() },
-      });
-      if (ipfsCid && ipfsRetention !== "reuse") unpinFromIpfs(ipfsCid);
-      return null;
+      let ipfsCid: string | undefined;
+      let ipfsRetention: "ephemeral" | "reuse" | undefined;
+      try {
+        const built = await this.buildFileArtifact(artifact, preferences);
+        ipfsCid = built.ipfsCid;
+        ipfsRetention = built.ipfsRetention;
+        const args = { file: built.file };
+        const { message: result, dispatchMs } = await this.mcpHost.callTool(
+          tool.providerId,
+          tool.name,
+          args,
+          preferences.maxWaitMs,
+          { conversationId: this.conversationId, capabilityId: tool.capabilityId }
+        );
+        const duration = Date.now() - startTime;
+        const textResult = extractText(result);
+
+        this.emit({ type: "tool.completed", data: { name: tool.name, duration, success: true } });
+        this.atlasClient.recordSample({
+          providerId: tool.providerId,
+          capability: tool.capabilityId,
+          sample: { dispatchMs, totalMs: duration, success: true, at: Date.now() },
+        });
+        this.usedTools.push({
+          capability: tool.capabilityId,
+          providerId: tool.providerId,
+          providerName: tool.providerName,
+          toolName: tool.name,
+        });
+        if (ipfsCid && ipfsRetention !== "reuse") unpinFromIpfs(ipfsCid);
+        return textResult;
+      } catch (err: any) {
+        const duration = Date.now() - startTime;
+        this.emit({ type: "tool.error", data: { name: tool.name, error: err.message } });
+        this.atlasClient.recordSample({
+          providerId: tool.providerId,
+          capability: tool.capabilityId,
+          sample: { dispatchMs: null, totalMs: duration, success: false, at: Date.now() },
+        });
+        if (ipfsCid && ipfsRetention !== "reuse") unpinFromIpfs(ipfsCid);
+
+        if (i < tools.length - 1) {
+          const next = tools[i + 1];
+          this.emit({
+            type: "provider.failover",
+            data: {
+              capability: tool.capabilityId,
+              failedProviderId: tool.providerId,
+              failedProviderName: tool.providerName,
+              nextProviderId: next.providerId,
+              nextProviderName: next.providerName,
+            },
+          });
+        }
+      }
     }
+
+    return null;
   }
 
   /**

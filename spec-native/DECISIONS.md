@@ -868,3 +868,22 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - Nuevo: `spec-native/tasks/kb-multi-consulta/TASKS.md`.
   - Verificado con `npm run typecheck`/`build` en `galaxIA` y `galaxIA-satellite-star`; toggle de advertencia de `kbMaxPerQuestion` verificado en `portal-dev` real.
   - Pendiente (backlog, no bloqueante): verificación E2E completa con el stack real (Atlas + Navigator + Portal + rag-provider + ≥2 kb-provider) — no ejecutada en esta sesión, sin ese stack corriendo.
+
+## DEC-0055 — Nova: nuevo tipo de nodo con loop de razonamiento propio, distinto de Star
+
+- **Fecha:** 2026-07-07
+- **Estado:** `accepted` — protocolo implementado; nodo de referencia pendiente
+- **Contexto:** al debatir cómo cerrar el gate de KB (DEC-0054), el usuario argumentó que conectar directo a un LLM genera fricción porque un LLM y un agente son cosas distintas — un LLM es una llamada, un agente necesita poder razonar en varios pasos para resolver problemas reales. Se distinguió esto del riesgo ya documentado (DEC-0016/DEC-0017/DEC-0020): el problema nunca fue "el LLM no puede razonar en pasos", fue "no se puede confiar en que el LLM decida ejecución de forma oculta vía tool-calling en este hardware, y cada ronda adicional multiplica ese riesgo si no está blindada". El usuario aceptó la distinción y pidió que el protocolo soporte explícitamente pedir un LLM o un agente, con la cantidad de pasos como sugerencia — y nombró el nuevo tipo de nodo: **Nova**.
+- **Decisión — `NodeType` gana `"agent"` (producto: Nova):** mismo patrón que Star/Satellite (DEC-0024) — Star razona una vez, Nova razona en varias rondas internas antes de responder. Encaja con una nota ya existente en `docs/vocabulario.md`: *"No hay subtipos de Star reservados todavía"* — Nova se resuelve como un tipo de nodo hermano, no un subtipo de Star, para no forzar que comparta manifiesto/semántica con un Star plano.
+- **Decisión — forma de protocolo:**
+  - `NovaBeacon` (`packages/fhs-protocol/src/manifest.ts`) — mismo patrón que `StarBeacon` (`models: ModelInfo[]`), más `reasoning: { maxSteps: number }` (el techo de rondas que ese Nova soporta).
+  - `GenerateRequest.maxReasoningSteps?: number` — sugerencia de quien pide (ej. Navigator) de cuántas rondas usar; un Star la ignora, no tiene loop.
+  - `GenerateResponse.reasoningSteps?: number` — cuántas rondas usó realmente un Nova, dato de traceability/Flight Log — nunca el contenido de cada paso.
+  - `flattenManifest` extendido para reconocer `NovaBeacon`. `validateManifest` en Atlas no necesitó cambios — ya acepta cualquier `provider.type` con `endpoint` sin caso especial.
+- **Por qué esto no reabre DEC-0020:** Nova no cambia quién decide *cuándo* invocar un nodo — esa decisión sigue siendo de quien orquesta (Navigator), determinística, igual que hoy decide entre un Star u otro. Lo que cambia es que ahora existe un tipo de nodo que, una vez invocado, puede dar varias vueltas internas antes de responder — no es una decisión oculta nueva, es la misma arquitectura con un nodo de más capacidad.
+- **Riesgo explícito, no resuelto por el protocolo:** cada ronda del loop interno de un Nova sigue siendo una llamada donde el modelo podría no llenar el formato esperado (DEC-0016/DEC-0017) — el protocolo no puede forzar que la implementación sea robusta. Documentado como requisito de la implementación de referencia (debe reutilizar el patrón de parser tolerante de DEC-0050/DEC-0054 en cada ronda, con límite duro además de lo sugerido en `maxReasoningSteps`), no del protocolo.
+- **Consecuencias:**
+  - Nuevo: `spec-native/specs/nova-agente/SPEC.md` (SPEC-NOVA-0001).
+  - `packages/fhs-protocol`: `NodeType`, `NovaBeacon`, `GenerateRequest.maxReasoningSteps`, `GenerateResponse.reasoningSteps` — cambio puramente aditivo, verificado que no rompe ningún consumidor existente (`npm run typecheck` en `atlas`/`navigator`/`portal` sin cambios).
+  - `docs/vocabulario.md`: Nova agregado como tercer tipo de nodo (pendiente de escribir en este mismo ciclo).
+  - Pendiente (backlog, siguiente paso de esta iniciativa): implementación de referencia de un Nova en `galaxIA-satellite-star`, para probar el diseño con hardware real (`laptop-lan`/`raspi4b-lan`, acceso agregado esta sesión vía `bastion-wifi`).
