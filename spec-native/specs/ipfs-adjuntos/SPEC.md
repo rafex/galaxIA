@@ -2,7 +2,7 @@
 
 ## Estado
 
-`accepted` (diseño cerrado) — sin implementar. Ver DEC-0044, DEC-0045, DEC-0046.
+`accepted` (diseño cerrado) — sin implementar. Ver DEC-0044, DEC-0045, DEC-0046, DEC-0047.
 
 ## Owner
 
@@ -94,6 +94,7 @@ Default: **3 horas** desde que se sube (`privacy.retention: { ttl: "PT3H" }`, mi
 | Exponer por error el endpoint de **escritura** (API con credenciales) en vez del de lectura (gateway) en el protocolo, dejando credenciales de subida circulando por el canal FHS | Alto si ocurre | Resuelto por diseño (DEC-0046): `ArtifactRef` modela explícitamente solo el endpoint de lectura; el de escritura es responsabilidad local de quien sube y nunca forma parte del tipo de protocolo |
 | Nadie despina el CID después de la ventana de retención — el archivo queda huérfano pero recuperable | Medio | El mecanismo de expiración (quién corre el unpin tras el TTL) es responsabilidad de implementación, no resuelto en este spec |
 | El usuario no entiende la diferencia entre los dos modos y elige el que no le conviene | Bajo | El selector del Portal debe explicar la diferencia en una línea (mismo patrón que la advertencia de `kbMaxPerQuestion`, DEC-0027) |
+| `file_base64` se reemplaza sin transición (DEC-0047) — un provider de `galaxIA-satellite-star` no actualizado en el mismo ciclo deja de poder recibir adjuntos por transmisión directa | Alto durante el rollout, si no se coordina | Implementar y desplegar el cambio de protocolo (`galaxIA`) y la actualización de los providers afectados (`galaxIA-satellite-star`) en el mismo ciclo de trabajo — no hay compatibilidad hacia atrás que lo cubra |
 
 ## Preguntas abiertas (para cuando se priorice implementar)
 
@@ -104,7 +105,7 @@ Default: **3 horas** desde que se sube (`privacy.retention: { ttl: "PT3H" }`, mi
 5. ¿Quién ejecuta el unpin cuando expira el TTL — un proceso propio de Navigator, un servicio aparte, o se delega al propio nodo IPFS si soporta expiración nativa?
 6. ¿Cuál es el gateway público *default* cuando el usuario elige `network: "public"` sin especificar `gatewayUrl`? ¿Configurable por el operador del nodo Portal, o hardcodeado a uno conocido (ej. `ipfs.io`)?
 7. ~~Si el usuario especifica un nodo privado para subir, ¿la subida y la descarga necesitan URLs distintas?~~ **Resuelta (DEC-0046):** son estructuralmente dos endpoints distintos siempre (API de escritura vs. gateway de lectura) — `ArtifactRef` solo modela el de lectura (`gatewayUrl`); el de escritura es config local de quien sube y nunca viaja por el protocolo.
-8. ¿`ArtifactRef.transport: "inline"` reemplaza por completo el `file_base64` actual de cada tool (breaking change en el schema de `arguments`), o convive con él durante una transición? Afecta si esto requiere coordinarse con `galaxIA-satellite-star` (los providers que ya implementan `file_base64` hoy).
+8. ~~¿`ArtifactRef` reemplaza por completo `file_base64`, o convive con él durante una transición?~~ **Resuelta (DEC-0047): se reemplaza.** No hay convivencia — `file_base64` se retira del schema de `arguments` en el mismo cambio que introduce `file: ArtifactRef`. Es un breaking change deliberado, no accidental: requiere actualizar `galaxIA` (protocolo) y `galaxIA-satellite-star` (providers que ya implementan `file_base64`: `satellite-ocr-example`, `rag-provider`, `kb-provider`) en el mismo ciclo de trabajo — no hay periodo donde ambas formas coexistan.
 
 ## Enlaces y decisiones relacionadas
 

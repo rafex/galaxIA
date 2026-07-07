@@ -720,3 +720,15 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
 - **Consecuencias:**
   - `spec-native/specs/ipfs-adjuntos/SPEC.md`: nueva sección "`ArtifactRef` — tipo de protocolo compartido"; "Alcance", tabla de Riesgos y Preguntas abiertas actualizadas (pregunta #7 de DEC-0045 marcada resuelta, nueva pregunta #8 sobre si `file_base64` se reemplaza de golpe o convive durante una transición).
   - Sin cambios de código — sigue siendo diseño, no implementación. Cuando se implemente, toca `packages/fhs-protocol/src/types.ts` y `messages.ts`, y cualquier provider existente que use `file_base64` (`galaxIA-satellite-star`) necesitará actualizarse en coordinación — pregunta #8 de la spec queda abierta justo por esto.
+
+## DEC-0047 — `file_base64` se reemplaza por `ArtifactRef`, sin período de convivencia
+
+- **Fecha:** 2026-07-06
+- **Estado:** `accepted` (diseño) — sin implementar, cierra la pregunta #8 dejada abierta en DEC-0046
+- **Contexto:** DEC-0046 dejó explícitamente sin resolver si `ArtifactRef` reemplazaría `file_base64` de golpe (breaking change coordinado entre `galaxIA` y `galaxIA-satellite-star`) o si ambas formas convivirían temporalmente. El usuario decidió: se reemplaza.
+- **Decisión:** no hay compatibilidad hacia atrás ni período de transición. `file_base64: string` se retira del schema de `arguments` en el mismo cambio que introduce `file: ArtifactRef` — ambos repos (`galaxIA` para el tipo de protocolo, `galaxIA-satellite-star` para los providers `satellite-ocr-example`/`rag-provider`/`kb-provider` que hoy implementan `file_base64`) se actualizan en el mismo ciclo de trabajo, no en ciclos separados con una ventana donde ambas formas deban soportarse a la vez.
+- **Por qué (razón implícita en la decisión, no una justificación separada del usuario):** mantener dos formas del mismo concepto vivas a la vez (aceptar `file_base64` y `file: ArtifactRef` simultáneamente) habría significado dos rutas de código por mantener en cada provider, exactamente el tipo de complejidad accidental que el proyecto ha evitado consistentemente en otras decisiones (ver por ejemplo DEC-0033/DEC-0034, donde los renames de identificadores de código también se hicieron de golpe, no con alias de compatibilidad).
+- **Consecuencias:**
+  - `spec-native/specs/ipfs-adjuntos/SPEC.md`: pregunta #8 marcada resuelta; nueva fila en la tabla de Riesgos sobre el rollout coordinado entre repos.
+  - Cuando se implemente: el cambio de `packages/fhs-protocol` y la actualización de los tres providers afectados en `galaxIA-satellite-star` deben desplegarse juntos — no hay compatibilidad hacia atrás que permita desplegarlos por separado.
+  - Sin cambios de código en esta sesión — sigue siendo diseño.
