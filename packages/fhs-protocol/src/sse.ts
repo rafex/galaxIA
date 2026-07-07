@@ -106,19 +106,20 @@ export interface NodeOnlineEvent {
   };
 }
 
+/**
+ * SPEC-KB-0002 (DEC-0054) — puede traer más de un candidato (fan-out
+ * multi-KB, `kbMaxPerQuestion`) o exactamente uno resuelto por el LLM en el
+ * caso límite (sin match determinístico confiable) — nunca oculto, siempre
+ * mostrado al usuario antes de consultar (requisito no negociable del spec).
+ */
 export interface KbRecommendedEvent {
   type: "kb.recommended";
   data: {
     conversationId: string;
-    providerId: string;
-    providerName: string;
-    description: string;
+    candidates: Array<{ providerId: string; providerName: string; description: string }>;
+    /** true si ningún candidato superó el umbral determinístico y el LLM eligió entre las KBs disponibles (paso 5, SPEC-KB-0002). */
+    chosenByLlm?: boolean;
   };
-}
-
-export interface KbWarningEvent {
-  type: "kb.warning";
-  data: { conversationId: string; message: string };
 }
 
 export interface ErrorEvent {
@@ -143,5 +144,4 @@ export type AgentSSEEvent =
   | NodeLostEvent
   | NodeOnlineEvent
   | KbRecommendedEvent
-  | KbWarningEvent
   | ErrorEvent;

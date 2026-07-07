@@ -22,6 +22,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     privacyScope: "community",
     ocrMode: "confirm",
     kbProviderId: "",
+    kbMaxPerQuestion: 1,
     ipfsEnabled: false,
     ipfsNetwork: "public",
     ipfsRetention: "ephemeral",
@@ -96,6 +97,15 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
           </select>
         </label>
         <label>
+          KBs por pregunta:
+          <select class="kb-max-selector">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
+        </label>
+        <span class="kb-max-warning" hidden>⚠️ Consultar más de una KB puede ser notablemente más lento en modelos pequeños</span>
+        <label>
           Transporte de adjuntos:
           <select class="ipfs-mode-selector">
             <option value="direct" selected>Transmisión directa</option>
@@ -131,6 +141,8 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
   const scopeSelector = container.querySelector(".scope-selector") as HTMLSelectElement;
   const ocrModeSelector = container.querySelector(".ocr-mode-selector") as HTMLSelectElement;
   const kbSelector = container.querySelector(".kb-selector") as HTMLSelectElement;
+  const kbMaxSelector = container.querySelector(".kb-max-selector") as HTMLSelectElement;
+  const kbMaxWarning = container.querySelector(".kb-max-warning") as HTMLElement;
   const ipfsModeSelector = container.querySelector(".ipfs-mode-selector") as HTMLSelectElement;
   const ipfsNetworkRow = container.querySelector(".ipfs-network-row") as HTMLElement;
   const ipfsNetworkSelector = container.querySelector(".ipfs-network-selector") as HTMLSelectElement;
@@ -157,6 +169,14 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
 
   kbSelector.addEventListener("change", () => {
     state.kbProviderId = kbSelector.value;
+  });
+
+  // DEC-0027: advertencia obligatoria antes de permitir consultar más de
+  // una KB por pregunta — modelos pequeños/sin GPU pueden volverse
+  // notablemente más lentos combinando contexto de varias KBs.
+  kbMaxSelector.addEventListener("change", () => {
+    state.kbMaxPerQuestion = Number(kbMaxSelector.value);
+    kbMaxWarning.hidden = state.kbMaxPerQuestion <= 1;
   });
 
   ipfsModeSelector.addEventListener("change", () => {
@@ -301,6 +321,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
         allowExternalProviders: state.privacyScope === "external",
         ocrMode: state.ocrMode,
         kb: state.kbProviderId || undefined,
+        kbMaxPerQuestion: state.kbMaxPerQuestion,
         ipfs: state.ipfsEnabled
           ? { enabled: true, network: state.ipfsNetwork, retention: state.ipfsRetention }
           : undefined,
@@ -362,12 +383,9 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
         break;
       case "kb.recommended":
         hideThinking();
-        addKbRecommendedMessage(event.data.conversationId, event.data.providerName, event.data.description);
+        addKbRecommendedMessage(event.data.conversationId, event.data.candidates, event.data.chosenByLlm);
         state.isStreaming = false;
         sendBtn.disabled = false;
-        break;
-      case "kb.warning":
-        addActivityItem("warning", event.data.message);
         break;
       case "error":
         hideThinking();
@@ -474,20 +492,44 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  function addKbRecommendedMessage(convId: string, providerName: string, description: string) {
+  function addKbRecommendedMessage(
+    convId: string,
+    candidates: Array<{ providerId: string; providerName: string; description: string }>,
+    chosenByLlm?: boolean
+  ) {
     const div = document.createElement("div");
     div.className = "message assistant kb-recommendation";
 
     const question = document.createElement("p");
-    question.textContent = `📚 Encontré una base de conocimiento relevante: "${providerName}" (${description}). ¿La uso para responder?`;
+    const names = candidates.map((c) => c.providerName).join(", ");
+    const intro =
+      candidates.length > 1
+        ? `📚 Encontré ${candidates.length} bases de conocimiento relevantes: `
+        : "📚 Encontré una base de conocimiento relevante: ";
+    // textContent (no innerHTML) — providerName/description son autodeclarados
+    // por el operador de cada nodo (DEC-0028), no se confía en que vengan
+    // sanitizados (mismo cuidado ya aplicado a KbCitation, DEC-0049).
+    question.textContent =
+      intro +
+      names +
+      (chosenByLlm ? " (elegida por el modelo, sin coincidencia determinística clara)." : ".") +
+      " ¿Las uso para responder?";
     div.appendChild(question);
+
+    const list = document.createElement("ul");
+    for (const c of candidates) {
+      const item = document.createElement("li");
+      item.textContent = `${c.providerName} — ${c.description}`;
+      list.appendChild(item);
+    }
+    div.appendChild(list);
 
     const actions = document.createElement("div");
     actions.className = "ocr-preview-actions";
 
     const useBtn = document.createElement("button");
     useBtn.type = "button";
-    useBtn.textContent = "Usar esta KB";
+    useBtn.textContent = candidates.length > 1 ? "Usar estas KBs" : "Usar esta KB";
     const discardBtn = document.createElement("button");
     discardBtn.type = "button";
     discardBtn.className = "secondary";
@@ -497,7 +539,8 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
       useBtn.disabled = true;
       discardBtn.disabled = true;
       actions.remove();
-      question.textContent = use ? `✓ Usando "${providerName}" para responder.` : "No se usó ninguna KB para esta pregunta.";
+      question.textContent = use ? `✓ Usando "${names}" para responder.` : "No se usó ninguna KB para esta pregunta.";
+      list.remove();
       chatConnection?.sendKbDecision(convId, use);
     };
 

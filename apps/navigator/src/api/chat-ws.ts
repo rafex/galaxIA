@@ -18,8 +18,7 @@ interface PendingAttachment {
 interface PendingKbRecommendation {
   message: UserMessage;
   preferences: ModelPreferences;
-  providerId: string;
-  providerName: string;
+  candidates: Array<{ providerId: string; providerName: string; description: string }>;
 }
 
 export async function setupChatWebSocket(
@@ -87,22 +86,13 @@ export async function setupChatWebSocket(
       preferences: ModelPreferences,
       preExtractedText?: string,
       artifacts?: string[],
-      kbProviderId?: string
+      kbProviderIds?: string[]
     ) {
       const runtime = new AgentRuntime(atlasClient, eventBus, id);
       runtimes.set(id, runtime);
 
-      if ((preferences.kbMaxPerQuestion ?? 1) > 1) {
-        // TASK-KB-0004: solo se soporta 1 KB por pregunta en esta iteración —
-        // avisar en vez de fingir que se respetó el límite pedido.
-        send({
-          type: "kb.warning",
-          data: { conversationId: id, message: "Solo se consulta 1 KB por pregunta en esta versión, aunque pediste más." },
-        });
-      }
-
       runtime
-        .run(message, preferences, artifacts, preExtractedText, ragActiveConversations.has(id), kbProviderId)
+        .run(message, preferences, artifacts, preExtractedText, ragActiveConversations.has(id), kbProviderIds)
         .catch((err: any) => {
           console.error("Agent runtime error:", err);
           send({ type: "error", data: { conversationId: id, code: "RUNTIME_ERROR", message: err.message } });
@@ -112,40 +102,33 @@ export async function setupChatWebSocket(
         });
     }
 
-    // SPEC-KB-0001: modo recomendado — matching determinístico contra
-    // capability.description/tags, nunca el LLM decide. Si hay coincidencia,
-    // se pide confirmación antes de consultar (mismo espíritu que la
-    // confirmación de adjunto de OCR/RAG). Modo manual (preferences.kb) se
+    // SPEC-KB-0001/SPEC-KB-0002: modo recomendado — matching determinístico
+    // contra capability.description/tags top-N sobre un umbral; si nada
+    // califica, el LLM elige una sola vez entre las KBs disponibles (caso
+    // límite, con parser tolerante determinístico, nunca sin validar). Se
+    // pide confirmación antes de consultar en ambos casos — el requisito no
+    // negociable de SPEC-KB-0002 es que las KBs consultadas siempre se
+    // muestren, nunca una elección oculta. Modo manual (preferences.kb) se
     // resuelve sin pasar por aquí — se aplica directo, sin confirmación
     // (SPEC-KB-0001: "esa elección se usa... hasta que el usuario la cambie").
     function resolveKbAndChat(id: string, message: UserMessage, preferences: ModelPreferences) {
       if (preferences.kb) {
-        runChat(id, message, preferences, undefined, undefined, preferences.kb);
+        runChat(id, message, preferences, undefined, undefined, [preferences.kb]);
         return;
       }
 
       const runtime = new AgentRuntime(atlasClient, eventBus, id);
       runtime
-        .recommendKb(message.content, preferences.scope)
-        .then((recommendation) => {
-          if (!recommendation) {
+        .resolveKbCandidates(message.content, preferences)
+        .then(({ candidates, chosenByLlm }) => {
+          if (candidates.length === 0) {
             runChat(id, message, preferences);
             return;
           }
-          pendingKbRecommendations.set(id, {
-            message,
-            preferences,
-            providerId: recommendation.providerId,
-            providerName: recommendation.providerName,
-          });
+          pendingKbRecommendations.set(id, { message, preferences, candidates });
           send({
             type: "kb.recommended",
-            data: {
-              conversationId: id,
-              providerId: recommendation.providerId,
-              providerName: recommendation.providerName,
-              description: recommendation.description,
-            },
+            data: { conversationId: id, candidates, chosenByLlm },
           });
         })
         .catch((err: any) => {
@@ -248,7 +231,7 @@ export async function setupChatWebSocket(
           pending.preferences,
           undefined,
           undefined,
-          body.use ? pending.providerId : undefined
+          body.use ? pending.candidates.map((c) => c.providerId) : undefined
         );
         return;
       }
