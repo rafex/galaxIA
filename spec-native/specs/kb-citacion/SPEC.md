@@ -2,7 +2,7 @@
 
 ## Estado
 
-`accepted` (diseño cerrado) — sin implementar. Extiende `SPEC-KB-0001`. Ver DEC-0049.
+`done (local)` — implementado y verificado con `npm run typecheck`/`build` en `galaxIA` (protocolo, Navigator, Portal) y `galaxIA-satellite-star` (`kb-provider`). Extiende `SPEC-KB-0001`. Ver DEC-0049.
 
 ## Owner
 
@@ -94,4 +94,9 @@ Los campos de primera clase (`documentTitle`, `sourceArtifact`/`sourceUrl`, `ver
 
 ## Tareas relacionadas
 
-- Aún no creadas — `spec-native/tasks/kb-citacion/TASKS.md` se escribe cuando se priorice la implementación.
+- Ver `spec-native/tasks/kb-citacion/TASKS.md`.
+
+## Notas
+
+- Implementado el 2026-07-07: `ArtifactRef`/`KbCitation`/`KbQueryChunk` en `packages/fhs-protocol/src/types.ts`; `ProvenanceInfo.tools[].citations?` en `packages/fhs-protocol/src/sse.ts`. El `kb-provider` de referencia (`galaxIA-satellite-star`) puebla `citation.documentTitle` con el nombre del archivo fuente — suficiente para demostrar el contrato, sin ser una recomendación de curaduría. `apps/navigator/src/agent/runtime.ts::queryKb` etiqueta cada fragmento con su fuente al construir el contexto (atribución vía prompting, DEC-0048) y propaga las citas a `usedTools`/`buildProvenance`. `apps/portal/src/components/chat-view.ts` las muestra en el panel de Procedencia (con escape de HTML — la metadata de citación es autodeclarada por un provider, DEC-0028, no se confía en que venga sanitizada).
+- `sourceArtifact`/`ArtifactRef` queda con la referencia de tipo agregada pero sin ningún flujo que la use todavía (SPEC-IPFS-0001/DEC-0047 — reemplazo de `file_base64` — sigue sin implementar); el `kb-provider` de referencia solo puebla `documentTitle`.

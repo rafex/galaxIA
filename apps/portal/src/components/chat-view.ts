@@ -458,20 +458,39 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     activityLogEl.scrollTop = activityLogEl.scrollHeight;
   }
 
+  function escapeHtml(value: string): string {
+    const div = document.createElement("div");
+    div.textContent = value;
+    return div.innerHTML;
+  }
+
+  function renderCitation(citation: any): string {
+    const pages =
+      citation.pageStart != null
+        ? ` (p. ${citation.pageStart}${citation.pageEnd != null ? `–${citation.pageEnd}` : ""})`
+        : "";
+    return `${escapeHtml(citation.documentTitle)}${pages}`;
+  }
+
   function renderProvenance(provenance: any) {
     provenancePlaceholder.innerHTML = `
       <dl>
-        <dt>Modelo</dt><dd>${provenance.llm.model}</dd>
-        <dt>Razonamiento</dt><dd>${provenance.llm.providerName}</dd>
+        <dt>Modelo</dt><dd>${escapeHtml(provenance.llm.model)}</dd>
+        <dt>Razonamiento</dt><dd>${escapeHtml(provenance.llm.providerName)}</dd>
         ${provenance.tools
           .map(
             (tool: any) => `
-          <dt>Tool</dt><dd>${tool.capability} @ ${tool.providerName}</dd>
+          <dt>Tool</dt><dd>${escapeHtml(tool.capability)} @ ${escapeHtml(tool.providerName)}</dd>
+          ${
+            tool.citations && tool.citations.length > 0
+              ? `<dt>Fuentes</dt><dd>${tool.citations.map(renderCitation).join(", ")}</dd>`
+              : ""
+          }
         `
           )
           .join("")}
-        <dt>Datos</dt><dd>${provenance.dataExported}</dd>
-        <dt>Ámbito</dt><dd>${provenance.jurisdiction}</dd>
+        <dt>Datos</dt><dd>${escapeHtml(provenance.dataExported)}</dd>
+        <dt>Ámbito</dt><dd>${escapeHtml(provenance.jurisdiction)}</dd>
       </dl>
     `;
   }

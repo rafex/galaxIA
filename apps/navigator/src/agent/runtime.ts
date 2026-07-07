@@ -1,6 +1,8 @@
 import {
   type Signal,
   type GenerateRequest,
+  type KbCitation,
+  type KbQueryChunk,
   type LlmMessage,
   type ModelInfo,
   type PrivacyScope,
@@ -74,6 +76,8 @@ export class AgentRuntime {
     providerId: string;
     providerName: string;
     toolName: string;
+    /** Citas de los fragmentos usados, si la tool las expone (DEC-0049). */
+    citations?: KbCitation[];
   }> = [];
 
   constructor(
@@ -464,7 +468,7 @@ export class AgentRuntime {
         preferences.maxWaitMs,
         { conversationId: this.conversationId, capabilityId: kbTool.capabilityId }
       );
-      const parsed = JSON.parse(extractText(result)) as { chunks: Array<{ text: string; score: number }> };
+      const parsed = JSON.parse(extractText(result)) as { chunks: KbQueryChunk[] };
       this.atlasClient.recordSample({
         providerId: kbTool.providerId,
         capability: kbTool.capabilityId,
@@ -472,13 +476,20 @@ export class AgentRuntime {
       });
       if (!parsed.chunks || parsed.chunks.length === 0) return null;
 
+      const citations = parsed.chunks.map((c) => c.citation).filter((c): c is KbCitation => !!c);
       this.usedTools.push({
         capability: kbTool.capabilityId,
         providerId: kbTool.providerId,
         providerName: kbTool.providerName,
         toolName: kbTool.name,
+        citations: citations.length > 0 ? citations : undefined,
       });
-      return parsed.chunks.map((c) => c.text).join("\n---\n");
+      // Cada fragmento se etiqueta con su fuente cuando hay citación
+      // disponible — el LLM puede así atribuir la respuesta en el texto
+      // (prompting, no lógica nueva de protocolo, DEC-0048).
+      return parsed.chunks
+        .map((c) => (c.citation ? `[Fuente: ${c.citation.documentTitle}]\n${c.text}` : c.text))
+        .join("\n---\n");
     } catch {
       this.atlasClient.recordSample({
         providerId: kbTool.providerId,
@@ -690,6 +701,7 @@ export class AgentRuntime {
         capability: t.capability,
         providerId: t.providerId,
         providerName: t.providerName,
+        citations: t.citations,
       })),
       dataExported: this.usedTools.length > 0 ? "Datos enviados a tools federadas" : "Ninguno",
       jurisdiction: "red local comunitaria",

@@ -2,6 +2,8 @@
  * Eventos SSE transmitidos desde el Agent Backend hacia el frontend.
  */
 
+import type { KbCitation } from "./types.js";
+
 export interface SessionEvent {
   type: "session";
   data: { conversationId: string };
@@ -74,6 +76,8 @@ export interface ProvenanceInfo {
     providerId: string;
     providerName: string;
     retention?: string;
+    /** Citas de los fragmentos usados de esta tool, si las expone (DEC-0049). */
+    citations?: KbCitation[];
   }>;
   dataExported: string;
   jurisdiction: string;

@@ -99,6 +99,43 @@ export interface ModelInfo {
 }
 
 /**
+ * Referencia a un binario (DEC-0046) — modela solo el endpoint de
+ * **lectura** (inline o gateway IPFS). El endpoint de escritura (con
+ * credenciales) es responsabilidad local de quien sube y nunca forma parte
+ * del protocolo. Usado hoy por `KbCitation.sourceArtifact`; el reemplazo de
+ * `file_base64` en `ToolCallRequestMessage`/`ToolCallResultMessage`
+ * (SPEC-IPFS-0001, DEC-0047) sigue sin implementar.
+ */
+export type ArtifactRef =
+  | { transport: "inline"; base64: string; filename?: string }
+  | { transport: "ipfs"; cid: string; network: "public" | "private"; gatewayUrl?: string; filename?: string };
+
+/**
+ * Metadata de citación y fuente primaria de un resultado de `kb.query`
+ * (SPEC-KB-0003, DEC-0049). Campos de primera clase aplican a cualquier KB
+ * sin importar el dominio; `metadata` es un bag libre para lo específico de
+ * cada dominio (jurisdicción, artículo, etc.) — el protocolo no impone
+ * vocabulario de dominio.
+ */
+export interface KbCitation {
+  documentTitle: string;
+  sourceArtifact?: ArtifactRef;
+  sourceUrl?: string;
+  versionDate?: string;
+  pageStart?: number;
+  pageEnd?: number;
+  tags?: string[];
+  metadata?: Record<string, string>;
+}
+
+/** Un fragmento devuelto por `kb.query` — `citation` es opcional (DEC-0049). */
+export interface KbQueryChunk {
+  text: string;
+  score: number;
+  citation?: KbCitation;
+}
+
+/**
  * Formato generalizado de retención (DEC-0025): `"none"` (no se guarda
  * nada más allá de la petición en curso), `"session"` (vive mientras dure
  * la conversación, sin más precisión), un TTL explícito en duración ISO
