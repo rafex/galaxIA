@@ -66,6 +66,27 @@ Abre un issue describiendo:
   abstracciones nuevas. No agregues configuración o manejo de errores para
   escenarios que no pueden ocurrir.
 
+## Git hooks
+
+El proyecto incluye hooks de git en `.githooks/` para ejecutar verificaciones
+automáticas antes de commits y pushes. Para activarlos:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Hooks incluidos:
+
+| Hook | Qué hace |
+|------|---------|
+| `pre-commit` | ESLint + typecheck + regenerar `version.json` |
+| `pre-push` | Build completo + tests + verificar tarball de fhs-protocol |
+| `post-checkout` | Regenerar `.env` + mostrar grafo de dependencias |
+| `post-merge` | Regenerar `.env` + `version.json` |
+| `commit-msg` | Validar formato Conventional Commits |
+
+Para saltar los hooks puntualmente: `git commit --no-verify`.
+
 ## Mensajes de commit
 
 Usa el formato `tipo: descripción breve` (`feat`, `fix`, `docs`, `refactor`,
