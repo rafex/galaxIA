@@ -22,6 +22,9 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     privacyScope: "community",
     ocrMode: "confirm",
     kbProviderId: "",
+    ipfsEnabled: false,
+    ipfsNetwork: "public",
+    ipfsRetention: "ephemeral",
   };
 
   let conversationId: string | null = null;
@@ -92,6 +95,28 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
             <option value="" selected>Recomendada automáticamente (con confirmación)</option>
           </select>
         </label>
+        <label>
+          Transporte de adjuntos:
+          <select class="ipfs-mode-selector">
+            <option value="direct" selected>Transmisión directa</option>
+            <option value="ipfs">Vía IPFS</option>
+          </select>
+        </label>
+        <label class="ipfs-network-row" hidden>
+          Red IPFS:
+          <select class="ipfs-network-selector">
+            <option value="public" selected>Pública</option>
+            <option value="private">Privada (nodo del operador)</option>
+          </select>
+        </label>
+        <label class="ipfs-retention-row" hidden>
+          Retención:
+          <select class="ipfs-retention-selector">
+            <option value="ephemeral" selected>Efímera (se borra al responder)</option>
+            <option value="reuse">Reutilizar (la borro yo después)</option>
+          </select>
+        </label>
+        <span class="ipfs-gateway-info" hidden></span>
       </footer>
     </div>
   `;
@@ -106,10 +131,17 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
   const scopeSelector = container.querySelector(".scope-selector") as HTMLSelectElement;
   const ocrModeSelector = container.querySelector(".ocr-mode-selector") as HTMLSelectElement;
   const kbSelector = container.querySelector(".kb-selector") as HTMLSelectElement;
+  const ipfsModeSelector = container.querySelector(".ipfs-mode-selector") as HTMLSelectElement;
+  const ipfsNetworkRow = container.querySelector(".ipfs-network-row") as HTMLElement;
+  const ipfsNetworkSelector = container.querySelector(".ipfs-network-selector") as HTMLSelectElement;
+  const ipfsRetentionRow = container.querySelector(".ipfs-retention-row") as HTMLElement;
+  const ipfsRetentionSelector = container.querySelector(".ipfs-retention-selector") as HTMLSelectElement;
+  const ipfsGatewayInfo = container.querySelector(".ipfs-gateway-info") as HTMLElement;
   const provenancePlaceholder = container.querySelector(".provenance-placeholder") as HTMLElement;
 
   loadModels();
   loadKbs();
+  loadIpfsConfig();
 
   modelSelector.addEventListener("change", () => {
     state.selectedModel = modelSelector.value as any;
@@ -125,6 +157,21 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
 
   kbSelector.addEventListener("change", () => {
     state.kbProviderId = kbSelector.value;
+  });
+
+  ipfsModeSelector.addEventListener("change", () => {
+    state.ipfsEnabled = ipfsModeSelector.value === "ipfs";
+    ipfsNetworkRow.hidden = !state.ipfsEnabled;
+    ipfsRetentionRow.hidden = !state.ipfsEnabled;
+    ipfsGatewayInfo.hidden = !state.ipfsEnabled;
+  });
+
+  ipfsNetworkSelector.addEventListener("change", () => {
+    state.ipfsNetwork = ipfsNetworkSelector.value as ChatState["ipfsNetwork"];
+  });
+
+  ipfsRetentionSelector.addEventListener("change", () => {
+    state.ipfsRetention = ipfsRetentionSelector.value as ChatState["ipfsRetention"];
   });
 
   textareaEl.addEventListener("keydown", (event) => {
@@ -195,6 +242,28 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     }
   }
 
+  /**
+   * SPEC-IPFS-0001 (DEC-0052, pregunta #6): el usuario debe saber qué
+   * gateway público se usará antes de elegir ese transporte, no un detalle
+   * oculto. Si Navigator no tiene IPFS configurado, se deshabilita la
+   * opción en vez de dejar que el usuario elija algo que va a fallar.
+   */
+  async function loadIpfsConfig() {
+    try {
+      const response = await fetch("/api/ipfs-config");
+      const data = (await response.json()) as { enabled: boolean; publicGatewayUrl: string };
+      if (!data.enabled) {
+        const ipfsOption = ipfsModeSelector.querySelector('option[value="ipfs"]') as HTMLOptionElement;
+        ipfsOption.disabled = true;
+        ipfsOption.textContent = "Vía IPFS (no disponible en este nodo)";
+        return;
+      }
+      ipfsGatewayInfo.textContent = `Gateway público: ${data.publicGatewayUrl}`;
+    } catch (err) {
+      console.error("Failed to load IPFS config", err);
+    }
+  }
+
   async function submitMessage() {
     const text = textareaEl.value.trim();
     if ((!text && !pendingAttachment) || state.isStreaming) return;
@@ -232,6 +301,9 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
         allowExternalProviders: state.privacyScope === "external",
         ocrMode: state.ocrMode,
         kb: state.kbProviderId || undefined,
+        ipfs: state.ipfsEnabled
+          ? { enabled: true, network: state.ipfsNetwork, retention: state.ipfsRetention }
+          : undefined,
       },
     };
 

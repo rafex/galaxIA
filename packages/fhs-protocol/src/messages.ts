@@ -3,6 +3,7 @@
  */
 
 import type { Beacon } from "./manifest.js";
+import type { ArtifactRef } from "./types.js";
 
 export interface BaseMessage {
   type: string;
@@ -166,7 +167,13 @@ export interface ToolCallResultMessage extends BaseMessage {
   type: "tool.result";
   requestId: string;
   toolName: string;
-  content: Array<{ type: "text"; text: string }>;
+  /**
+   * `{ type: "artifact" }` (DEC-0046) — un provider puede devolver un
+   * resultado binario grande subiéndolo él mismo a IPFS y regresando un
+   * `ArtifactRef` en vez de un payload inline, misma forma simétrica con la
+   * que puede recibir un adjunto.
+   */
+  content: Array<{ type: "text"; text: string } | { type: "artifact"; artifact: ArtifactRef }>;
 }
 
 export interface ToolCallErrorMessage extends BaseMessage {

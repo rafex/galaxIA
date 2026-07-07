@@ -386,6 +386,15 @@ body,
   gap: 0.5rem;
 }
 
+.settings-bar [hidden] {
+  display: none;
+}
+
+.ipfs-gateway-info {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
 .settings-bar select {
   background: var(--bg);
   color: var(--text);

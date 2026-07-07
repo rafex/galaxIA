@@ -1,4 +1,5 @@
 import {
+  type ArtifactRef,
   type Signal,
   type GenerateRequest,
   type KbCitation,
@@ -16,6 +17,13 @@ import { AtlasClient } from "../atlas-client.js";
 import { EventBus } from "../sse/event-bus.js";
 import { LlmGateway } from "../providers/llm-gateway.js";
 import { McpHost, LoadedTool } from "../providers/mcp-host.js";
+import {
+  isIpfsConfigured,
+  resolveGatewayUrl,
+  scheduleBackstopUnpin,
+  unpinFromIpfs,
+  uploadToIpfs,
+} from "../ipfs/ipfs-client.js";
 
 export interface ModelPreferences {
   model?: "auto" | string;
@@ -50,6 +58,18 @@ export interface ModelPreferences {
    * ver TASK-KB-0004.
    */
   kbMaxPerQuestion?: number;
+  /**
+   * Transporte de adjuntos vía IPFS (SPEC-IPFS-0001, DEC-0044/0051/0052) —
+   * configuración explícita del Portal, no una elección por adjunto ni por
+   * conversación. Si no está presente o `enabled` es `false`, el adjunto
+   * viaja inline (comportamiento directo, sin cambios).
+   */
+  ipfs?: {
+    enabled: boolean;
+    network: "public" | "private";
+    /** "ephemeral" (default): se borra tras usarse. "reuse": el usuario es responsable del borrado. */
+    retention: "ephemeral" | "reuse";
+  };
 }
 
 interface ResolvedLlm {
@@ -155,7 +175,7 @@ export class AgentRuntime {
 
       if (ocrToolIndex >= 0) {
         const ocrTool = loadedTools[ocrToolIndex];
-        const ocrText = await this.runOcrDeterministically(ocrTool, preferences.maxWaitMs);
+        const ocrText = await this.runOcrDeterministically(ocrTool, preferences);
         loadedTools.splice(ocrToolIndex, 1); // ya se ejecutó; no ofrecerla también al LLM
         userContent = ocrText
           ? `[Texto extraído automáticamente del archivo adjunto mediante OCR]\n${ocrText}\n\n[Pregunta del usuario]\n${message.content}`
@@ -210,7 +230,7 @@ export class AgentRuntime {
         const key = `${toolCall.function.name}:${toolCall.function.arguments}`;
         if (executed.has(key)) continue;
         executed.add(key);
-        await this.executeToolCall(toolCall, loadedTools, preferences.scope, messages, preferences.maxWaitMs);
+        await this.executeToolCall(toolCall, loadedTools, preferences, messages);
       }
 
       // Segunda llamada: genera respuesta final SIN tools
@@ -321,7 +341,7 @@ export class AgentRuntime {
       return null;
     }
 
-    const text = await this.runOcrDeterministically(ocrTool, preferences.maxWaitMs);
+    const text = await this.runOcrDeterministically(ocrTool, preferences);
     if (text) {
       this.emit({ type: "ocr.extracted", data: { filename, text } });
     }
@@ -506,7 +526,7 @@ export class AgentRuntime {
    * el frontend muestre la misma actividad (tool.selected/running/completed).
    * Devuelve el texto extraído, o null si falla (degradación graceful).
    */
-  private async runOcrDeterministically(tool: LoadedTool, maxWaitMs?: number): Promise<string | null> {
+  private async runOcrDeterministically(tool: LoadedTool, preferences: ModelPreferences): Promise<string | null> {
     const artifact = this.artifacts[0];
     if (!artifact) return null;
 
@@ -517,14 +537,14 @@ export class AgentRuntime {
     this.emit({ type: "tool.running", data: { name: tool.name, providerId: tool.providerId } });
     const startTime = Date.now();
 
+    const { file, ipfsCid, ipfsRetention } = await this.buildFileArtifact(artifact, preferences);
     try {
-      const parsed = parseDataUrl(artifact);
-      const args = { file_base64: parsed.base64, filename: `upload-${Date.now()}.${parsed.extension}` };
+      const args = { file };
       const { message: result, dispatchMs } = await this.mcpHost.callTool(
         tool.providerId,
         tool.name,
         args,
-        maxWaitMs,
+        preferences.maxWaitMs,
         { conversationId: this.conversationId, capabilityId: tool.capabilityId }
       );
       const duration = Date.now() - startTime;
@@ -542,6 +562,7 @@ export class AgentRuntime {
         providerName: tool.providerName,
         toolName: tool.name,
       });
+      if (ipfsCid && ipfsRetention !== "reuse") unpinFromIpfs(ipfsCid);
       return textResult;
     } catch (err: any) {
       const duration = Date.now() - startTime;
@@ -551,16 +572,49 @@ export class AgentRuntime {
         capability: tool.capabilityId,
         sample: { dispatchMs: null, totalMs: duration, success: false, at: Date.now() },
       });
+      if (ipfsCid && ipfsRetention !== "reuse") unpinFromIpfs(ipfsCid);
       return null;
     }
+  }
+
+  /**
+   * Resuelve un adjunto (data URL) a un `ArtifactRef` (DEC-0047) — inline si
+   * IPFS no está activo en las preferencias, o subido vía Navigator si sí
+   * (DEC-0051). Devuelve también el CID y el modo de retención cuando aplica,
+   * para que el llamador pueda hacer unpin inmediato tras la respuesta
+   * (DEC-0052) — el TTL de respaldo ya queda agendado aquí mismo.
+   */
+  private async buildFileArtifact(
+    artifact: string,
+    preferences: ModelPreferences
+  ): Promise<{ file: ArtifactRef; ipfsCid?: string; ipfsRetention?: "ephemeral" | "reuse" }> {
+    const parsed = parseDataUrl(artifact);
+    const filename = `upload-${Date.now()}.${parsed.extension}`;
+
+    if (preferences.ipfs?.enabled && isIpfsConfigured()) {
+      const network = preferences.ipfs.network;
+      const retention = preferences.ipfs.retention;
+      const cid = await uploadToIpfs(parsed.base64, filename);
+      scheduleBackstopUnpin(cid, retention);
+      const file: ArtifactRef = {
+        transport: "ipfs",
+        cid,
+        network,
+        gatewayUrl: resolveGatewayUrl(network),
+        filename,
+        retention,
+      };
+      return { file, ipfsCid: cid, ipfsRetention: retention };
+    }
+
+    return { file: { transport: "inline", base64: parsed.base64, filename } };
   }
 
   private async executeToolCall(
     toolCall: ToolCall,
     loadedTools: LoadedTool[],
-    scope?: PrivacyScope,
-    messages?: LlmMessage[],
-    maxWaitMs?: number
+    preferences: ModelPreferences,
+    messages?: LlmMessage[]
   ) {
     const toolName = toolCall.function.name;
     let tool = loadedTools.find((t) => t.name === toolName);
@@ -580,7 +634,7 @@ export class AgentRuntime {
       },
     });
 
-    if (!authorize(tool.providerId, scope)) {
+    if (!authorize(tool.providerId, preferences.scope)) {
       this.emit({
         type: "tool.error",
         data: { name: toolName, error: "No autorizado por política de privacidad" },
@@ -592,26 +646,29 @@ export class AgentRuntime {
     this.emit({ type: "tool.running", data: { name: toolName, providerId: tool.providerId } });
     const startTime = Date.now();
 
+    let ipfsCid: string | undefined;
+    let ipfsRetention: "ephemeral" | "reuse" | undefined;
     try {
       const args = JSON.parse(toolCall.function.arguments || "{}") as Record<string, any>;
 
-      if (tool.capabilityId === "document.ocr" && !args.file_base64) {
+      if (tool.capabilityId === "document.ocr" && !args.file) {
         const artifact = this.artifacts[0];
         if (!artifact) {
           this.emit({ type: "tool.error", data: { name: toolName, error: "No hay archivo adjunto para OCR" } });
           messages?.push({ role: "tool", content: "Error: no hay archivo adjunto", tool_call_id: toolCall.id });
           return;
         }
-        const parsed = parseDataUrl(artifact);
-        args.file_base64 = parsed.base64;
-        args.filename = args.filename || `upload-${Date.now()}.${parsed.extension}`;
+        const built = await this.buildFileArtifact(artifact, preferences);
+        args.file = built.file;
+        ipfsCid = built.ipfsCid;
+        ipfsRetention = built.ipfsRetention;
       }
 
       const { message: result, dispatchMs } = await this.mcpHost.callTool(
         tool.providerId,
         toolName,
         args,
-        maxWaitMs,
+        preferences.maxWaitMs,
         { conversationId: this.conversationId, capabilityId: tool.capabilityId }
       );
       const duration = Date.now() - startTime;
@@ -631,6 +688,7 @@ export class AgentRuntime {
       });
 
       messages?.push({ role: "tool", content: textResult, tool_call_id: toolCall.id });
+      if (ipfsCid && ipfsRetention !== "reuse") unpinFromIpfs(ipfsCid);
     } catch (err: any) {
       const duration = Date.now() - startTime;
       this.emit({ type: "tool.error", data: { name: toolName, error: err.message } });
@@ -640,6 +698,7 @@ export class AgentRuntime {
         sample: { dispatchMs: null, totalMs: duration, success: false, at: Date.now() },
       });
       messages?.push({ role: "tool", content: `Error: ${err.message}`, tool_call_id: toolCall.id });
+      if (ipfsCid && ipfsRetention !== "reuse") unpinFromIpfs(ipfsCid);
     }
   }
 

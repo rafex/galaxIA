@@ -7,6 +7,7 @@ import { setupChatApi } from "./api/chat.js";
 import { setupEventsApi } from "./api/events.js";
 import { setupChatWebSocket } from "./api/chat-ws.js";
 import { EventBus } from "./sse/event-bus.js";
+import { isIpfsConfigured, getPublicGatewayUrl } from "./ipfs/ipfs-client.js";
 import versionInfo from "./version.json" with { type: "json" };
 
 const PORT = Number(process.env.PORT || 8090);
@@ -48,6 +49,14 @@ async function main() {
     fhsVersion: FHS_VERSION,
     version: versionInfo.commit,
     buildDate: versionInfo.date,
+  }));
+
+  // SPEC-IPFS-0001 (DEC-0052): el Portal necesita saber si IPFS está
+  // disponible y cuál es el gateway público default para mostrárselo al
+  // usuario antes de que elija ese transporte — no un dato oculto.
+  app.get("/api/ipfs-config", async () => ({
+    enabled: isIpfsConfigured(),
+    publicGatewayUrl: getPublicGatewayUrl(),
   }));
 
   try {

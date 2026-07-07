@@ -101,14 +101,26 @@ export interface ModelInfo {
 /**
  * Referencia a un binario (DEC-0046) — modela solo el endpoint de
  * **lectura** (inline o gateway IPFS). El endpoint de escritura (con
- * credenciales) es responsabilidad local de quien sube y nunca forma parte
- * del protocolo. Usado hoy por `KbCitation.sourceArtifact`; el reemplazo de
- * `file_base64` en `ToolCallRequestMessage`/`ToolCallResultMessage`
- * (SPEC-IPFS-0001, DEC-0047) sigue sin implementar.
+ * credenciales) es responsabilidad local de quien sube (Navigator, DEC-0051)
+ * y nunca forma parte del protocolo. Usado por `KbCitation.sourceArtifact` y
+ * por `file` en `ToolCallRequestMessage.arguments` (reemplaza `file_base64`,
+ * DEC-0047).
  */
 export type ArtifactRef =
   | { transport: "inline"; base64: string; filename?: string }
-  | { transport: "ipfs"; cid: string; network: "public" | "private"; gatewayUrl?: string; filename?: string };
+  | {
+      transport: "ipfs";
+      cid: string;
+      network: "public" | "private";
+      gatewayUrl?: string;
+      filename?: string;
+      /**
+       * DEC-0052 — "ephemeral" (default si se omite): quien recibió el
+       * archivo debe borrarlo tras usarlo. "reuse": no debe borrarlo, el
+       * borrado queda como responsabilidad del usuario. Ver SPEC-IPFS-0001.
+       */
+      retention?: "ephemeral" | "reuse";
+    };
 
 /**
  * Metadata de citación y fuente primaria de un resultado de `kb.query`

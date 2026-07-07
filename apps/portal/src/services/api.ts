@@ -12,6 +12,11 @@ export interface ApiOptions {
     ocrMode?: "confirm" | "auto";
     kb?: string;
     kbMaxPerQuestion?: number;
+    ipfs?: {
+      enabled: boolean;
+      network: "public" | "private";
+      retention: "ephemeral" | "reuse";
+    };
   };
 }
 
