@@ -74,7 +74,7 @@ Default: **3 horas** desde que se sube (`privacy.retention: { ttl: "PT3H" }`, mi
 
 - Selector en el Portal: transmisión directa (default) vs. IPFS, por adjunto o por conversación (a definir en implementación — ver preguntas abiertas).
 - Si se elige IPFS, selector adicional de red: pública (con gateway default) vs. privada (requiere especificar `gatewayUrl`) — misma UI, mismo nivel de elección que directo/IPFS.
-- Subida del archivo a IPFS desde el Portal (o desde Navigator en nombre del Portal — a definir en implementación), usando el endpoint de escritura local de quien sube (nunca transportado por el protocolo).
+- Subida del archivo a IPFS **desde Navigator** (DEC-0051) — el Portal sigue siendo un frontal puro, entrega el binario a Navigator igual que ya hace hoy en el modo directo (`artifacts: string[]` en `chat-ws.ts`); Navigator usa su endpoint de escritura configurado localmente (nunca transportado por el protocolo, ver `ArtifactRef` arriba).
 - Nuevo tipo de protocolo `ArtifactRef` (`packages/fhs-protocol/src/types.ts`) — reemplaza `file_base64: string` en `ToolCallRequestMessage.arguments` por `file: ArtifactRef`, y agrega `{ type: "artifact"; artifact: ArtifactRef }` como nuevo item posible en `ToolCallResultMessage.content`.
 - Simetría: un provider puede devolver un resultado de la misma forma (`ArtifactRef` con `transport: "ipfs"`), no solo recibir adjuntos así.
 - Retención de 3 horas por default, extensible explícitamente por quien subió el archivo.
@@ -100,7 +100,7 @@ Default: **3 horas** desde que se sube (`privacy.retention: { ttl: "PT3H" }`, mi
 
 1. ~~¿Red IPFS pública o un nodo IPFS privado operado por el propio operador de la red FHS?~~ **Resuelta (DEC-0045):** es elección de quien sube el archivo, el protocolo soporta ambas vía `ipfs.network`/`ipfs.endpoint`.
 2. ¿La elección de transporte (directo vs. IPFS) es una preferencia por conversación, o por cada adjunto individual dentro de la misma conversación?
-3. ¿Quién sube el archivo a IPFS — el propio Portal (cliente) directo contra un nodo/gateway, o el Portal se lo entrega a Navigator y Navigator lo sube? Afecta qué componente necesita credenciales/acceso al nodo IPFS.
+3. ~~¿Quién sube el archivo a IPFS — el propio Portal (cliente) directo contra un nodo/gateway, o el Portal se lo entrega a Navigator y Navigator lo sube?~~ **Resuelta (DEC-0051): Navigator.** El Portal es un frontal puro, no debe guardar credenciales de escritura de IPFS en el navegador (expuestas por construcción). Navigator ya recibe el binario crudo hoy en el modo directo (`artifacts: string[]`, `chat-ws.ts`) — mismo punto de confianza, sin superficie nueva; solo cambia qué hace con el binario una vez recibido.
 4. ¿Cómo se implementa técnicamente "ampliar la ventana de retención" — un mensaje/acción nueva en el protocolo, o un parámetro adicional en la tool call original?
 5. ¿Quién ejecuta el unpin cuando expira el TTL — un proceso propio de Navigator, un servicio aparte, o se delega al propio nodo IPFS si soporta expiración nativa?
 6. ¿Cuál es el gateway público *default* cuando el usuario elige `network: "public"` sin especificar `gatewayUrl`? ¿Configurable por el operador del nodo Portal, o hardcodeado a uno conocido (ej. `ipfs.io`)?
