@@ -2,7 +2,7 @@
 
 ## Estado
 
-`accepted` (diseño cerrado) — sin implementar. Ver DEC-0044, DEC-0045, DEC-0046, DEC-0047.
+`accepted` (diseño cerrado) — sin implementar. Ver DEC-0044, DEC-0045, DEC-0046, DEC-0047, DEC-0051, DEC-0052.
 
 ## Owner
 
@@ -25,6 +25,8 @@ Agregar IPFS como un **transporte alternativo de adjuntos**, elegible por el usu
 
 La elección es una preferencia explícita del usuario en el Portal (mismo patrón que `preferences.ocrMode`/`preferences.kb` — un control visible en la barra de configuración, no un comportamiento oculto).
 
+**Granularidad (DEC-0052):** es una configuración del Portal, no una elección por adjunto individual ni siquiera implícitamente por conversación — el usuario declara de antemano si IPFS está activo y, si lo está, con qué red (pública/privada, DEC-0045). Mientras esa configuración esté activa, los adjuntos van por IPFS; si no está activa, van directo, sin ningún paso intermedio ("sin mayor rodeo").
+
 ### Red pública vs. privada: también elección de quien sube el archivo (DEC-0045)
 
 La pregunta abierta original ("¿red IPFS pública o nodo privado del operador?") se resuelve así: **no es una decisión fija del operador ni de este spec — es otra elección de quien sube el archivo**, mismo nivel que la elección directo/IPFS. El protocolo debe soportar ambas configuraciones (un gateway/nodo público, o un nodo privado que el usuario u operador especifique), no imponer una.
@@ -45,10 +47,18 @@ Esto se modela como un tipo compartido en `packages/fhs-protocol/src/types.ts`, 
 ```ts
 export type ArtifactRef =
   | { transport: "inline"; base64: string; filename?: string }
-  | { transport: "ipfs"; cid: string; network: "public" | "private"; gatewayUrl?: string; filename?: string };
+  | {
+      transport: "ipfs";
+      cid: string;
+      network: "public" | "private";
+      gatewayUrl?: string;
+      filename?: string;
+      /** DEC-0052 — "ephemeral": el satellite debe borrar tras responder (con TTL de respaldo). "reuse": no borra, el usuario es responsable del borrado. Default "ephemeral" si se omite. */
+      retention?: "ephemeral" | "reuse";
+    };
 ```
 
-`gatewayUrl` opcional si `network` es `"public"` (se puede usar un gateway público por default, ver preguntas abiertas); obligatorio si `"private"`.
+`gatewayUrl` opcional si `network` es `"public"` (se puede usar un gateway público por default, ver preguntas abiertas); obligatorio si `"private"`. `retention` solo aplica al modo `"ipfs"` — un adjunto `"inline"` no tiene nada que pinear/borrar.
 
 ### Dirección inversa: el provider también puede subir y devolver un CID
 
@@ -64,26 +74,32 @@ Además de recibir adjuntos vía IPFS, un provider debe poder **generar** un res
 - **Desacopla la entrega del procesamiento.** Subir a IPFS y descargar del lado del provider son dos operaciones independientes en el tiempo — si el provider está ocupado, el archivo ya está disponible esperando en IPFS, no se pierde ni hay que reenviarlo. Esto es lo que permite tratar la descarga como un proceso batch/asíncrono en vez de una recepción síncrona.
 - **Anonimiza el origen del binario frente al provider.** El provider nunca ve el archivo llegar directamente desde la conexión del usuario — solo pide un CID a la red/nodo IPFS. Quien sirve el blob (el nodo IPFS) no es la misma parte que sabe qué conversación/usuario lo originó.
 
-### Retención
+### Retención (DEC-0052)
 
-Default: **3 horas** desde que se sube (`privacy.retention: { ttl: "PT3H" }`, mismo formato generalizado de DEC-0025 que ya usa `rag-provider`). Quien sube el archivo puede pedir ampliar esa ventana explícitamente si planea reutilizarlo (ej. la misma sesión de trabajo se extiende más de 3 horas) — la ampliación es una acción explícita del usuario, no un default más largo.
+Dos modos, declarados explícitamente en el Portal al subir el archivo — reemplaza el modelo original de DEC-0044 ("3h por default, ampliable"):
+
+1. **Efímera (default):** el archivo vive solo mientras dura el procesamiento. En cuanto el satellite que lo consumió termina y devuelve su respuesta (`tool.result`), **el propio satellite debe borrar (unpin) el archivo original de IPFS** — no es una ventana de tiempo, es un evento (fin del procesamiento). Como respaldo ante el caso en que el satellite nunca llega a responder (caída, timeout, desconexión, ver Riesgos), se mantiene un **TTL de seguridad de 3 horas** (`privacy.retention: { ttl: "PT3H" }`, mismo formato de DEC-0025) — solo como red de seguridad, el mecanismo principal sigue siendo el borrado inmediato al responder.
+2. **Reutilizar:** el usuario declara explícitamente en el frontend que quiere conservar el archivo más allá de un solo procesamiento. Esta elección se informa al satellite (junto con el `ArtifactRef`, ver más abajo) para que **no** lo borre tras responder. Sin TTL — el archivo no expira solo. El borrado queda como **responsabilidad exclusiva del usuario**, sin ningún barrido/expiración automática (un punto centralizado que recorra todos los CIDs "reutilizar" pendientes de borrar no es factible ahora mismo, requeriría un componente nuevo con ese único propósito). Queda documentado como funcionalidad a futuro: una acción explícita en el Portal ("borrar este adjunto") que dispare la petición de unpin bajo demanda — no implementada en esta iteración.
+
+**Cómo viaja esta elección por el protocolo:** el modo (`ephemeral` | `reuse`) se transporta junto al `ArtifactRef` cuando `transport: "ipfs"` — ver `ArtifactRef` más abajo.
 
 ## Alcance
 
 ### Dentro del alcance
 
-- Selector en el Portal: transmisión directa (default) vs. IPFS, por adjunto o por conversación (a definir en implementación — ver preguntas abiertas).
-- Si se elige IPFS, selector adicional de red: pública (con gateway default) vs. privada (requiere especificar `gatewayUrl`) — misma UI, mismo nivel de elección que directo/IPFS.
+- Configuración en el Portal (DEC-0052): activar/desactivar transporte IPFS, red (pública/privada) si está activo, y modo de retención (efímera/reutilizar) — configuración explícita, no una elección oculta ni un default silencioso.
 - Subida del archivo a IPFS **desde Navigator** (DEC-0051) — el Portal sigue siendo un frontal puro, entrega el binario a Navigator igual que ya hace hoy en el modo directo (`artifacts: string[]` en `chat-ws.ts`); Navigator usa su endpoint de escritura configurado localmente (nunca transportado por el protocolo, ver `ArtifactRef` arriba).
-- Nuevo tipo de protocolo `ArtifactRef` (`packages/fhs-protocol/src/types.ts`) — reemplaza `file_base64: string` en `ToolCallRequestMessage.arguments` por `file: ArtifactRef`, y agrega `{ type: "artifact"; artifact: ArtifactRef }` como nuevo item posible en `ToolCallResultMessage.content`.
+- Nuevo tipo de protocolo `ArtifactRef` (`packages/fhs-protocol/src/types.ts`) — reemplaza `file_base64: string` en `ToolCallRequestMessage.arguments` por `file: ArtifactRef`, y agrega `{ type: "artifact"; artifact: ArtifactRef }` como nuevo item posible en `ToolCallResultMessage.content`. Incluye `retention?: "ephemeral" | "reuse"` (DEC-0052).
 - Simetría: un provider puede devolver un resultado de la misma forma (`ArtifactRef` con `transport: "ipfs"`), no solo recibir adjuntos así.
-- Retención de 3 horas por default, extensible explícitamente por quien subió el archivo.
+- Contrato de borrado (DEC-0052): en modo `ephemeral`, el satellite que consume el `ArtifactRef` debe hacer unpin del CID al terminar de procesar y responder; TTL de 3h como respaldo si nunca responde. En modo `reuse`, el satellite no borra — el borrado queda como responsabilidad del usuario (sin mecanismo automático todavía).
 
 ### Fuera del alcance (para esta iteración)
 
 - Elegir el motor/nodo IPFS concreto (ver pregunta abierta #1 abajo) — igual que con RAG/KB (DEC-0026/DEC-0037), este spec define el contrato (qué transporta el protocolo, quién decide el modo, política de retención) pero no impone una implementación de infraestructura IPFS específica.
 - Deduplicación explícita entre distintos usuarios que suben el mismo archivo (mencionada como beneficio natural de IPFS en el ROADMAP original, pero no es un requisito de esta iteración — es una consecuencia gratuita del content-addressing, no algo que haya que construir).
 - Migrar adjuntos existentes ya enviados por transmisión directa a IPFS retroactivamente.
+- Acción explícita en el Portal para que el usuario borre bajo demanda un archivo en modo `reuse` (DEC-0052) — documentado como funcionalidad a futuro, no implementada en esta iteración.
+- Cualquier mecanismo de barrido/expiración centralizado para archivos en modo `reuse` — no es factible ahora mismo (requeriría un componente nuevo con ese único propósito); el borrado en ese modo es responsabilidad del usuario hasta que exista la acción explícita de borrado.
 
 ## Riesgos
 
@@ -92,17 +108,19 @@ Default: **3 horas** desde que se sube (`privacy.retention: { ttl: "PT3H" }`, mi
 | Un CID en una red IPFS **pública** es recuperable por cualquiera que lo tenga, indefinidamente mientras algún nodo lo mantenga pinneado — no hay control de acceso nativo. "Anonimizar el origen" no es lo mismo que "el contenido es privado". | Alto si el adjunto es sensible | Mitigado por diseño (DEC-0045): la elección de red pública/privada es del usuario que sube el archivo, no un default fijo — quien maneje contenido sensible puede elegir un nodo privado explícitamente. La responsabilidad de saber cuál conviene es del usuario/operador, el protocolo solo debe soportar ambas opciones |
 | Sin `gatewayUrl`, un provider no puede resolver un CID subido a un nodo privado — el CID solo no basta | Alto (bloquea el caso privado por completo si se omite) | Resuelto en el diseño (DEC-0046): `ArtifactRef` con `transport: "ipfs"` siempre incluye `gatewayUrl` cuando `network` es `"private"`, nunca se transporta el CID aislado |
 | Exponer por error el endpoint de **escritura** (API con credenciales) en vez del de lectura (gateway) en el protocolo, dejando credenciales de subida circulando por el canal FHS | Alto si ocurre | Resuelto por diseño (DEC-0046): `ArtifactRef` modela explícitamente solo el endpoint de lectura; el de escritura es responsabilidad local de quien sube y nunca forma parte del tipo de protocolo |
-| Nadie despina el CID después de la ventana de retención — el archivo queda huérfano pero recuperable | Medio | El mecanismo de expiración (quién corre el unpin tras el TTL) es responsabilidad de implementación, no resuelto en este spec |
+| En modo `ephemeral`, el satellite se cae/pierde conexión antes de responder y nunca hace el unpin — el archivo queda huérfano | Medio | Mitigado (DEC-0052): TTL de respaldo de 3h además del borrado por evento; no depende únicamente de que el satellite responda con éxito |
+| En modo `reuse`, el usuario nunca borra el archivo manualmente — queda huérfano indefinidamente, sin ningún mecanismo de expiración | Medio | Aceptado a propósito (DEC-0052): un barrido centralizado no es factible ahora; la funcionalidad de borrado bajo demanda queda como trabajo futuro, documentado, no bloqueante |
+| Un satellite mal implementado ignora `retention: "ephemeral"` y no hace unpin (o al revés, borra un archivo marcado `"reuse"`) | Medio | Sin mitigación técnica — mismo nivel de confianza que cualquier otro contrato de provider (DEC-0028); el protocolo declara la obligación, no puede forzar su cumplimiento por un tercero |
 | El usuario no entiende la diferencia entre los dos modos y elige el que no le conviene | Bajo | El selector del Portal debe explicar la diferencia en una línea (mismo patrón que la advertencia de `kbMaxPerQuestion`, DEC-0027) |
 | `file_base64` se reemplaza sin transición (DEC-0047) — un provider de `galaxIA-satellite-star` no actualizado en el mismo ciclo deja de poder recibir adjuntos por transmisión directa | Alto durante el rollout, si no se coordina | Implementar y desplegar el cambio de protocolo (`galaxIA`) y la actualización de los providers afectados (`galaxIA-satellite-star`) en el mismo ciclo de trabajo — no hay compatibilidad hacia atrás que lo cubra |
 
 ## Preguntas abiertas (para cuando se priorice implementar)
 
 1. ~~¿Red IPFS pública o un nodo IPFS privado operado por el propio operador de la red FHS?~~ **Resuelta (DEC-0045):** es elección de quien sube el archivo, el protocolo soporta ambas vía `ipfs.network`/`ipfs.endpoint`.
-2. ¿La elección de transporte (directo vs. IPFS) es una preferencia por conversación, o por cada adjunto individual dentro de la misma conversación?
+2. ~~¿La elección de transporte (directo vs. IPFS) es una preferencia por conversación, o por cada adjunto individual dentro de la misma conversación?~~ **Resuelta (DEC-0052):** ni una ni otra — es una configuración del Portal (activo/inactivo + red), no una elección repetida por conversación ni por adjunto. Si está activa, todos los adjuntos van por IPFS; si no, van directo.
 3. ~~¿Quién sube el archivo a IPFS — el propio Portal (cliente) directo contra un nodo/gateway, o el Portal se lo entrega a Navigator y Navigator lo sube?~~ **Resuelta (DEC-0051): Navigator.** El Portal es un frontal puro, no debe guardar credenciales de escritura de IPFS en el navegador (expuestas por construcción). Navigator ya recibe el binario crudo hoy en el modo directo (`artifacts: string[]`, `chat-ws.ts`) — mismo punto de confianza, sin superficie nueva; solo cambia qué hace con el binario una vez recibido.
-4. ¿Cómo se implementa técnicamente "ampliar la ventana de retención" — un mensaje/acción nueva en el protocolo, o un parámetro adicional en la tool call original?
-5. ¿Quién ejecuta el unpin cuando expira el TTL — un proceso propio de Navigator, un servicio aparte, o se delega al propio nodo IPFS si soporta expiración nativa?
+4. ~~¿Cómo se implementa técnicamente "ampliar la ventana de retención" — un mensaje/acción nueva en el protocolo, o un parámetro adicional en la tool call original?~~ **Resuelta (DEC-0052):** no es una "ampliación" de una ventana — es una elección binaria declarada por adelantado (`ephemeral` vs `reuse`), transportada como parte de `ArtifactRef`. No hace falta un mensaje nuevo de protocolo.
+5. ~~¿Quién ejecuta el unpin cuando expira el TTL — un proceso propio de Navigator, un servicio aparte, o se delega al propio nodo IPFS si soporta expiración nativa?~~ **Resuelta (DEC-0052):** en modo `ephemeral`, el propio satellite que consumió el archivo, inmediatamente al responder (evento, no TTL) — con el TTL de 3h solo como respaldo si nunca responde. En modo `reuse`, nadie automáticamente — responsabilidad del usuario, sin mecanismo de expiración (funcionalidad de borrado bajo demanda queda a futuro).
 6. ¿Cuál es el gateway público *default* cuando el usuario elige `network: "public"` sin especificar `gatewayUrl`? ¿Configurable por el operador del nodo Portal, o hardcodeado a uno conocido (ej. `ipfs.io`)?
 7. ~~Si el usuario especifica un nodo privado para subir, ¿la subida y la descarga necesitan URLs distintas?~~ **Resuelta (DEC-0046):** son estructuralmente dos endpoints distintos siempre (API de escritura vs. gateway de lectura) — `ArtifactRef` solo modela el de lectura (`gatewayUrl`); el de escritura es config local de quien sube y nunca viaja por el protocolo.
 8. ~~¿`ArtifactRef` reemplaza por completo `file_base64`, o convive con él durante una transición?~~ **Resuelta (DEC-0047): se reemplaza.** No hay convivencia — `file_base64` se retira del schema de `arguments` en el mismo cambio que introduce `file: ArtifactRef`. Es un breaking change deliberado, no accidental: requiere actualizar `galaxIA` (protocolo) y `galaxIA-satellite-star` (providers que ya implementan `file_base64`: `satellite-ocr-example`, `rag-provider`, `kb-provider`) en el mismo ciclo de trabajo — no hay periodo donde ambas formas coexistan.

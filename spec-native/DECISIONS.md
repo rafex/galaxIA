@@ -812,3 +812,19 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - `spec-native/specs/ipfs-adjuntos/SPEC.md`: pregunta abierta #3 marcada resuelta; sección "Dentro del alcance" actualizada.
   - Sin cambios de código — sigue siendo diseño. Cuando se implemente, `apps/navigator/src/api/chat-ws.ts`/`apps/navigator/src/agent/runtime.ts` necesitarán el endpoint de escritura de IPFS como configuración local de Navigator (variable de entorno o similar, no un dato que viaje por el protocolo).
   - Preguntas abiertas restantes de `SPEC-IPFS-0001` sin cambios: granularidad de la elección (conversación vs. adjunto), mecanismo de extensión de retención, quién ejecuta el unpin, gateway público default.
+
+## DEC-0052 — Granularidad y retención de IPFS: configuración del Portal, dos modos (`ephemeral`/`reuse`), TTL de respaldo
+
+- **Fecha:** 2026-07-07
+- **Estado:** `accepted` (diseño) — sin implementar, cierra las preguntas abiertas #2, #4 y #5 de `SPEC-IPFS-0001`
+- **Contexto:** al retomar el backlog de `SPEC-IPFS-0001`, quedaban sin resolver la granularidad de la elección directo/IPFS, el mecanismo de "ampliar retención", y quién ejecuta el unpin. El usuario definió las tres a la vez, con un modelo más simple que el original de DEC-0044 (TTL fijo de 3h ampliable).
+- **Decisión — granularidad (pregunta #2):** es una configuración del Portal (activo/inactivo + red pública/privada, DEC-0045), no una elección por conversación ni por adjunto individual. Si IPFS está activo, todos los adjuntos van por ahí; si no, van directo, sin ningún paso intermedio.
+- **Decisión — retención (preguntas #4 y #5), reemplaza el modelo de DEC-0044:** dos modos explícitos, declarados por el usuario en el Portal al subir el archivo:
+  - **`ephemeral` (default):** el archivo vive solo mientras dura el procesamiento. El satellite que lo consume debe hacer unpin del CID **al terminar de responder** (evento, no ventana de tiempo).
+  - **`reuse`:** el usuario declara que quiere conservar el archivo; se informa al satellite (vía `ArtifactRef`) para que no lo borre. Sin TTL — el borrado queda como responsabilidad exclusiva del usuario, sin ningún barrido automático (no es factible ahora mismo, requeriría un punto centralizado nuevo). Queda documentado como funcionalidad futura: una acción explícita de borrado bajo demanda desde el Portal.
+- **Decisión — TTL de respaldo para el modo `ephemeral` (resuelto vía pregunta directa al usuario, no asumido):** si el satellite nunca responde (caída, timeout, desconexión), el borrado por evento nunca se dispara y el archivo quedaría huérfano indefinidamente. Se mantiene el TTL de 3h de DEC-0044 **solo como red de seguridad** — el mecanismo principal sigue siendo el borrado inmediato al responder; el TTL cubre únicamente el caso de falla.
+- **Decisión — forma de protocolo:** el modo de retención viaja junto al `ArtifactRef` cuando `transport: "ipfs"` — nuevo campo `retention?: "ephemeral" | "reuse"` (default `"ephemeral"` si se omite). No hace falta un mensaje nuevo de protocolo para "ampliar" nada — es una elección binaria declarada por adelantado, no una acción posterior.
+- **Consecuencias:**
+  - `spec-native/specs/ipfs-adjuntos/SPEC.md`: preguntas #2/#4/#5 marcadas resueltas; secciones "Propuesta", "Retención", `ArtifactRef`, "Alcance" y "Riesgos" actualizadas.
+  - Sin cambios de código — sigue siendo diseño. Cuando se implemente: `packages/fhs-protocol/src/types.ts` (`ArtifactRef.retention`), el `kb-provider`/`rag-provider`/`satellite-ocr-example` de `galaxIA-satellite-star` necesitarán ejecutar el unpin al responder cuando `retention === "ephemeral"`, y algún componente (Navigator u otro) necesita implementar el TTL de respaldo de 3h.
+  - Preguntas abiertas restantes de `SPEC-IPFS-0001`: gateway público default (#6); acción de borrado bajo demanda desde el Portal para modo `reuse` (nueva, explícitamente a futuro, no bloqueante).
