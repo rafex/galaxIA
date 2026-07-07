@@ -56,6 +56,22 @@ export interface Signal {
   tags?: string[];
 }
 
+/**
+ * Referencia declarativa (DEC-0050) a un perfil de parseo tolerante conocido
+ * por la comunidad para un modelo — nunca la regla en sí, solo el
+ * identificador y dónde vive el catálogo real. El catálogo (las reglas de
+ * parseo, cómo se versionan, cómo se evalúan) es un recurso externo al
+ * protocolo (ver `galaxia-parser-catalog`) — mismo principio que
+ * DEC-0026/DEC-0037/DEC-0046 ya establecieron para KB/ArtifactRef: el
+ * protocolo transporta la referencia, nunca el motor detrás de ella.
+ */
+export interface ModelParserProfile {
+  /** Id del perfil en el catálogo, e.g. "jinja-plain-json-toolcall-fallback-v1". */
+  profileId: string;
+  /** Dónde vive el catálogo real (repo, paquete, URL) — informativo, no resuelto por el protocolo. */
+  registryRef?: string;
+}
+
 export interface ModelInfo {
   id: string;
   displayName: string;
@@ -69,6 +85,8 @@ export interface ModelInfo {
     formats?: string[];
     parallelCalls?: boolean;
     maxToolsPerRequest?: number;
+    /** Perfil de parseo tolerante declarado para este modelo (DEC-0050). */
+    parserProfile?: ModelParserProfile;
   };
   privacy?: {
     retention?: string;

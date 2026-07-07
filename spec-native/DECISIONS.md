@@ -775,3 +775,27 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - Nuevo: `spec-native/specs/kb-citacion/SPEC.md` (SPEC-KB-0003).
   - Sin cambios de código — sigue siendo diseño, no implementación.
   - Pendiente (backlog): escribir `spec-native/tasks/kb-citacion/TASKS.md` e implementar cuando se priorice; cuando se implemente, `queryKb()`/`recommendKb()` en `apps/navigator/src/agent/runtime.ts` y el `kb-provider` de referencia en `galaxIA-satellite-star` necesitarán actualizarse para poblar/consumir `citation`.
+
+## DEC-0050 — `ModelParserProfile`: perfil declarativo de parseo tolerante por modelo, catálogo real en repo aparte
+
+- **Fecha:** 2026-07-07
+- **Estado:** `accepted` — implementado (protocolo + primer perfil + ajuste de `galaxIA-satellite-star`)
+- **Contexto:** al debatir cómo debía resolverse el "caso límite" de SPEC-KB-0002 (LLM elige KB cuando no hay match determinístico confiable, pregunta abierta #3), el usuario propuso primero un loop de razonamiento multi-paso; se le mostró con código real (`examples/star-example/src/llm-bridge.ts`, `tryParseFallbackToolCall`) el incidente ya documentado en DEC-0016/DEC-0017 — `qwen2.5-coder-3b-instruct` decide correctamente invocar una tool pero el motor de inferencia escribe el JSON como texto plano en `content` en vez de llenar `tool_calls` — para argumentar que un parser tolerante de una sola llamada es más confiable que un loop de varios pasos (cada paso es una nueva oportunidad de este mismo fallo). El usuario estuvo de acuerdo y extendió la idea: este tipo de tolerancia varía por modelo, debe acumularse como conocimiento de comunidad, y necesita trazabilidad fuerte para poder evaluar falsos positivos — no debe quedar hardcodeado y anónimo en un solo Star como hoy.
+- **Corrección de encuadre del propio usuario:** el primer intento de resolver esto (mover todo a `galaxIA-satellite-star`, protocolo sin ningún rol) fue corregido — el protocolo sí tiene competencia aquí, pero es la misma que ya tiene para `ArtifactRef` (DEC-0046) y `capability.tags` (DEC-0028): transportar una **referencia declarativa** a conocimiento externo/comunitario, nunca el motor detrás de ella. Dejar esto enteramente del lado de cada provider individual, sin ninguna forma compartida de declarar/transportar qué perfil usa, haría que cada operador tuviera que redescubrir el mismo problema desde cero — inaceptable para que haya respuestas funcionales de forma consistente entre nodos.
+- **Decisión — tipo de protocolo:**
+  ```ts
+  export interface ModelParserProfile {
+    profileId: string;      // e.g. "jinja-plain-json-toolcall-fallback-v1"
+    registryRef?: string;   // dónde vive el catálogo real — informativo
+  }
+  ```
+  Colgado de `ModelInfo.toolCalling.parserProfile?: ModelParserProfile` en `packages/fhs-protocol/src/types.ts`.
+- **Decisión — el catálogo real vive fuera de `galaxIA`, en su propio repo público** ([`galaxia-parser-catalog`](https://github.com/rafex/galaxia-parser-catalog)): `profiles/*.json` (fuente humana, un perfil por archivo: `modelPattern`, `strategy`, `rule`, `notes`, `sourceIncident`) se compila a `catalog.sqlite` (formato de distribución pedido explícitamente por el usuario) mediante un matcher genérico (`matchProfile`/`tryParse`) que interpreta la regla declarada en vez de tener lógica hardcodeada por modelo. Trazabilidad de cada intento de parseo (modelo, perfil, match sí/no, **hash** del contenido — nunca el contenido crudo, mismo cuidado de retención de DEC-0013/DEC-0025) queda como base para un eval futuro de falsos positivos, sin diseñar el mecanismo de evaluación completo todavía.
+- **Por qué esto no reabre DEC-0020:** el parseo de una tool call que el modelo **ya decidió** invocar no es una nueva decisión de enrutamiento — es tolerancia a un formato de salida inconsistente del motor de inferencia. Y al quedar declarado en el manifiesto (`ModelInfo`, campo visible/publicado), es auditable igual que cualquier otro dato de un nodo, no una elección oculta.
+- **Primer perfil real implementado:** `jinja-plain-json-toolcall-fallback-v1`, generalizando el `tryParseFallbackToolCall` ya existente en `examples/star-example/src/llm-bridge.ts` (`galaxIA-satellite-star`) — la función hardcodeada anterior pasa a ser la implementación local de un perfil catalogado y nombrado, no un hack anónimo.
+- **Consecuencias:**
+  - Nuevo: `spec-native/specs/parser-catalog/SPEC.md` (SPEC-PARSER-0001).
+  - `packages/fhs-protocol/src/types.ts`: `ModelParserProfile` agregado, `ModelInfo.toolCalling.parserProfile?` extendido — sin cambio en la versión publicada del paquete todavía (pendiente bump/publish si se decide liberar).
+  - Nuevo repo: [`galaxia-parser-catalog`](https://github.com/rafex/galaxia-parser-catalog) — `profiles/jinja-plain-json-toolcall-fallback-v1.json`, `schema.sql`, `src/match.ts`, `src/build-db.ts`, `catalog.sqlite` compilado.
+  - `galaxIA-satellite-star`: `examples/star-example/src/llm-bridge.ts` ajustado para usar el matcher genérico en vez de la función hardcodeada.
+  - Pendiente (backlog, no bloqueante): mecanismo de distribución/actualización automática del catálogo hacia los Stars (hoy es una copia local cargada al arrancar); diseño completo del "eval" sistemático de falsos positivos/negativos con los datos de trazabilidad; bump y publicación de `@rafex/galaxia-fhs-protocol` con el nuevo tipo.
