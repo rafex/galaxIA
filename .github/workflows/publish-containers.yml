@@ -91,5 +91,4 @@ jobs:
           push: true
           build-args: |
             COMMIT_HASH=${{ github.sha }}
-            BUILD_DATE=${{ github.event.repository.updated_at }}
-          tags: ${{ steps.tag.outputs.value }}
+            BUILD_DATE=${{ github.run_started_at }}
