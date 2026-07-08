@@ -13,9 +13,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@fastify/websocket": "^10.0.0",
+    "@fastify/websocket": "^11.3.0",
     "@rafex/galaxia-fhs-protocol": "^0.1.0",
-    "fastify": "^4.28.0",
+    "fastify": "^5.10.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
