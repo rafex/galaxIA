@@ -6,6 +6,7 @@ include helpers/mk/common.mk
 include helpers/mk/node.mk
 include helpers/mk/container.mk
 include helpers/mk/protocol.mk
+include helpers/mk/release.mk
 
 .DEFAULT_GOAL := help
 
@@ -40,5 +41,8 @@ help:
 	@echo "  make navigator-publish    @galaxia/navigator: bump + verify + npm publish"
 	@echo "  make portal-chat-publish  @galaxia/portal-chat: bump + verify + npm publish"
 	@echo "  (cada uno también tiene -bump-check/-bump/-verify por separado, requiere GH_TOKEN)"
+	@echo ""
+	@echo "$(C_BOLD)Release (GHCR):$(C_RESET)"
+	@echo "  make release-tag        Crea y pushea el siguiente tag vX.Y.Z-beta.N (dispara publish-containers.yml)"
 	@echo ""
 	@echo "$(C_BOLD)Orquestación:$(C_RESET) usar $(C_CYAN)just$(C_RESET) (ver Justfile o ejecutar 'just --list')"
