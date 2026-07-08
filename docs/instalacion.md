@@ -16,8 +16,9 @@ Docker.
 
 ```bash
 mkdir galaxia && cd galaxia
-curl -O https://raw.githubusercontent.com/rafex/galaxIA/main/containers/compose.release.yaml
-curl -O https://raw.githubusercontent.com/rafex/galaxIA/main/containers/.env.example
+REF=main  # o: v0.1.0-beta.1 (para una release reproducible)
+curl -O https://raw.githubusercontent.com/rafex/galaxIA/${REF}/containers/compose.release.yaml
+curl -O https://raw.githubusercontent.com/rafex/galaxIA/${REF}/containers/.env.example
 cp .env.example .env
 # editar .env si hace falta (versión a usar, puertos) — los defaults
 # funcionan para un solo host sin tocar nada
