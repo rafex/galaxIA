@@ -77,7 +77,7 @@ Abre un issue describiendo:
   `npm install`, y verificar `npm run lint && npm run typecheck && npm run
   test && npm run build` antes de commitear. La única excepción es
   `@rafex/galaxia-fhs-protocol` (paquete interno del monorepo, gestionado por
-  el workflow de auto-bump, ver `.github/workflows/publish-fhs-protocol.yml`).
+  el workflow de auto-bump, ver `.github/workflows/publish-packages.yml`).
 
 ## Git hooks
 
@@ -93,7 +93,7 @@ Hooks incluidos:
 | Hook | Qué hace |
 |------|---------|
 | `pre-commit` | ESLint + typecheck + regenerar `version.json` |
-| `pre-push` | Build completo + tests + verificar tarball de fhs-protocol |
+| `pre-push` | Build completo + tests + verificar tarballs de los 4 paquetes |
 | `post-checkout` | Regenerar `.env` + mostrar grafo de dependencias |
 | `post-merge` | Regenerar `.env` + `version.json` |
 | `commit-msg` | Validar formato Conventional Commits |

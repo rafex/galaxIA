@@ -14,19 +14,18 @@ promocion o cambie el proceso de release.
 
 ## Pipelines activos
 
-### 1. Publicar `@rafex/galaxia-fhs-protocol` a GitHub Packages
+### 1. Publicar los 4 paquetes distribuibles a GitHub Packages
 
 - **Plataforma de CD:** GitHub Actions.
-- **Archivo de configuración:** `.github/workflows/publish-fhs-protocol.yml`.
-- **Dónde ver el estado:** pestaña "Actions" del repo (workflow "Publish @rafex/galaxia-fhs-protocol to GitHub Packages"); paquete publicado visible en la pestaña "Packages" de `github.com/rafex/galaxIA`.
-- **Trigger:** push a `main` que modifique `packages/fhs-protocol/**`, o `workflow_dispatch` manual.
-- **Qué hace (DEC-0041):**
-  1. `make protocol-bump` — si la versión de `package.json` ya está publicada en GitHub Packages, la sube automáticamente (patch) usando `helpers/python/bump_package_version.py` (`uv run`). Ya no depende de que quien mergea se acuerde de subir el `version` a mano.
-  2. Si el bump modificó `package.json`/`package-lock.json`, los commitea y pushea a `main` (`chore: bump ... [skip ci]`).
-  3. `make protocol-verify` — compila y corre `npm pack --dry-run`, verificando con `helpers/shell/verify-package.sh` que el tarball incluya `dist/*.js` (guarda contra el bug de la versión `0.1.0`, ver DEC-0040).
-  4. `npm publish -w packages/fhs-protocol`.
+- **Archivo de configuración:** `.github/workflows/publish-packages.yml` (generalizado de `publish-fhs-protocol.yml` en DEC-0061/0062, fases 2-3 del plan de distribución — antes solo `packages/fhs-protocol` se publicaba).
+- **Paquetes:** `@rafex/galaxia-fhs-protocol` (`packages/fhs-protocol`), `@galaxia/atlas`, `@galaxia/navigator`, `@galaxia/portal-chat`.
+- **Dónde ver el estado:** pestaña "Actions" del repo (workflow "Publish packages to GitHub Packages"); paquetes publicados visibles en la pestaña "Packages" de `github.com/rafex/galaxIA`.
+- **Trigger:** push a `main` que modifique cualquiera de los 4 workspaces, o `workflow_dispatch` manual (con un input `package` para publicar solo uno, o los 4 por default).
+- **Qué hace (DEC-0041, generalizado en DEC-0062):**
+  1. Determina qué paquetes cambiaron realmente en el push (`git diff` contra el commit anterior) — un push que solo toca `apps/atlas` no dispara bump/publish de los otros 3.
+  2. Para cada paquete cambiado, en un solo job secuencial (no en paralelo, para no competir por el mismo push a `main`): `helpers/python/bump_package_version.py <workspace>` (sube el patch si la versión actual ya está publicada), commit+push si hubo bump, `helpers/shell/verify-package.sh <workspace>` (verifica que el tarball incluya `dist/*.js`, guarda contra el bug de la versión `0.1.0` de fhs-protocol, ver DEC-0040), y `npm publish -w <workspace>`.
 - **Auth:** usa el `GITHUB_TOKEN` automático de Actions (`permissions.contents: write` + `packages: write` declarados en el workflow) — no requiere un secret adicional. El bump/commit son intra-repo, por eso no hace falta un PAT con alcance a otros repos.
-- **Consumo hoy:** `galaxIA-satellite-star` ya consume `@rafex/galaxia-fhs-protocol` vía GitHub Packages (migrado en DEC-0040, ya no la rama git `fhs-protocol-dist`). Cómo y cuándo ese repo actualiza su dependencia **no es responsabilidad de `galaxIA`** — es el mismo principio de DEC-0026/DEC-0037 (el protocolo define el contrato, nunca gestiona a sus consumidores) llevado al ciclo de publicación: `galaxIA` publica versiones a un registro público, cualquier consumidor (`galaxIA-satellite-star` u otro) decide solo cuándo y cómo actualizarse.
+- **Consumo hoy:** `galaxIA-satellite-star` ya consume `@rafex/galaxia-fhs-protocol` vía GitHub Packages (migrado en DEC-0040, ya no la rama git `fhs-protocol-dist`). Cómo y cuándo ese repo (u otro operador instalando `@galaxia/atlas`/`navigator`/`portal-chat` vía `npx`) actualiza su dependencia **no es responsabilidad de `galaxIA`** — es el mismo principio de DEC-0026/DEC-0037 (el protocolo define el contrato, nunca gestiona a sus consumidores) llevado al ciclo de publicación: `galaxIA` publica versiones a un registro público, cualquier consumidor decide solo cuándo y cómo actualizarse.
 
 ### 2. Sitio público (`galax-ia.rafex.io`)
 
@@ -40,19 +39,19 @@ promocion o cambie el proceso de release.
 
 | Ambiente | Rama o tag | Deploy automático | Aprobación requerida |
 | --- | --- | --- | --- |
-| GitHub Packages (`@rafex/galaxia-fhs-protocol`) | `main` (cuando cambia `packages/fhs-protocol/`) | Sí | No |
+| GitHub Packages (fhs-protocol/atlas/navigator/portal-chat) | `main` (cuando cambia el workspace correspondiente) | Sí | No |
 | Sitio público (GitHub Pages) | `main` | Sí | No |
-| Core (Atlas/Navigator/Portal) | N/A | No — despliegue manual (`just container-up`/`podman-compose`) contra el bastion/laptop del operador | No aplica, es despliegue manual |
+| Core (Atlas/Navigator/Portal) | N/A | No — despliegue manual (`just container-up`/`podman-compose`, o `npx @galaxia/atlas`/`navigator`/`portal-chat`) contra el bastion/laptop del operador | No aplica, es despliegue manual |
 | Providers (`galaxIA-satellite-star`) | N/A | No — despliegue manual, mismo mecanismo que el core | No aplica |
 
 No hay ambiente de "staging" — el proyecto es una PoC de un solo operador (no un servicio SaaS multiusuario todavía), así que el único destino real de los contenedores del core/providers es la topología multi-host laptop+bastion descrita en `docs/despliegue-multi-host.md`.
 
-## Proceso de release (paquete `@rafex/galaxia-fhs-protocol`)
+## Proceso de release (cualquiera de los 4 paquetes)
 
-1. Cambiar `packages/fhs-protocol/src/*`.
-2. Mergear a `main` — **ya no hace falta subir `version` a mano** (DEC-0041): el workflow lo hace automáticamente si detecta que la versión actual ya está publicada.
-3. El workflow `publish-fhs-protocol.yml` corre, sube la versión si hace falta (y commitea ese bump de vuelta a `main`), verifica el contenido del paquete, y publica a GitHub Packages.
-4. (Pendiente, manual por ahora — alcance explícito de DEC-0041) Si `galaxIA-satellite-star` necesita la versión nueva: ir a ese repo, subir el rango en el `package.json` de los providers si hace falta (`^0.1.0` ya cubre cualquier `0.1.x` automáticamente), y correr `npm install` con `GH_TOKEN` exportado.
+1. Cambiar código en `packages/fhs-protocol/src/*`, `apps/atlas/src/*`, `apps/navigator/src/*`, o `apps/portal-chat/src/*`.
+2. Mergear a `main` — **ya no hace falta subir `version` a mano** (DEC-0041): el workflow lo hace automáticamente si detecta que la versión actual ya está publicada, solo para el/los paquete(s) que cambiaron en ese push.
+3. El workflow `publish-packages.yml` corre, sube la versión si hace falta (y commitea ese bump de vuelta a `main`), verifica el contenido del paquete, y publica a GitHub Packages.
+4. (Pendiente, manual por ahora — alcance explícito de DEC-0041) Si `galaxIA-satellite-star` necesita la versión nueva de `@rafex/galaxia-fhs-protocol`: ir a ese repo, subir el rango en el `package.json` de los providers si hace falta (`^0.1.0` ya cubre cualquier `0.1.x` automáticamente), y correr `npm install` con `GH_TOKEN` exportado.
 
 ### Comandos locales equivalentes (`make`)
 
@@ -63,6 +62,8 @@ make protocol-bump         # sube la versión si ya está publicada
 make protocol-verify       # build + verifica que el tarball incluya dist/
 make protocol-publish      # bump + verify + npm publish
 ```
+
+Mismo patrón con `atlas-*`, `navigator-*`, `portal-chat-*` en vez de `protocol-*` para los otros 3 paquetes (ver `helpers/mk/protocol.mk`).
 
 ## Gates de promoción
 
