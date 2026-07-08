@@ -54,9 +54,9 @@ services:
     container_name: fhs-portal-chat
     ports:
       - "${PORTAL_PORT:-3000}:80"
-    # Defaults para un solo host (Docker DNS) — sobreescribir en .env
-    # cuando Atlas/Navigator viven en otra máquina de la red (ver
-    # docs/instalacion.md), ej. ATLAS_URL=http://192.168.1.50:8081.
+    # Defaults para un solo host (DNS del compose: atlas/navigator). Para
+    # multi-host, corre Portal-chat por separado (sin este compose completo) y
+    # setea ATLAS_URL/NAVIGATOR_URL a las IPs reales — ver docs/instalacion.md.
     environment:
       - ATLAS_URL=${ATLAS_URL:-http://atlas:8081}
       - NAVIGATOR_URL=${NAVIGATOR_URL:-http://navigator:8090}
