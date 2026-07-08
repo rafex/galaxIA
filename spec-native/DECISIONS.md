@@ -921,3 +921,15 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - ~15 archivos modificados en `apps/atlas`, `apps/navigator`, `apps/portal` y los 5 scripts de `scripts/` — todos tipados sin `any`, sin cambiar comportamiento (solo tipos).
   - `CONTRIBUTING.md`: nueva regla explícita bajo "Estilo de código".
   - Verificado: `npm run lint`/`typecheck`/`test`/`build --workspaces` limpios (0 warnings, 0 errores) en los 4 workspaces más `scripts/`.
+
+## DEC-0058 — Dependencias de terceros con versión exacta, no rangos `^`
+
+- **Fecha:** 2026-07-08
+- **Estado:** `accepted` — implementado y verificado
+- **Contexto:** al cerrar DEC-0057 (auditoría de seguridad del PR #32) se encontraron 7 vulnerabilidades de `npm audit` (fastify/`fast-uri`, vite/esbuild) que requirieron bumps de major (`fastify` 4→5, `vite` 5→8, PR #34). El usuario señaló el riesgo estructural: con rangos `^`, un `npm install` puede subir de minor/patch sin que quede explícito en ningún diff — cualquier cambio de comportamiento o vulnerabilidad nueva llega silenciosa.
+- **Decisión:** toda dependencia de terceros en cualquier `package.json` del monorepo (raíz, `packages/fhs-protocol`, `apps/atlas`, `apps/navigator`, `apps/portal`) se fija a versión exacta (`"fastify": "5.10.0"`, no `"^5.10.0"`) — actualizar una dependencia ahora requiere un cambio explícito y visible en el diff, nunca un `npm install` silencioso.
+- **Excepción, no una inconsistencia:** `@rafex/galaxia-fhs-protocol` (paquete interno del monorepo) se queda en rango `^0.1.0` — no es una dependencia de terceros con riesgo de cadena de suministro, es el propio paquete del monorepo gestionado por `.github/workflows/publish-fhs-protocol.yml`, que hace un commit de bump automático (`chore: bump ... version [skip ci]`) tras cada cambio de protocolo. Fijarlo también en exacto rompería ese flujo sin aportar la misma protección.
+- **Consecuencias:**
+  - `package.json` (raíz), `packages/fhs-protocol/package.json`, `apps/atlas/package.json`, `apps/navigator/package.json`, `apps/portal/package.json`: todas las dependencias de terceros pasan de `^x.y.z` a `x.y.z` exacto, fijadas a la versión ya instalada y verificada (no a "latest").
+  - `CONTRIBUTING.md`: nueva regla explícita bajo "Estilo de código" documentando la política y el procedimiento para actualizar una dependencia.
+  - Verificado: `npm install` sin cambios de resolución, `npm audit` → 0 vulnerabilidades, `npm run lint`/`typecheck`/`test`/`build --workspaces` limpios.
