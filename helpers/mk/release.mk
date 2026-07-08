@@ -12,7 +12,7 @@ include helpers/mk/common.mk
 .PHONY: release-tag
 release-tag:
 	$(call section,Creando el siguiente tag de release)
-	@if [ -n "$$(git status --porcelain)" ]; then \
+	@if [ -n "$$(git status --porcelain --untracked-files=no)" ]; then \
 		echo "✗ ERROR: hay cambios sin commitear — commitea o descarta antes de tagear." >&2; \
 		exit 1; \
 	fi
