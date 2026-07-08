@@ -992,3 +992,17 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - `spec-native/pipelines/CD.md`: sección 1 reescrita para reflejar el workflow único de 4 paquetes; tabla de ambientes y proceso de release actualizados.
   - `CONTRIBUTING.md`, `helpers/README.md`, `.github/workflows/ci.yml` (comentario): referencias al nombre viejo del workflow actualizadas.
   - Pendiente (backlog, siguiente fase del plan): verificar esta primera corrida real; Fase 4 (`publish-containers.yml` para GHCR, multi-arch); Fase 5 (primer release real con `compose.release.yaml`/`.env.example`/`docs/instalacion.md`).
+
+## DEC-0063 — Workflow de imágenes GHCR multi-arch (Fase 4 del plan de distribución)
+
+- **Fecha:** 2026-07-08
+- **Estado:** `accepted` — implementado, pendiente de verificación real (ver Riesgos)
+- **Contexto:** Fase 4 del plan de distribución (fases 1-3: DEC-0060/0061/0062). Segundo canal de distribución confirmado por el usuario junto a npm: imágenes de contenedor publicadas en GitHub Container Registry para quien prefiere no usar Node/npm directamente.
+- **Decisión — multi-arch amd64+arm64:** este proyecto ya usa hardware ARM real en su topología documentada (`raspi4b-lan`, ver `docs/despliegue-multi-host.md`) — publicar solo `amd64` dejaría fuera ese caso de uso real, no uno hipotético. Build con `docker/build-push-action` + `buildx` + `docker/setup-qemu-action` (emulación para compilar `arm64` en un runner `amd64` de GitHub Actions).
+- **Decisión — solo en release (tag `v*`), no en cada push a `main`:** a diferencia de `publish-packages.yml` (continuo), construir y subir 3 imágenes multi-arch en cada commit satura GHCR sin necesidad — un release es la unidad natural de "esta es la versión que alguien va a desplegar". `workflow_dispatch` con un input `tag` opcional permite forzar una publicación manual (ej. para probar el workflow por primera vez) sin esperar a un tag real.
+- **Tags:** cada imagen (`ghcr.io/rafex/galaxia-{atlas,navigator,portal-chat}`) recibe `:latest` siempre, más `:<tag>` (ej. `:v0.1.0-beta.1`) cuando el trigger es un tag real o se especifica manualmente.
+- **Riesgo explícito, no resuelto por este cambio:** este workflow no se ha corrido contra GHCR real todavía — la primera corrida real (recomendado: `workflow_dispatch` con un `tag` de prueba antes del primer tag real) es la verificación pendiente. Además, la visibilidad del paquete GHCR (público/privado) se define la primera vez que se publica un paquete nuevo — no se puede garantizar de antemano desde el workflow que quede público; puede requerir un ajuste manual una sola vez en la configuración del paquete en GitHub tras el primer push.
+- **Consecuencias:**
+  - Nuevo: `.github/workflows/publish-containers.yml`.
+  - Verificado localmente: sintaxis YAML válida; `podman build` real de las 3 `Containerfile` (atlas, navigator, portal-chat) exitoso (arquitectura nativa del runner local, no multi-arch — el build multi-arch real vía `buildx`/QEMU solo puede verificarse corriendo el workflow en GitHub Actions).
+  - Pendiente (backlog, siguiente fase): primera corrida real del workflow; verificar/ajustar visibilidad de los 3 paquetes GHCR; Fase 5 (primer release real con `compose.release.yaml`/`.env.example`/`docs/instalacion.md`, apuntando a estas imágenes).

@@ -27,7 +27,16 @@ promocion o cambie el proceso de release.
 - **Auth:** usa el `GITHUB_TOKEN` automático de Actions (`permissions.contents: write` + `packages: write` declarados en el workflow) — no requiere un secret adicional. El bump/commit son intra-repo, por eso no hace falta un PAT con alcance a otros repos.
 - **Consumo hoy:** `galaxIA-satellite-star` ya consume `@rafex/galaxia-fhs-protocol` vía GitHub Packages (migrado en DEC-0040, ya no la rama git `fhs-protocol-dist`). Cómo y cuándo ese repo (u otro operador instalando `@galaxia/atlas`/`navigator`/`portal-chat` vía `npx`) actualiza su dependencia **no es responsabilidad de `galaxIA`** — es el mismo principio de DEC-0026/DEC-0037 (el protocolo define el contrato, nunca gestiona a sus consumidores) llevado al ciclo de publicación: `galaxIA` publica versiones a un registro público, cualquier consumidor decide solo cuándo y cómo actualizarse.
 
-### 2. Sitio público (`galax-ia.rafex.io`)
+### 2. Imágenes de contenedor a GHCR (Atlas/Navigator/portal-chat)
+
+- **Plataforma de CD:** GitHub Actions + GitHub Container Registry.
+- **Archivo de configuración:** `.github/workflows/publish-containers.yml` (DEC-0063, fase 4 del plan de distribución).
+- **Dónde ver el estado:** pestaña "Actions" (workflow "Publish container images to GHCR"); imágenes en `ghcr.io/rafex/galaxia-{atlas,navigator,portal-chat}`.
+- **Trigger:** push de un tag `v*`, o `workflow_dispatch` manual (con un input `tag` opcional para probar sin esperar a un tag real).
+- **Qué hace:** build multi-arch (`linux/amd64` + `linux/arm64`, vía `buildx`/QEMU — la topología real de este proyecto usa hardware ARM, `raspi4b-lan`) de las 3 `Containerfile` del core, push a GHCR con tag `:latest` + `:<tag>`. A diferencia de la publicación npm (continua, en cada push a `main`), esto solo corre en un release explícito — evita saturar GHCR con builds de cada commit.
+- **Auth:** `secrets.GITHUB_TOKEN` (permiso `packages: write`), sin secret adicional.
+
+### 3. Sitio público (`galax-ia.rafex.io`)
 
 - **Plataforma de CD:** GitHub Actions + GitHub Pages.
 - **Archivo de configuración:** `.github/workflows/jekyll-gh-pages.yml`.
@@ -40,6 +49,7 @@ promocion o cambie el proceso de release.
 | Ambiente | Rama o tag | Deploy automático | Aprobación requerida |
 | --- | --- | --- | --- |
 | GitHub Packages (fhs-protocol/atlas/navigator/portal-chat) | `main` (cuando cambia el workspace correspondiente) | Sí | No |
+| GHCR (imágenes atlas/navigator/portal-chat) | tag `v*` | Sí | No |
 | Sitio público (GitHub Pages) | `main` | Sí | No |
 | Core (Atlas/Navigator/Portal) | N/A | No — despliegue manual (`just container-up`/`podman-compose`, o `npx @galaxia/atlas`/`navigator`/`portal-chat`) contra el bastion/laptop del operador | No aplica, es despliegue manual |
 | Providers (`galaxIA-satellite-star`) | N/A | No — despliegue manual, mismo mecanismo que el core | No aplica |
