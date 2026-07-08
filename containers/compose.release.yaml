@@ -9,8 +9,9 @@
 # spec-native/DECISIONS.md DEC-0060 a DEC-0063).
 #
 # Uso:
-#   curl -O https://raw.githubusercontent.com/rafex/galaxIA/main/containers/compose.release.yaml
-#   curl -O https://raw.githubusercontent.com/rafex/galaxIA/main/containers/.env.example
+#   REF=main  # o: v0.1.0-beta.1 (para una release reproducible)
+#   curl -O https://raw.githubusercontent.com/rafex/galaxIA/${REF}/containers/compose.release.yaml
+#   curl -O https://raw.githubusercontent.com/rafex/galaxIA/${REF}/containers/.env.example
 #   cp .env.example .env   # y editar según docs/instalacion.md
 #   podman-compose -f compose.release.yaml up -d
 #
