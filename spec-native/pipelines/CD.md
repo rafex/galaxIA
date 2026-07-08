@@ -27,7 +27,7 @@ promocion o cambie el proceso de release.
 - **Auth:** usa el `GITHUB_TOKEN` automático de Actions (`permissions.contents: write` + `packages: write` declarados en el workflow) — no requiere un secret adicional. El bump/commit son intra-repo, por eso no hace falta un PAT con alcance a otros repos.
 - **Consumo hoy:** `galaxIA-satellite-star` ya consume `@rafex/galaxia-fhs-protocol` vía GitHub Packages (migrado en DEC-0040, ya no la rama git `fhs-protocol-dist`). Cómo y cuándo ese repo (u otro operador instalando `@galaxia/atlas`/`navigator`/`portal-chat` vía `npx`) actualiza su dependencia **no es responsabilidad de `galaxIA`** — es el mismo principio de DEC-0026/DEC-0037 (el protocolo define el contrato, nunca gestiona a sus consumidores) llevado al ciclo de publicación: `galaxIA` publica versiones a un registro público, cualquier consumidor decide solo cuándo y cómo actualizarse.
 
-### 2. Imágenes de contenedor a GHCR (Atlas/Navigator/Portal-chat)
+### 2. Imágenes de contenedor a GHCR (Atlas/Navigator/portal-chat)
 
 - **Plataforma de CD:** GitHub Actions + GitHub Container Registry.
 - **Archivo de configuración:** `.github/workflows/publish-containers.yml` (DEC-0063, fase 4 del plan de distribución).
