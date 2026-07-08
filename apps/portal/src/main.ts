@@ -9,7 +9,7 @@ if (!app) {
 async function loadVersion(): Promise<string> {
   try {
     const res = await fetch("/version.json");
-    const data = await res.json();
+    const data = (await res.json()) as { commit?: string };
     return data.commit || "unknown";
   } catch {
     return "unknown";

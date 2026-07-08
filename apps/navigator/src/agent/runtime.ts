@@ -1,4 +1,5 @@
 import {
+  type AgentSSEEvent,
   type ArtifactRef,
   type Signal,
   type GenerateRequest,
@@ -13,6 +14,16 @@ import {
   type ToolDefinition,
   type UserMessage,
 } from "@rafex/galaxia-fhs-protocol";
+
+/**
+ * Todo evento conversation-scoped se construye sin `conversationId` — `emit()`
+ * lo adjunta siempre (ver DEC-0018) — así ningún call site puede olvidarlo.
+ */
+type AgentEventInput = AgentSSEEvent extends infer E
+  ? E extends { data: infer D }
+    ? Omit<E, "data"> & { data: Omit<D, "conversationId"> }
+    : never
+  : never;
 import { AtlasClient } from "../atlas-client.js";
 import { EventBus } from "../sse/event-bus.js";
 import { LlmGateway } from "../providers/llm-gateway.js";
@@ -547,13 +558,13 @@ export class AgentRuntime {
     }
 
     const trimmed = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
-    let parsed: any;
+    let parsed: unknown;
     try {
       parsed = JSON.parse(trimmed);
     } catch {
       return null;
     }
-    const kbId = parsed?.kbId;
+    const kbId = parsed && typeof parsed === "object" ? (parsed as { kbId?: unknown }).kbId : undefined;
     if (typeof kbId !== "string") return null;
     const known = new Set(candidates.map((c) => c.providerId));
     return known.has(kbId) ? kbId : null;
@@ -733,9 +744,10 @@ export class AgentRuntime {
         });
         if (ipfsCid && ipfsRetention !== "reuse") void unpinFromIpfs(ipfsCid);
         return textResult;
-      } catch (err: any) {
+      } catch (err) {
         const duration = Date.now() - startTime;
-        this.emit({ type: "tool.error", data: { name: tool.name, error: err.message } });
+        const message = err instanceof Error ? err.message : String(err);
+        this.emit({ type: "tool.error", data: { name: tool.name, error: message } });
         this.atlasClient.recordSample({
           providerId: tool.providerId,
           capability: tool.capabilityId,
@@ -834,7 +846,7 @@ export class AgentRuntime {
     let ipfsCid: string | undefined;
     let ipfsRetention: "ephemeral" | "reuse" | undefined;
     try {
-      const args = JSON.parse(toolCall.function.arguments || "{}") as Record<string, any>;
+      const args = JSON.parse(toolCall.function.arguments || "{}") as Record<string, unknown>;
 
       if (tool.capabilityId === "document.ocr" && !args.file) {
         const artifact = this.artifacts[0];
@@ -874,15 +886,16 @@ export class AgentRuntime {
 
       messages?.push({ role: "tool", content: textResult, tool_call_id: toolCall.id });
       if (ipfsCid && ipfsRetention !== "reuse") void unpinFromIpfs(ipfsCid);
-    } catch (err: any) {
+    } catch (err) {
       const duration = Date.now() - startTime;
-      this.emit({ type: "tool.error", data: { name: toolName, error: err.message } });
+      const message = err instanceof Error ? err.message : String(err);
+      this.emit({ type: "tool.error", data: { name: toolName, error: message } });
       this.atlasClient.recordSample({
         providerId: tool.providerId,
         capability: tool.capabilityId,
         sample: { dispatchMs: null, totalMs: duration, success: false, at: Date.now() },
       });
-      messages?.push({ role: "tool", content: `Error: ${err.message}`, tool_call_id: toolCall.id });
+      messages?.push({ role: "tool", content: `Error: ${message}`, tool_call_id: toolCall.id });
       if (ipfsCid && ipfsRetention !== "reuse") void unpinFromIpfs(ipfsCid);
     }
   }
@@ -954,11 +967,11 @@ export class AgentRuntime {
 
   // Todo evento conversation-scoped pasa por aquí para que conversationId se
   // adjunte siempre — así ningún call site puede olvidarlo (ver DEC-0018).
-  private emit(event: any) {
+  private emit(event: AgentEventInput) {
     this.eventBus.emit({
       ...event,
       data: { ...event.data, conversationId: this.conversationId },
-    });
+    } as AgentSSEEvent);
   }
 
   private emitStatus(status: string, message: string) {
@@ -1008,7 +1021,7 @@ function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
   return union === 0 ? 0 : intersection / union;
 }
 
-function matchesScope(service: PublishedService, scope: PrivacyScope): boolean {
+function matchesScope(_service: PublishedService, _scope: PrivacyScope): boolean {
   // Para la PoC, asumimos que todos los proveedores locales están en scope.
   // En versiones futuras, el manifiesto declararía el scope explícitamente.
   return true;
@@ -1037,11 +1050,14 @@ function parseDataUrl(dataUrl: string): { base64: string; mimeType: string; exte
   return { base64, mimeType, extension: EXTENSION_BY_MIME[mimeType] || "bin" };
 }
 
-function extractText(result: any): string {
+function extractText(result: unknown): string {
   if (typeof result === "string") return result;
   if (result && typeof result === "object") {
-    if (result.content && Array.isArray(result.content)) {
-      return result.content.map((c: any) => c.text || "").join("\n");
+    const content = (result as { content?: unknown }).content;
+    if (Array.isArray(content)) {
+      return content
+        .map((c) => (c && typeof c === "object" && typeof (c as { text?: unknown }).text === "string" ? (c as { text: string }).text : ""))
+        .join("\n");
     }
     return JSON.stringify(result);
   }

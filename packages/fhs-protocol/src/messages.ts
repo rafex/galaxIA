@@ -4,6 +4,7 @@
 
 import type { Beacon } from "./manifest.js";
 import type { ArtifactRef } from "./types.js";
+import type { ToolParameterSchema } from "./llm.js";
 
 export interface BaseMessage {
   type: string;
@@ -160,7 +161,7 @@ export interface ToolCallRequestMessage extends BaseMessage {
   type: "tool.call";
   requestId: string;
   toolName: string;
-  arguments: Record<string, any>;
+  arguments: Record<string, unknown>;
 }
 
 export interface ToolCallResultMessage extends BaseMessage {
@@ -195,7 +196,7 @@ export interface ToolListResponseMessage extends BaseMessage {
   tools: Array<{
     name: string;
     description?: string;
-    inputSchema?: Record<string, any>;
+    inputSchema?: ToolParameterSchema;
   }>;
 }
 

@@ -9,12 +9,25 @@ export interface ManifestValidationResult {
   missing: string[];
 }
 
-export function validateManifest(manifest: any): ManifestValidationResult {
+interface ManifestShape {
+  fhsVersion?: unknown;
+  provider?: { id?: unknown; type?: unknown; visibility?: unknown };
+  privacy?: { retention?: unknown; trainingUse?: unknown };
+  services?: Array<{ endpoint?: unknown }>;
+  endpoint?: unknown;
+}
+
+function isManifestShape(value: unknown): value is ManifestShape {
+  return typeof value === "object" && value !== null;
+}
+
+export function validateManifest(input: unknown): ManifestValidationResult {
   const missing: string[] = [];
 
-  if (!manifest || typeof manifest !== "object") {
+  if (!isManifestShape(input)) {
     return { valid: false, missing: ["manifest"] };
   }
+  const manifest = input;
   if (!manifest.fhsVersion) missing.push("fhsVersion");
   if (!manifest.provider?.id) missing.push("provider.id");
   if (!manifest.provider?.type) missing.push("provider.type");
@@ -28,7 +41,7 @@ export function validateManifest(manifest: any): ManifestValidationResult {
     if (!Array.isArray(manifest.services) || manifest.services.length === 0) {
       missing.push("services");
     } else {
-      manifest.services.forEach((service: any, i: number) => {
+      manifest.services.forEach((service, i) => {
         if (!service.endpoint) missing.push(`services[${i}].endpoint`);
       });
     }

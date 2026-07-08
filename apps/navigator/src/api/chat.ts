@@ -30,7 +30,7 @@ export function setupChatApi(
 
     runtime
       .run(body.message, body.preferences || {})
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         console.error("Agent runtime error:", err);
       })
       .finally(() => {

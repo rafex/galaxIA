@@ -36,6 +36,7 @@ jobs:
         # (mismo motivo documentado en DEC-0042 para typecheck/build).
         run: npm run build -w packages/fhs-protocol
       - run: npm run lint --workspaces
+      - run: npm run lint:scripts
 
   typecheck:
     runs-on: ubuntu-latest

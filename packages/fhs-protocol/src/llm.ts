@@ -2,8 +2,6 @@
  * Tipos para interacción con proveedores LLM.
  */
 
-import type { UserMessage } from "./types.js";
-
 export interface ToolParameterSchema {
   type: string;
   properties?: Record<string, unknown>;

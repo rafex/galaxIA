@@ -1,10 +1,10 @@
-import type { AgentSSEEvent } from "@rafex/galaxia-fhs-protocol";
+import type { AgentSSEEvent, ProvenanceInfo } from "@rafex/galaxia-fhs-protocol";
 
 export * from "@rafex/galaxia-fhs-protocol";
 
 export type ChatMessage =
   | { role: "user"; content: string; attachmentName?: string; attachmentIsPdf?: boolean }
-  | { role: "assistant"; content: string; provenance?: any };
+  | { role: "assistant"; content: string; provenance?: ProvenanceInfo };
 
 export interface ChatState {
   messages: ChatMessage[];

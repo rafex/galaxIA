@@ -14,7 +14,8 @@
     "build": "npm run build -w packages/fhs-protocol && npm run build -w apps/navigator && npm run build -w apps/portal",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "npm run lint --workspaces",
+    "lint": "npm run lint --workspaces && npm run lint:scripts",
+    "lint:scripts": "eslint scripts/",
     "typecheck": "npm run typecheck --workspaces"
   },
   "engines": {

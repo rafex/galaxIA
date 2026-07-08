@@ -1,10 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import type { WebSocket } from "@fastify/websocket";
 import { randomUUID } from "node:crypto";
-import type { UserMessage } from "@rafex/galaxia-fhs-protocol";
+import type { AgentSSEEvent, UserMessage } from "@rafex/galaxia-fhs-protocol";
 import { AtlasClient } from "../atlas-client.js";
 import { EventBus } from "../sse/event-bus.js";
 import { AgentRuntime, type ModelPreferences } from "../agent/runtime.js";
+
+/** Envoltorio mínimo de mensajes entrantes del WS del Portal — cada rama de `handleMessage` los castea a su forma concreta. */
+type IncomingMessage = { type?: string } & Record<string, unknown>;
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 interface PendingAttachment {
   text: string;
@@ -42,7 +49,7 @@ export function setupChatWebSocket(
   app.get("/api/chat/ws", { websocket: true }, (socket: WebSocket) => {
     let conversationId: string | null = null;
 
-    const send = (event: any) => {
+    const send = (event: AgentSSEEvent) => {
       if (socket.readyState === 1) {
         socket.send(JSON.stringify(event));
       }
@@ -50,22 +57,22 @@ export function setupChatWebSocket(
 
     const unsubscribe = eventBus.subscribe({
       id: `ws-chat-${Date.now()}`,
-      send: (event: any) => {
+      send: (event: AgentSSEEvent) => {
         // Eventos con conversationId solo se reenvían al socket dueño de esa
         // conversación — ver DEC-0018. (node.online/node.lost viven en el
         // EventBus interno de Atlas, un proceso aparte desde DEC-0035 — no
         // llegan a este EventBus de Navigator.)
-        const eventConversationId = event?.data?.conversationId;
+        const eventConversationId = "conversationId" in event.data ? event.data.conversationId : undefined;
         if (eventConversationId && eventConversationId !== conversationId) return;
         send(event);
       },
     });
 
-    socket.on("message", (raw: any) => {
+    socket.on("message", (raw: Buffer) => {
       try {
-        const msg = JSON.parse(raw.toString());
+        const msg = JSON.parse(raw.toString()) as IncomingMessage;
         handleMessage(msg);
-      } catch (err) {
+      } catch {
         send({ type: "error", data: { code: "PARSE_ERROR", message: "Invalid JSON" } });
       }
     });
@@ -93,9 +100,9 @@ export function setupChatWebSocket(
 
       runtime
         .run(message, preferences, artifacts, preExtractedText, ragActiveConversations.has(id), kbProviderIds)
-        .catch((err: any) => {
+        .catch((err: unknown) => {
           console.error("Agent runtime error:", err);
-          send({ type: "error", data: { conversationId: id, code: "RUNTIME_ERROR", message: err.message } });
+          send({ type: "error", data: { conversationId: id, code: "RUNTIME_ERROR", message: errorMessage(err) } });
         })
         .finally(() => {
           runtimes.delete(id);
@@ -131,7 +138,7 @@ export function setupChatWebSocket(
             data: { conversationId: id, candidates, chosenByLlm },
           });
         })
-        .catch((err: any) => {
+        .catch((err: unknown) => {
           console.error("KB recommendation error:", err);
           runChat(id, message, preferences);
         });
@@ -149,14 +156,14 @@ export function setupChatWebSocket(
         .then((indexed) => {
           if (indexed) ragActiveConversations.add(id);
         })
-        .catch((err: any) => {
+        .catch((err: unknown) => {
           console.error("RAG indexing error:", err);
         });
     }
 
-    function handleMessage(msg: any) {
+    function handleMessage(msg: IncomingMessage) {
       if (msg.type === "start") {
-        conversationId = msg.conversationId || randomUUID();
+        conversationId = (msg.conversationId as string | undefined) || randomUUID();
         const body = msg as {
           conversationId?: string;
           message: UserMessage;
@@ -165,7 +172,7 @@ export function setupChatWebSocket(
           preferences?: ModelPreferences;
         };
 
-        const id = conversationId!;
+        const id = conversationId;
         send({ type: "session", data: { conversationId: id } });
         const preferences = body.preferences || {};
 
@@ -199,9 +206,9 @@ export function setupChatWebSocket(
                 });
               }
             })
-            .catch((err: any) => {
+            .catch((err: unknown) => {
               console.error("OCR extraction error:", err);
-              send({ type: "error", data: { conversationId: id, code: "RUNTIME_ERROR", message: err.message } });
+              send({ type: "error", data: { conversationId: id, code: "RUNTIME_ERROR", message: errorMessage(err) } });
             });
           return;
         }

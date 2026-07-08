@@ -36,9 +36,14 @@ export function announceRegistry(
     },
   });
 
+  // bonjour-service tipa `Service.stop` como `CallableFunction` (sin firma
+  // real) — se acota aquí a la firma real documentada por la librería en
+  // vez de dejar pasar ese tipo laxo sin acotar.
+  const stopService = service.stop as (callback: () => void) => void;
+
   return {
     stop: () => {
-      service.stop(() => instance.destroy());
+      stopService(() => instance.destroy());
     },
   };
 }

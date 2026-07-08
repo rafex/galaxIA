@@ -59,8 +59,9 @@ export async function unpinFromIpfs(cid: string): Promise<void> {
   if (!IPFS_API_URL) return;
   try {
     await fetch(`${IPFS_API_URL}/api/v0/pin/rm?arg=${encodeURIComponent(cid)}`, { method: "POST" });
-  } catch (err: any) {
-    console.error(`[ipfs] unpin falló para ${cid}: ${err.message}`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[ipfs] unpin falló para ${cid}: ${message}`);
   }
 }
 

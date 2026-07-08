@@ -5,6 +5,7 @@ import type {
   GenerateResponse,
   ModelInfo,
   ToolDefinition,
+  ToolParameterSchema,
   PublishedService,
   ChatRequestMessage,
   ChatDeltaMessage,
@@ -12,6 +13,12 @@ import type {
   ChatErrorMessage,
 } from "@rafex/galaxia-fhs-protocol";
 import { logTrace } from "../observability/trace.js";
+
+/** Envoltorio mínimo para narrowing de mensajes FHS crudos antes de castear al tipo específico. */
+interface FhsMessageEnvelope {
+  requestId?: string;
+  type?: string;
+}
 
 /** Contexto de trazabilidad (DEC-0012). */
 export interface TraceContext {
@@ -107,7 +114,7 @@ export class LlmGateway {
 
       ws.on("message", (raw: Buffer) => {
         try {
-          const msg = JSON.parse(String(raw));
+          const msg = JSON.parse(String(raw)) as FhsMessageEnvelope;
           if (msg.requestId !== requestId) return;
 
           if (msg.type === "dispatch.ack") {
@@ -188,7 +195,7 @@ export class LlmGateway {
 
     ws.on("message", (raw: Buffer) => {
       try {
-        const msg = JSON.parse(raw.toString());
+        const msg = JSON.parse(raw.toString()) as FhsMessageEnvelope;
         if (msg.requestId !== requestId) return;
 
         if (msg.type === "chat.delta") {
@@ -255,7 +262,7 @@ export class LlmGateway {
     tools: Array<{
       name: string;
       description?: string;
-      inputSchema?: any;
+      inputSchema?: ToolParameterSchema;
     }>
   ): ToolDefinition[] {
     return tools.map((t) => ({

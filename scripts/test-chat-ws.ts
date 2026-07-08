@@ -20,8 +20,8 @@ socket.on("open", () => {
   );
 });
 
-socket.on("message", (data: any) => {
-  const event = JSON.parse(data.toString());
+socket.on("message", (data: Buffer) => {
+  const event = JSON.parse(data.toString()) as { type?: string; data?: unknown };
   console.log("EVENT:", event.type, JSON.stringify(event.data, null, 2));
 });
 

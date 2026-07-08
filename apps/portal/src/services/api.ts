@@ -46,7 +46,7 @@ export function connectToChat(
     onOpen?.();
   });
 
-  socket.addEventListener("message", (event) => {
+  socket.addEventListener("message", (event: MessageEvent<string>) => {
     try {
       const payload = JSON.parse(event.data) as AgentSSEEvent;
       onEvent(payload);
@@ -65,10 +65,17 @@ export function connectToChat(
   });
 
   function send(options: ApiOptions) {
-    const msg: any = {
+    const msg: {
+      type: "start";
+      conversationId?: string;
+      message: UserMessage;
+      artifacts: string[];
+      attachmentName?: string;
+      preferences: NonNullable<ApiOptions["preferences"]>;
+    } = {
       type: "start",
       conversationId: options.conversationId,
-      message: { role: "user", content: options.message } as UserMessage,
+      message: { role: "user", content: options.message },
       artifacts: options.artifacts || [],
       attachmentName: options.attachmentName,
       preferences: options.preferences || {},
