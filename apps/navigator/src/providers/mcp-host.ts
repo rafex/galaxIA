@@ -5,20 +5,21 @@ import type {
   PublishedService,
   ToolCallRequestMessage,
   ToolListRequestMessage,
+  ToolListResponseMessage,
 } from "@rafex/galaxia-fhs-protocol";
 import { logTrace } from "../observability/trace.js";
 
 export interface LoadedTool {
   name: string;
   description?: string;
-  inputSchema?: any;
+  inputSchema?: Record<string, unknown>;
   providerId: string;
   providerName: string;
   capabilityId: string;
 }
 
 export interface DispatchResult {
-  message: any;
+  message: unknown;
   /** null si el nodo nunca envió dispatch.ack (SPEC-SATRATING-0001) */
   dispatchMs: number | null;
 }
@@ -90,10 +91,10 @@ export class McpHost {
       });
     });
 
-    ws.on("message", (raw) => {
-      let msg: any;
+    ws.on("message", (raw: Buffer) => {
+      let msg: Record<string, unknown> & { requestId: string; type: string; code?: string; message?: string };
       try {
-        msg = JSON.parse(raw.toString());
+        msg = JSON.parse(String(raw));
       } catch {
         return; // ignorar mensajes no JSON
       }
@@ -155,9 +156,9 @@ export class McpHost {
 
     const listRequestId = randomUUID();
     const listMsg: ToolListRequestMessage = { type: "tool.list", requestId: listRequestId };
-    const { message: listResponse } = await this.sendAndWait(providerClient, listMsg, listRequestId);
+    const { message: listResponse } = await this.sendAndWait(providerClient, listMsg, listRequestId) as { message: ToolListResponseMessage };
 
-    providerClient.tools = (listResponse.tools || []).map((tool: any) => ({
+    providerClient.tools = (listResponse.tools || []).map((tool) => ({
       name: tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema,
@@ -195,7 +196,7 @@ export class McpHost {
   async callTool(
     providerId: string,
     toolName: string,
-    args: Record<string, any>,
+    args: Record<string, unknown>,
     timeoutMs?: number,
     trace?: TraceContext
   ): Promise<DispatchResult> {
@@ -218,7 +219,7 @@ export class McpHost {
 
   private sendAndWait(
     client: McpProviderClient,
-    msg: any,
+    msg: ToolCallRequestMessage | ToolListRequestMessage,
     requestId: string,
     timeoutMs?: number,
     trace?: TraceContext

@@ -151,12 +151,12 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
   const ipfsGatewayInfo = container.querySelector(".ipfs-gateway-info") as HTMLElement;
   const provenancePlaceholder = container.querySelector(".provenance-placeholder") as HTMLElement;
 
-  loadModels();
-  loadKbs();
-  loadIpfsConfig();
+  void loadModels();
+  void loadKbs();
+  void loadIpfsConfig();
 
   modelSelector.addEventListener("change", () => {
-    state.selectedModel = modelSelector.value as any;
+    state.selectedModel = modelSelector.value;
   });
 
   scopeSelector.addEventListener("change", () => {
@@ -197,15 +197,15 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
   textareaEl.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      submitMessage();
+      void submitMessage();
     }
   });
 
-  sendBtn.addEventListener("click", submitMessage);
+  sendBtn.addEventListener("click", () => void submitMessage());
 
   attachBtn.addEventListener("click", () => fileInput.click());
 
-  fileInput.addEventListener("change", async () => {
+  fileInput.addEventListener("change", () => void (async () => {
     const file = fileInput.files?.[0];
     if (!file) return;
     const isPdf = file.type === "application/pdf";
@@ -219,7 +219,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     pendingAttachmentName = file.name;
     attachBtn.textContent = `${isPdf ? "📄" : "📎"} ${file.name}`;
     attachBtn.classList.add("attached");
-  });
+  })());
 
   async function loadModels() {
     try {
@@ -284,7 +284,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     }
   }
 
-  async function submitMessage() {
+  function submitMessage() {
     const text = textareaEl.value.trim();
     if ((!text && !pendingAttachment) || state.isStreaming) return;
 

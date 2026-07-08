@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# pre-push — verifica build, tests y tarball del protocolo antes de push
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+
+echo "→ Build completo..."
+npm run build --workspaces --prefix "$ROOT"
+
+echo "→ Tests..."
+npm run test --workspaces --prefix "$ROOT"
+
+echo "→ Verificando tarball de fhs-protocol..."
+"$ROOT/helpers/shell/verify-protocol-package.sh"
+
+echo "✓ pre-push OK"

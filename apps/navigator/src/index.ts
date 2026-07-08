@@ -30,7 +30,7 @@ async function main() {
     tlsEnabled
       ? Fastify({
           logger: true,
-          https: { cert: readFileSync(TLS_CERT_PATH!), key: readFileSync(TLS_KEY_PATH!) },
+          https: { cert: readFileSync(TLS_CERT_PATH), key: readFileSync(TLS_KEY_PATH) },
         })
       : Fastify({ logger: true })
   ) as FastifyInstance;
@@ -40,11 +40,11 @@ async function main() {
   const eventBus = new EventBus();
   const atlasClient = new AtlasClient(ATLAS_URL);
 
-  await setupEventsApi(app, eventBus);
-  await setupChatApi(app, atlasClient, eventBus);
-  await setupChatWebSocket(app, atlasClient, eventBus);
+  setupEventsApi(app, eventBus);
+  setupChatApi(app, atlasClient, eventBus);
+  setupChatWebSocket(app, atlasClient, eventBus);
 
-  app.get("/health", async () => ({
+  app.get("/health", () => ({
     ok: true,
     fhsVersion: FHS_VERSION,
     version: versionInfo.commit,
@@ -54,7 +54,7 @@ async function main() {
   // SPEC-IPFS-0001 (DEC-0052): el Portal necesita saber si IPFS está
   // disponible y cuál es el gateway público default para mostrárselo al
   // usuario antes de que elija ese transporte — no un dato oculto.
-  app.get("/api/ipfs-config", async () => ({
+  app.get("/api/ipfs-config", () => ({
     enabled: isIpfsConfigured(),
     publicGatewayUrl: getPublicGatewayUrl(),
   }));
@@ -68,4 +68,4 @@ async function main() {
   }
 }
 
-main();
+void main();

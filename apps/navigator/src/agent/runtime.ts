@@ -26,7 +26,7 @@ import {
 } from "../ipfs/ipfs-client.js";
 
 export interface ModelPreferences {
-  model?: "auto" | string;
+  model?: string;
   scope?: PrivacyScope;
   allowExternalProviders?: boolean;
   /**
@@ -731,7 +731,7 @@ export class AgentRuntime {
           providerName: tool.providerName,
           toolName: tool.name,
         });
-        if (ipfsCid && ipfsRetention !== "reuse") unpinFromIpfs(ipfsCid);
+        if (ipfsCid && ipfsRetention !== "reuse") void unpinFromIpfs(ipfsCid);
         return textResult;
       } catch (err: any) {
         const duration = Date.now() - startTime;
@@ -741,7 +741,7 @@ export class AgentRuntime {
           capability: tool.capabilityId,
           sample: { dispatchMs: null, totalMs: duration, success: false, at: Date.now() },
         });
-        if (ipfsCid && ipfsRetention !== "reuse") unpinFromIpfs(ipfsCid);
+        if (ipfsCid && ipfsRetention !== "reuse") void unpinFromIpfs(ipfsCid);
 
         if (i < tools.length - 1) {
           const next = tools[i + 1];
@@ -802,7 +802,7 @@ export class AgentRuntime {
     messages?: LlmMessage[]
   ) {
     const toolName = toolCall.function.name;
-    let tool = loadedTools.find((t) => t.name === toolName);
+    const tool = loadedTools.find((t) => t.name === toolName);
 
     if (!tool) {
       this.emit({ type: "tool.error", data: { name: toolName, error: "Tool no encontrada" } });
@@ -873,7 +873,7 @@ export class AgentRuntime {
       });
 
       messages?.push({ role: "tool", content: textResult, tool_call_id: toolCall.id });
-      if (ipfsCid && ipfsRetention !== "reuse") unpinFromIpfs(ipfsCid);
+      if (ipfsCid && ipfsRetention !== "reuse") void unpinFromIpfs(ipfsCid);
     } catch (err: any) {
       const duration = Date.now() - startTime;
       this.emit({ type: "tool.error", data: { name: toolName, error: err.message } });
@@ -883,7 +883,7 @@ export class AgentRuntime {
         sample: { dispatchMs: null, totalMs: duration, success: false, at: Date.now() },
       });
       messages?.push({ role: "tool", content: `Error: ${err.message}`, tool_call_id: toolCall.id });
-      if (ipfsCid && ipfsRetention !== "reuse") unpinFromIpfs(ipfsCid);
+      if (ipfsCid && ipfsRetention !== "reuse") void unpinFromIpfs(ipfsCid);
     }
   }
 

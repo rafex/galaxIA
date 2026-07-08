@@ -21,7 +21,7 @@ interface PendingKbRecommendation {
   candidates: Array<{ providerId: string; providerName: string; description: string }>;
 }
 
-export async function setupChatWebSocket(
+export function setupChatWebSocket(
   app: FastifyInstance,
   atlasClient: AtlasClient,
   eventBus: EventBus

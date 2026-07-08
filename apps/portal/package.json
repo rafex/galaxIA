@@ -9,7 +9,8 @@
     "build": "sh ../../helpers/scripts/shell/gen-version.sh 2>/dev/null || true; tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'No linter configured yet'"
+    "lint": "eslint src/",
+    "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
     "typescript": "^5.5.0",

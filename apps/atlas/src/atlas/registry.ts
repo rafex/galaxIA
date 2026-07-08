@@ -123,7 +123,7 @@ export class Atlas {
         models: entry.models,
         status: "available",
         updatedAt: now,
-      } as PublishedService);
+      });
     }
 
     this.store.replaceServices(providerId, services, now);
