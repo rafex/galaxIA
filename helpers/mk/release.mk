@@ -16,8 +16,8 @@ release-tag:
 		echo "✗ ERROR: hay cambios sin commitear — commitea o descarta antes de tagear." >&2; \
 		exit 1; \
 	fi
-	@TAG=$$(sh helpers/shell/next-release-tag.sh); \
-	echo "→ Siguiente tag: $$TAG"; \
-	git tag -a "$$TAG" -m "Release $$TAG"; \
+	@TAG=$$(sh helpers/shell/next-release-tag.sh) && \
+	echo "→ Siguiente tag: $$TAG" && \
+	git tag -a "$$TAG" -m "Release $$TAG" && \
 	git push origin "$$TAG"
 	$(call ok,Tag creado y pusheado — ver Actions para publish-containers.yml)
