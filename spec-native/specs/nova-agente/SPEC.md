@@ -2,7 +2,7 @@
 
 ## Estado
 
-`accepted` (diseño, protocolo implementado) — sin un Nova de referencia todavía. Ver DEC-0055.
+`done (local)` — protocolo implementado (DEC-0055) y Nova de referencia (`nova-example`) implementado y verificado contra hardware real (DEC-0056): `qwen2.5-coder-3b-instruct` real en `bastion-wifi`, sin Atlas/Navigator de por medio (prueba directa del loop, no el registro FHS completo — ver Notas).
 
 ## Owner
 
@@ -60,6 +60,9 @@ DEC-0020 estableció que el LLM no debe decidir **ejecución/enrutamiento** de f
 | Un Nova mal implementado reintroduce el riesgo de DEC-0016/DEC-0017 en cada ronda de su loop interno | Alto si no se implementa con cuidado | El protocolo no puede forzarlo — el Nova de referencia debe usar el mismo patrón de parser tolerante + límite duro ya validado (DEC-0050/DEC-0054), documentado como requisito de la implementación de referencia, no del protocolo |
 | Confundir Nova con el "modo mágico" ya rechazado (DEC-0027) | Medio | Diferente: el modo mágico era "el LLM decide sin confirmación si usa una KB"; Nova es un tipo de nodo distinto, invocado explícitamente por quien orquesta — no reabre esa decisión |
 | Sin límite duro en `maxReasoningSteps`, un Nova podría entrar en un loop largo/costoso en hardware comunitario | Medio | `maxReasoningSteps` es responsabilidad de quien pide (Navigator) declarar un techo razonable; la implementación de referencia debe respetar un límite duro propio además de lo sugerido |
+| Dejar el JSON crudo del fallback de parseo también en `content` (no solo en `tool_calls`) contamina el historial en un loop — el modelo tiende a repetir el mismo tool call en vez de avanzar | Alto (encontrado y corregido, DEC-0056) | `content` se limpia (`""`) cuando el parser tolerante extrae un tool call desde ahí — verificado contra hardware real: sin el fix, misma tool call repetida 3 veces idénticas y respuesta final corrupta; con el fix, respuesta final correcta |
+| Un modelo pequeño puede no incorporar bien el resultado de una tool entre rondas y seguir repitiendo la misma llamada (observado con `qwen2.5-coder-3b-instruct`, DEC-0056) | Medio | Sin solución asignada — el límite duro de pasos + llamada final sin tools (ya parte del diseño) rescata una respuesta correcta aunque el modelo no reconozca cuándo detenerse por sí mismo |
+| Ofrecer una tool irrelevante para la pregunta puede degradar la respuesta de un modelo pequeño (observado con `calculate` ofrecida incondicionalmente en `nova-example`, DEC-0056) — mismo problema ya resuelto para KB en DEC-0054 | Medio | Sin resolver aquí — un Nova real necesitaría el mismo tipo de gate de relevancia ya diseñado para KB antes de decidir qué tools ofrecer en cada turno |
 
 ## Enlaces y decisiones relacionadas
 
@@ -76,4 +79,7 @@ DEC-0020 estableció que el LLM no debe decidir **ejecución/enrutamiento** de f
 
 ## Notas
 
-- Protocolo implementado y verificado (`npm run typecheck`/`build` en `galaxIA`) el 2026-07-07. Nova de referencia (`galaxIA-satellite-star`) pendiente — siguiente paso de esta iniciativa.
+- Protocolo implementado y verificado (`npm run typecheck`/`build` en `galaxIA`) el 2026-07-07.
+- Nova de referencia (`galaxIA-satellite-star/examples/nova-example`) implementado y verificado contra hardware real el 2026-07-08 (DEC-0056) — `qwen2.5-coder-3b-instruct` en `bastion-wifi` (CPU-only, `llama-server --jinja`). Dos hallazgos reales: un bug de contaminación de contexto (encontrado y corregido) y dos limitaciones observadas del modelo/diseño (documentadas, sin resolver) — ver DEC-0056 para el detalle completo.
+- **Lo que sí se verificó:** el mecanismo del loop en sí (`ReasoningLoop.run()` contra un `LlmBridge` real) — llama la tool cuando hace falta, respeta el límite de pasos, fuerza una respuesta final coherente aunque el modelo no se detenga solo, reporta `reasoningSteps` correctamente.
+- **Lo que falta verificar:** el registro/descubrimiento FHS completo de un Nova contra un Atlas real (`hello`/`register`/`chat.request` vía WebSocket) — esta sesión solo probó `ReasoningLoop` de forma directa (`smoke-test.ts`), no el flujo de red completo. El flujo de red en sí ya está probado por `star-example`/`satellite-ocr-example` en sesiones anteriores y `nova-example` reutiliza exactamente el mismo código de conexión, pero no se ejecutó de punta a punta con un Nova real en esta sesión.
