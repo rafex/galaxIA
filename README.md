@@ -14,7 +14,8 @@ GalaxIA (Galaxy + IA) tiene su propio vocabulario de producto — **Star** (nodo
 |---|---|
 | `apps/atlas/` | Atlas — Registry (catálogo de nodos), servicio independiente desde DEC-0035 |
 | `apps/navigator/` | Navigator — Agent Runtime + API de chat, habla con Atlas por HTTP |
-| `apps/portal/` | Portal — chat web vanilla con Vite |
+| `apps/portal-chat/` | Portal de chat web — vanilla TypeScript con Vite |
+| `apps/portal-tui/` | Portal de terminal (TUI) — estructura base, sin implementar todavía |
 | `packages/fhs-protocol/` | Tipos y constantes del protocolo FHS — fuente de verdad, no dependencia obligatoria |
 | `docs/` | Documentación para humanos — protocolo, despliegue, vocabulario, contenedores |
 | `spec-native/` | Contexto técnico para agentes de IA — specs, decisiones (`DECISIONS.md`), roadmap, trazabilidad |

@@ -933,3 +933,16 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - `package.json` (raíz), `packages/fhs-protocol/package.json`, `apps/atlas/package.json`, `apps/navigator/package.json`, `apps/portal/package.json`: todas las dependencias de terceros pasan de `^x.y.z` a `x.y.z` exacto, fijadas a la versión ya instalada y verificada (no a "latest").
   - `CONTRIBUTING.md`: nueva regla explícita bajo "Estilo de código" documentando la política y el procedimiento para actualizar una dependencia.
   - Verificado: `npm install` sin cambios de resolución, `npm audit` → 0 vulnerabilidades, `npm run lint`/`typecheck`/`test`/`build --workspaces` limpios.
+
+## DEC-0059 — Portal separado del protocolo: `apps/portal` → `apps/portal-chat`, scaffold de `apps/portal-tui`
+
+- **Fecha:** 2026-07-08
+- **Estado:** `accepted` — implementado y verificado
+- **Contexto:** el usuario pidió separar el portal web del protocolo (`packages/fhs-protocol`) para dejar espacio a un segundo cliente FHS (terminal/TUI) sin acoplarlo al cliente web existente — mismo principio que DEC-0038 (protocolo vs. implementaciones), aplicado ahora entre clientes en vez de entre protocolo/providers.
+- **Decisión:** `apps/portal` se renombra a `apps/portal-chat` (`@galaxia/portal` → `@galaxia/portal-chat`) sin cambio de comportamiento — mismo Vite + vanilla TypeScript de siempre. Se agrega `apps/portal-tui` como scaffold base (`package.json`/`tsconfig.json`/`src/index.ts` placeholder, mismo patrón de `apps/navigator`) — **sin implementar todavía**, solo para reservar el espacio del segundo cliente (terminal) sin bloquear el trabajo en curso del protocolo/specs.
+- **Alcance de la migración:** `apps/portal-chat/` (código, sin cambios funcionales), `containers/portal-chat/` (Containerfile + nginx confs, renombrado desde `containers/portal/`), `containers/compose.yaml`/`compose.tls.yaml` (servicio `portal` → `portal-chat`, `fhs-portal` → `fhs-portal-chat`), `package.json` raíz (`dev:web`, `build`), `helpers/mk/*.mk`, `helpers/just/*.just` (`WS_WEB`, targets de container-up-core, logs), `.claude/launch.json`, `helpers/scripts/shell/gen-version.sh`, y documentación de estado actual (`README.md`, `docs/arquitectura.md`, `docs/tls-autofirmado.md`, `docs/despliegue-multi-host.md`, `containers/README.md`).
+- **Fuera de alcance a propósito:** entradas históricas de `DECISIONS.md`/`ROADMAP.md`/`TRACEABILITY.md` que documentan decisiones ya cerradas (DEC-0033/0034/0035, etc.) se dejan tal cual — son registro de lo que era cierto en ese momento, no documentación del estado actual.
+- **Consecuencias:**
+  - Nuevo: `apps/portal-tui/` (scaffold, no funcional — imprime un mensaje y termina).
+  - Verificado: `npm run lint`/`typecheck`/`test`/`build --workspaces` limpios en las 6 workspaces (incluye `portal-tui`); build real del contenedor `containers/portal-chat/Containerfile` con `podman build` exitoso de punta a punta (multi-stage, imagen nginx final).
+  - Pendiente (backlog, no bloqueante): implementación real de `apps/portal-tui` — sin spec ni fecha asignada, este ciclo solo reserva el espacio.

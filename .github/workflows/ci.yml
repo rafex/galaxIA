@@ -59,12 +59,12 @@ jobs:
         with:
           node-version: "20"
       - name: Instalar dependencias
-        # `apps/portal` corre vitest reutilizando vite.config.ts, que carga
+        # `apps/portal-chat` corre vitest reutilizando vite.config.ts, que carga
         # el binario nativo de Rollup — mismo problema de DEC-0042 (el
         # lockfile, generado en macOS ARM, no trae la entrada
         # @rollup/rollup-linux-x64-gnu). Sin borrar+reinstalar aquí, este
         # job falla en el runner Linux con "Cannot find module
-        # @rollup/rollup-linux-x64-gnu" al arrancar vitest para portal.
+        # @rollup/rollup-linux-x64-gnu" al arrancar vitest para portal-chat.
         run: |
           rm -f package-lock.json
           npm install
@@ -87,7 +87,7 @@ jobs:
         # así que solo pinea el binario nativo de Rollup para esa
         # plataforma (node_modules/@rollup/rollup-darwin-arm64) — no incluye
         # una entrada resuelta para @rollup/rollup-linux-x64-gnu, y `vite
-        # build` (apps/portal) en el runner (Linux x64) falla con "Cannot
+        # build` (apps/portal-chat) en el runner (Linux x64) falla con "Cannot
         # find module @rollup/rollup-linux-x64-gnu" tanto con "npm ci" como
         # con "npm install" respetando ese lockfile. Confirmado inspeccionando
         # package-lock.json: solo existe la entrada darwin-arm64 en

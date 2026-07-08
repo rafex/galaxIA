@@ -44,7 +44,7 @@ galaxIA tiene cuatro capas principales (DEC-0035: Atlas y Navigator son servicio
 
 ## Componentes
 
-### Portal (`apps/portal`)
+### Portal (`apps/portal-chat`)
 
 - Vite + vanilla TypeScript + CSS3.
 - Se conecta a Navigator por WebSocket (chat) y a Atlas por REST (catálogo) — vía el proxy nginx, que enruta por prefijo de ruta.
@@ -105,8 +105,8 @@ Los servicios se comunican por Docker DNS dentro de la red `fhs`:
 
 | Origen | Destino | Cómo |
 |---|---|---|
-| `fhs-portal` (nginx) | `atlas:8081` | proxy `/api/fhs/*`, `/fhs/v1/ws` (Docker DNS) |
-| `fhs-portal` (nginx) | `navigator:8090` | proxy `/api/chat*` (Docker DNS) |
+| `fhs-portal-chat` (nginx) | `atlas:8081` | proxy `/api/fhs/*`, `/fhs/v1/ws` (Docker DNS) |
+| `fhs-portal-chat` (nginx) | `navigator:8090` | proxy `/api/chat*` (Docker DNS) |
 | `navigator` | `atlas:8081` | HTTP (`ATLAS_URL`, `AtlasClient`) |
 | `navigator` | `star:43111` | WebSocket FHS (Docker DNS) |
 | `navigator` | `satellite-ocr:43112` | WebSocket FHS (Docker DNS) |

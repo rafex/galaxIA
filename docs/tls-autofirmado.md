@@ -93,8 +93,8 @@ Abrir el chat en `https://<ip-laptop>:8443` — el navegador mostrará la advert
 - **`apps/navigator`**: `TLS_CERT_PATH`/`TLS_KEY_PATH` (env) activan `https` en la configuración de Fastify — cubre `/fhs/v1/ws` (Registry) y `/api/chat/ws` (chat) con el mismo servidor, sin cambios en el código de esas rutas.
 - **`examples/star-example`, `examples/satellite-ocr-example`**: mismas variables activan un `https.createServer` interno para su propio servidor de chat/tools, y cambian el esquema anunciado en el manifiesto (`wss://` en vez de `ws://`). El cliente que se conecta al Registry también usa `wss://` cuando `REGISTRY_URL` lo especifica.
 - **Clientes WebSocket** (`llm-gateway.ts`, `mcp-host.ts`, y los clientes de Registry en ambos providers): pasan `{ rejectUnauthorized: false }` cuando la URL empieza con `wss://` — sin esto, Node rechazaría el certificado autofirmado por no tener una CA reconocida.
-- **`apps/portal` (nginx)**: `containers/portal/nginx-tls.conf` termina TLS para el navegador y reenvía a `navigator` por `https://` con `proxy_ssl_verify off` (mismo motivo: cert autofirmado).
-- **Frontend (`apps/portal/src/services/api.ts`)**: ya elegía `wss://` automáticamente cuando `location.protocol === "https:"` — no necesitó ningún cambio.
+- **`apps/portal-chat` (nginx)**: `containers/portal-chat/nginx-tls.conf` termina TLS para el navegador y reenvía a `navigator` por `https://` con `proxy_ssl_verify off` (mismo motivo: cert autofirmado).
+- **Frontend (`apps/portal-chat/src/services/api.ts`)**: ya elegía `wss://` automáticamente cuando `location.protocol === "https:"` — no necesitó ningún cambio.
 
 ## Riesgos y alcance deliberadamente limitado
 

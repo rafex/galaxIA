@@ -1,5 +1,5 @@
 # Overlay opcional para activar TLS/HTTPS con certificado autofirmado en
-# la comunicación FHS del core (navegador↔portal, portal↔navigator).
+# la comunicación FHS del core (navegador↔portal-chat, portal-chat↔navigator).
 # No modifica containers/compose.yaml — se usa junto a él.
 #
 # El overlay TLS de los providers externos (Star/Satellite/RAG/KB) vive en
@@ -48,7 +48,7 @@ services:
     volumes:
       - ${CERTS_DIR:-../certs}:/certs:ro
 
-  portal:
+  portal-chat:
     # 8443, no 443: podman rootless no puede exponer puertos privilegiados
     # (<1024) sin ajustar net.ipv4.ip_unprivileged_port_start o correr con
     # sudo. 8443 además ya está en la whitelist de UFW del bastion como
@@ -57,4 +57,4 @@ services:
       - "8443:443"
     volumes:
       - ${CERTS_DIR:-../certs}:/etc/nginx/certs:ro
-      - ./portal/nginx-tls.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./portal-chat/nginx-tls.conf:/etc/nginx/conf.d/default.conf:ro

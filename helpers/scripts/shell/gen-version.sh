@@ -16,5 +16,5 @@ echo "version: atlas -> $COMMIT"
 echo "$JSON" > "$ROOT/apps/navigator/src/version.json"
 echo "version: backend -> $COMMIT"
 
-echo "$JSON" > "$ROOT/apps/portal/public/version.json"
+echo "$JSON" > "$ROOT/apps/portal-chat/public/version.json"
 echo "version: frontend -> $COMMIT"
