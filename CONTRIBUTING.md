@@ -70,6 +70,14 @@ Abre un issue describiendo:
   o el tipo real, en su lugar. Un dato no confiable (JSON.parse de un
   WebSocket, `req.body`, `fetch().json()`) se tipa `unknown` en el borde y se
   acota con un type guard o un cast a una interfaz mínima, nunca con `any`.
+- Dependencias de terceros van con versión exacta (`"fastify": "5.10.0"`, no
+  `"^5.10.0"`) en todos los `package.json` del monorepo — un `npm install`
+  nunca debe poder subir de versión sin que quede explícito en un diff.
+  Para actualizar una dependencia: cambiar el número a mano, correr
+  `npm install`, y verificar `npm run lint && npm run typecheck && npm run
+  test && npm run build` antes de commitear. La única excepción es
+  `@rafex/galaxia-fhs-protocol` (paquete interno del monorepo, gestionado por
+  el workflow de auto-bump, ver `.github/workflows/publish-fhs-protocol.yml`).
 
 ## Git hooks
 
