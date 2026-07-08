@@ -105,7 +105,7 @@ export class LlmGateway {
         ws.send(JSON.stringify(msg));
       });
 
-      ws.on("message", (raw) => {
+      ws.on("message", (raw: Buffer) => {
         try {
           const msg = JSON.parse(String(raw));
           if (msg.requestId !== requestId) return;
@@ -186,7 +186,7 @@ export class LlmGateway {
       ws.send(JSON.stringify(msg));
     });
 
-    ws.on("message", (raw) => {
+    ws.on("message", (raw: Buffer) => {
       try {
         const msg = JSON.parse(raw.toString());
         if (msg.requestId !== requestId) return;

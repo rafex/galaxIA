@@ -48,9 +48,9 @@ async function main() {
   registry.startHealthChecks();
 
   // Registra rutas directamente (websocket no funciona bien dentro de un plugin anidado)
-  await setupWebSocket(app, registry);
-  await setupProvidersApi(app, registry);
-  await setupMetricsApi(app, registry);
+  setupWebSocket(app, registry);
+  setupProvidersApi(app, registry);
+  setupMetricsApi(app, registry);
 
   app.get("/health", () => ({
     ok: true,

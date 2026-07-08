@@ -31,5 +31,7 @@
     "vitest": "^4.1.10",
     "ws": "^8.18.0"
   },
-  "allowScripts": {}
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true
+  }
 }

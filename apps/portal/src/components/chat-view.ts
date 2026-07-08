@@ -205,7 +205,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
 
   attachBtn.addEventListener("click", () => fileInput.click());
 
-  fileInput.addEventListener("change", async () => {
+  fileInput.addEventListener("change", () => void (async () => {
     const file = fileInput.files?.[0];
     if (!file) return;
     const isPdf = file.type === "application/pdf";
@@ -219,7 +219,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     pendingAttachmentName = file.name;
     attachBtn.textContent = `${isPdf ? "📄" : "📎"} ${file.name}`;
     attachBtn.classList.add("attached");
-  });
+  })());
 
   async function loadModels() {
     try {

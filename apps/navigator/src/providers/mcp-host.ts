@@ -91,7 +91,7 @@ export class McpHost {
       });
     });
 
-    ws.on("message", (raw) => {
+    ws.on("message", (raw: Buffer) => {
       let msg: Record<string, unknown> & { requestId: string; type: string; code?: string; message?: string };
       try {
         msg = JSON.parse(String(raw));

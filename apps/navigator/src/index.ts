@@ -40,9 +40,9 @@ async function main() {
   const eventBus = new EventBus();
   const atlasClient = new AtlasClient(ATLAS_URL);
 
-  await setupEventsApi(app, eventBus);
-  await setupChatApi(app, atlasClient, eventBus);
-  await setupChatWebSocket(app, atlasClient, eventBus);
+  setupEventsApi(app, eventBus);
+  setupChatApi(app, atlasClient, eventBus);
+  setupChatWebSocket(app, atlasClient, eventBus);
 
   app.get("/health", () => ({
     ok: true,

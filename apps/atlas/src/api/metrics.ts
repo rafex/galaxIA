@@ -19,7 +19,7 @@ interface RecordSampleBody {
  * debe bloquear ni fallar el turno de chat, solo perder esa muestra de
  * telemetría (SPEC-SATRATING-0001).
  */
-export async function setupMetricsApi(app: FastifyInstance, registry: Atlas) {
+export function setupMetricsApi(app: FastifyInstance, registry: Atlas) {
   app.post("/api/fhs/metrics/sample", (req, reply) => {
     const body = req.body as RecordSampleBody;
     registry.recordSample(body.providerId, body.capability, body.sample);

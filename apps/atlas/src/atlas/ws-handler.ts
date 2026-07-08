@@ -27,7 +27,7 @@ function validateTimestamp(ts: number): true | string {
   return true;
 }
 
-export async function setupWebSocket(app: FastifyInstance, registry: Atlas) {
+export function setupWebSocket(app: FastifyInstance, registry: Atlas) {
   app.get("/fhs/v1/ws", { websocket: true }, (socket: WebSocket, req: FastifyRequest) => {
     let providerId: string | null = null;
     let pingTimer: NodeJS.Timeout | null = null;
