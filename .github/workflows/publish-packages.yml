@@ -1,0 +1,154 @@
+name: Publish packages to GitHub Packages
+
+# CD (entrega continua), no CI — ver spec-native/pipelines/CD.md.
+# Publica los 4 paquetes distribuibles del monorepo a GitHub Packages en
+# cada push a main que toque alguno: @rafex/galaxia-fhs-protocol (protocolo),
+# @galaxia/atlas, @galaxia/navigator, @galaxia/portal-chat (DEC-0061, fase 2
+# del plan de distribución — antes solo el protocolo se publicaba, DEC-0040/
+# DEC-0041). Generalizado de publish-fhs-protocol.yml: un solo job procesa
+# solo los paquetes cuyos archivos cambiaron en el push (o los 4, si se
+# dispara manualmente sin filtrar), en vez de un workflow por paquete.
+#
+# Automatización (DEC-0041, ver helpers/shell y helpers/python):
+# - Si la versión en package.json ya está publicada, el propio workflow la
+#   sube automáticamente (helpers/python/bump_package_version.py) y
+#   commitea el bump de vuelta a main — ya no depende de que quien mergea
+#   se acuerde de subir el número a mano.
+# - Antes de publicar, verifica que el tarball incluya dist/ compilado
+#   (helpers/shell/verify-package.sh) — la versión 0.1.0 de fhs-protocol se
+#   publicó rota por esto exacto (ver DEC-0040), este chequeo evita que se
+#   repita en cualquiera de los 4 paquetes.
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "packages/fhs-protocol/**"
+      - "apps/atlas/**"
+      - "apps/navigator/**"
+      - "apps/portal-chat/**"
+      - ".github/workflows/publish-packages.yml"
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Paquete a publicar (`all` = los 4)"
+        type: choice
+        options:
+          - all
+          - packages/fhs-protocol
+          - apps/atlas
+          - apps/navigator
+          - apps/portal-chat
+        default: all
+
+permissions:
+  contents: write
+  packages: write
+
+# Evita que dos runs concurrentes (ej. un push que toca este workflow +
+# un workflow_dispatch manual casi simultáneo) compitan por el mismo push
+# del commit de bump de versión — visto en vivo el 2026-07-06 con el
+# workflow original de un solo paquete: el segundo run perdía la carrera
+# con "! [rejected] main -> main (fetch first)". Un solo job secuencial
+# (no matriz) evita el mismo problema entre los 4 paquetes de este push.
+concurrency:
+  group: publish-packages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Necesario para poder pushear el commit de bump de vuelta a main,
+          # y para poder diffear contra el commit anterior (github.event.before)
+          # aunque sea un push por lotes de varios commits — 0 trae toda la
+          # historia, evitando que ese commit quede fuera de un checkout
+          # superficial.
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://npm.pkg.github.com"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Instalar jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Instalar dependencias del workspace
+        run: npm ci
+
+      - name: Determinar qué paquetes cambiaron
+        id: changed
+        run: |
+          ALL="packages/fhs-protocol apps/atlas apps/navigator apps/portal-chat"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.package }}" != "all" ]; then
+            TO_PROCESS="${{ inputs.package }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TO_PROCESS="$ALL"
+          else
+            BEFORE="${{ github.event.before }}"
+            # BEFORE es todo ceros en el primer push de una rama nueva (no hay
+            # commit anterior real que diffear) — en ese caso, procesar los 4
+            # es la opción segura (peor caso: un bump/verify de más, nunca de
+            # menos).
+            if [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE" 2>/dev/null; then
+              TO_PROCESS="$ALL"
+            else
+              CHANGED_FILES=$(git diff --name-only "$BEFORE" "${{ github.sha }}")
+              TO_PROCESS=""
+              for pkg in $ALL; do
+                if echo "$CHANGED_FILES" | grep -q "^$pkg/"; then
+                  TO_PROCESS="$TO_PROCESS $pkg"
+                fi
+              done
+            fi
+          fi
+          echo "Paquetes a procesar:$TO_PROCESS"
+          echo "packages=$TO_PROCESS" >> "$GITHUB_OUTPUT"
+
+      - name: Bump, verificar y publicar cada paquete cambiado
+        if: steps.changed.outputs.packages != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          for pkg in ${{ steps.changed.outputs.packages }}; do
+            echo "::group::$pkg"
+
+            echo "→ Bump de versión si ya está publicada..."
+            case "$pkg" in
+              packages/fhs-protocol) TARGET="protocol" ;;
+              apps/atlas) TARGET="atlas" ;;
+              apps/navigator) TARGET="navigator" ;;
+              apps/portal-chat) TARGET="portal-chat" ;;
+              *) echo "Workspace no soportado: $pkg" >&2; exit 1 ;;
+            esac
+            make "${TARGET}-bump"
+
+            if ! git diff --quiet -- "$pkg/package.json" package-lock.json; then
+              git add "$pkg/package.json" package-lock.json
+              PKG_NAME=$(node -p "require('./${pkg}/package.json').name")
+              git commit -m "chore: bump ${PKG_NAME} version [skip ci]"
+              git push
+            else
+              echo "Sin cambios de versión — nada que commitear."
+            fi
+
+            echo "→ Verificando contenido del paquete..."
+            make "${TARGET}-verify"
+
+            echo "→ Publicando a GitHub Packages..."
+            npm publish -w "$pkg"
+            echo "::endgroup::"
+          done

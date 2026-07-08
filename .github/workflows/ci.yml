@@ -1,7 +1,7 @@
 name: CI
 
 # Validación de Pull Requests — ver spec-native/pipelines/CI.md.
-# No publica ni despliega nada (eso es CD, ver publish-fhs-protocol.yml y
+# No publica ni despliega nada (eso es CD, ver publish-packages.yml y
 # jekyll-gh-pages.yml) — solo bloquea el merge si lint, typecheck, test o
 # build fallan.
 

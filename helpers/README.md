@@ -23,4 +23,4 @@ Los scripts en esta carpeta llevan metadata inline (PEP 723) y se ejecutan con `
 
 ## No llamar estos scripts directamente — usar `make`
 
-El `Makefile` raíz es la interfaz pensada para humanos y para CI (`make protocol-bump`, `make protocol-verify`, `make protocol-publish` — ver `make help`). Los scripts en `helpers/shell`/`helpers/python` son detalles de implementación: pueden cambiar de nombre, de firma o de lenguaje sin que cambie el target de `make` que los invoca. `.github/workflows/publish-fhs-protocol.yml` llama a los targets de `make`, nunca a los scripts directamente.
+El `Makefile` raíz es la interfaz pensada para humanos y para CI (`make protocol-bump`, `make protocol-verify`, `make protocol-publish` — ver `make help`). Los scripts en `helpers/shell`/`helpers/python` son detalles de implementación: pueden cambiar de nombre, de firma o de lenguaje sin que cambie el target de `make` que los invoca. `.github/workflows/publish-packages.yml` llama a los targets de `make`, nunca a los scripts directamente.
