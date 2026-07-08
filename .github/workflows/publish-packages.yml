@@ -31,7 +31,7 @@ on:
   workflow_dispatch:
     inputs:
       package:
-        description: "Paquete a publicar (vacío = los 4)"
+        description: "Paquete a publicar (`all` = los 4)"
         type: choice
         options:
           - all
@@ -127,21 +127,28 @@ jobs:
             echo "::group::$pkg"
 
             echo "→ Bump de versión si ya está publicada..."
-            uv run helpers/python/bump_package_version.py "$pkg"
+            case "$pkg" in
+              packages/fhs-protocol) TARGET="protocol" ;;
+              apps/atlas) TARGET="atlas" ;;
+              apps/navigator) TARGET="navigator" ;;
+              apps/portal-chat) TARGET="portal-chat" ;;
+              *) echo "Workspace no soportado: $pkg" >&2; exit 1 ;;
+            esac
+            make "${TARGET}-bump"
 
             if ! git diff --quiet -- "$pkg/package.json" package-lock.json; then
               git add "$pkg/package.json" package-lock.json
-              git commit -m "chore: bump $(node -p "require('./$pkg/package.json').name") version [skip ci]"
+              PKG_NAME=$(node -p "require('./${pkg}/package.json').name")
+              git commit -m "chore: bump ${PKG_NAME} version [skip ci]"
               git push
             else
               echo "Sin cambios de versión — nada que commitear."
             fi
 
             echo "→ Verificando contenido del paquete..."
-            sh helpers/shell/verify-package.sh "$pkg"
+            make "${TARGET}-verify"
 
             echo "→ Publicando a GitHub Packages..."
             npm publish -w "$pkg"
-
             echo "::endgroup::"
           done
