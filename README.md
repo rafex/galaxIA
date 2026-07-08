@@ -4,6 +4,8 @@ GalaxIA es un PoC de inteligencia artificial federada y soberana. Conecta equipo
 
 Implementa **FHS (Federation of Sovereign Horizons)**, un protocolo JSON sobre WebSocket, independiente de lenguaje — ver [`docs/implementacion-multilenguaje.md`](docs/implementacion-multilenguaje.md).
 
+¿Quieres correrlo? Ver [`docs/instalacion.md`](docs/instalacion.md) (contenedor + release, `npx`, o clonar y compilar).
+
 ## Vocabulario
 
 GalaxIA (Galaxy + IA) tiene su propio vocabulario de producto — **Star** (nodo LLM), **Satellite** (nodo de herramientas), **Atlas** (Registry), **Portal** (chat web), **Navigator** (orquestador), **Beacon** (manifiesto), **Pulse** (heartbeat), **Mission** (ejecución de una tool), **Flight Log** (procedencia/auditoría), **Orbit** (conexión activa), **Signal** (capacidad anunciada). Desde DEC-0033/DEC-0034/DEC-0035 este vocabulario también nombra identificadores de código, archivos, paquetes npm y contenedores (`Atlas`, `Signal`, `Beacon`, `apps/atlas`, `apps/navigator`...) — lo único que **no** cambia es el protocolo JSON en el cable (nombres de campo como `providerId`, tipos de mensaje `hello`/`register`). Tabla completa en [`docs/vocabulario.md`](docs/vocabulario.md).

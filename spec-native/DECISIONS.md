@@ -1007,3 +1007,17 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - Nuevo: `.github/workflows/publish-containers.yml`.
   - Verificado localmente: sintaxis YAML válida; `podman build` real de las 3 `Containerfile` (atlas, navigator, portal-chat) exitoso (arquitectura nativa del runner local — el flujo completo de build nativo por plataforma + fusión de manifest list con `docker buildx imagetools create` solo puede verificarse corriendo el workflow en GitHub Actions).
   - Pendiente (backlog, siguiente fase): primera corrida real del workflow; verificar/ajustar visibilidad de los 3 paquetes GHCR; Fase 5 (primer release real con `compose.release.yaml`/`.env.example`/`docs/instalacion.md`, apuntando a estas imágenes).
+
+## DEC-0064 — Artefactos de release + `docs/instalacion.md` (Fase 5 del plan de distribución)
+
+- **Fecha:** 2026-07-08
+- **Estado:** `accepted` — implementado; el primer release real (tag `v0.1.0-beta.1`) queda como acción explícita pendiente, no ejecutada en este cambio
+- **Contexto:** Fase 5, última del plan de distribución (fases 1-4: DEC-0060 a DEC-0063). Con `publish-packages.yml` y `publish-containers.yml` ya en `main`, falta el artefacto que alguien realmente descarga para correr el stack sin clonar el repo, y la documentación que explica las 3 formas de instalar.
+- **Decisión:** `containers/compose.release.yaml` (nuevo) — igual a `containers/compose.yaml` pero con `image: ghcr.io/rafex/galaxia-*:${GALAXIA_VERSION:-latest}` en vez de `build:` — no requiere clonar el repo, solo este archivo + `.env`. `containers/.env.example` (nuevo) documenta las variables reales (`GALAXIA_VERSION`, puertos, `ATLAS_URL`/`NAVIGATOR_URL` para el caso multi-host).
+- **`docs/instalacion.md` (nuevo):** documenta las 3 formas de instalar en orden de simplicidad — (1) contenedor + release (recomendada), (2) `npx` por servicio sin contenedores, (3) clonar y compilar (para contribuir) — con una tabla explícita de qué variable configurar en qué servicio para el caso "cada servicio en su propia máquina", más los dos riesgos ya documentados en DEC-0060/0061 (resolución de hostname al arrancar nginx, `better-sqlite3` en la ruta `npx` de Atlas) repetidos aquí porque es donde alguien instalando por primera vez los va a necesitar, no solo en el detalle técnico de esas decisiones.
+- **Por qué el tag real queda fuera de este cambio:** crear el tag `v0.1.0-beta.1` dispara de inmediato `publish-containers.yml` (push real a GHCR) y, si algún paquete cambió, también podría interactuar con `publish-packages.yml` — ninguno de los dos workflows se ha verificado contra los registros reales todavía (riesgo explícito documentado en DEC-0062/DEC-0063). Cortar el primer release real es una acción separada, deliberada, después de esta verificación pendiente.
+- **Consecuencias:**
+  - Nuevo: `containers/compose.release.yaml`, `containers/.env.example`, `docs/instalacion.md`.
+  - `README.md`: enlace a `docs/instalacion.md`.
+  - Verificado: `podman-compose -f compose.release.yaml config` resuelve correctamente con los defaults (sin `.env`).
+  - Pendiente (acción explícita, no automática): primera corrida real de `publish-packages.yml`/`publish-containers.yml` (recomendado antes de tagear), y el propio tag `v0.1.0-beta.1` + GitHub Release adjuntando `compose.release.yaml`/`.env.example`.
