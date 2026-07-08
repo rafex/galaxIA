@@ -52,11 +52,11 @@ services:
       - fhs
     restart: unless-stopped
 
-  portal:
+  portal-chat:
     build:
       context: ..
-      dockerfile: containers/portal/Containerfile
-    container_name: fhs-portal
+      dockerfile: containers/portal-chat/Containerfile
+    container_name: fhs-portal-chat
     ports:
       - "3000:80"
     depends_on:

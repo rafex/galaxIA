@@ -39,21 +39,21 @@ log-containers:
 #
 # Cada máquina de la PoC (ver docs/despliegue-multi-host.md) corre un
 # checkout de este mismo repo pero levanta contenedores distintos según su
-# rol: laptop = core (atlas+navigator+portal), bastion = star, raspi4b =
+# rol: laptop = core (atlas+navigator+portal-chat), bastion = star, raspi4b =
 # satellite-ocr+ether-ocr-api. Estas recetas combinan los logs de los
 # contenedores de CADA rol en una sola vista de lnav (colores, filtro en
 # vivo con "/", salto entre errores con "e"/"E") — usa la que corresponda
 # a la máquina en la que estás parado, `podman logs -f` funciona igual sin
 # importar si el contenedor se levantó con compose o con `podman run` suelto.
 
-# Logs del core (laptop): atlas + navigator + portal
+# Logs del core (laptop): atlas + navigator + portal-chat
 logs-core:
     #!/usr/bin/env bash
     set -euo pipefail
     exec lnav \
       <(podman logs -f --tail=200 fhs-atlas 2>&1 | sed -u 's/^/[atlas] /') \
       <(podman logs -f --tail=200 fhs-navigator 2>&1 | sed -u 's/^/[navigator] /') \
-      <(podman logs -f --tail=200 fhs-portal 2>&1 | sed -u 's/^/[portal] /')
+      <(podman logs -f --tail=200 fhs-portal-chat 2>&1 | sed -u 's/^/[portal-chat] /')
 
 # Logs del LLM (bastion): star (Star/LLM provider FHS)
 logs-llm:
@@ -71,7 +71,7 @@ logs-ocr:
       <(podman logs -f --tail=200 ether-ocr-api 2>&1 | sed -u 's/^/[ether-ocr-api] /')
 
 # Logs de contenedores arbitrarios en lnav (uno o más nombres separados por espacio)
-# Ejemplo: just logs-lnav fhs-navigator fhs-portal
+# Ejemplo: just logs-lnav fhs-navigator fhs-portal-chat
 logs-lnav *containers:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -103,13 +103,13 @@ poc-status:
     # dobles en el cuerpo de la receta (incluso dentro de comentarios), así
     # que cualquier sintaxis de plantilla de podman rompería el parseo del
     # Justfile. La tabla por defecto de "podman ps" ya alcanza.
-    found=$(podman ps -a --filter "name=fhs-atlas" --filter "name=fhs-navigator" --filter "name=fhs-portal" \
+    found=$(podman ps -a --filter "name=fhs-atlas" --filter "name=fhs-navigator" --filter "name=fhs-portal-chat" \
       --filter "name=fhs-star" --filter "name=fhs-satellite-ocr" \
       --filter "name=ether-ocr-api" --noheading 2>/dev/null)
     if [ -z "$found" ]; then
       echo "(ninguno de los contenedores conocidos de la PoC existe en esta máquina)"
     else
-      podman ps -a --filter "name=fhs-atlas" --filter "name=fhs-navigator" --filter "name=fhs-portal" \
+      podman ps -a --filter "name=fhs-atlas" --filter "name=fhs-navigator" --filter "name=fhs-portal-chat" \
         --filter "name=fhs-star" --filter "name=fhs-satellite-ocr" \
         --filter "name=ether-ocr-api" 2>/dev/null
     fi

@@ -18,8 +18,8 @@ container-up:
 
 .PHONY: container-up-core
 container-up-core:
-	$(call section,Levantando atlas + navigator + portal)
-	$(COMPOSE_CMD) -f $(COMPOSE_FILE) up -d --build atlas navigator portal
+	$(call section,Levantando atlas + navigator + portal-chat)
+	$(COMPOSE_CMD) -f $(COMPOSE_FILE) up -d --build atlas navigator portal-chat
 	$(call ok,Core arriba)
 
 .PHONY: container-up-atlas

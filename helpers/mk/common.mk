@@ -16,7 +16,7 @@ C_CYAN    := \033[36m
 WS_PROTOCOL := packages/fhs-protocol
 WS_ATLAS    := apps/atlas
 WS_AGENT    := apps/navigator
-WS_WEB      := apps/portal
+WS_WEB      := apps/portal-chat
 
 WS_ALL      := $(WS_PROTOCOL) $(WS_ATLAS) $(WS_AGENT) $(WS_WEB)
 

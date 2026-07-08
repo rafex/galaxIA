@@ -7,7 +7,7 @@
 WS_PROTOCOL := "packages/fhs-protocol"
 WS_ATLAS    := "apps/atlas"
 WS_AGENT    := "apps/navigator"
-WS_WEB      := "apps/portal"
+WS_WEB      := "apps/portal-chat"
 
 # ── Puerto defaults (se pueden sobrescribir en .env) ───────────────────────
 # DEC-0035: ATLAS_PORT (Registry, antes era el mismo AGENT_PORT) y AGENT_PORT

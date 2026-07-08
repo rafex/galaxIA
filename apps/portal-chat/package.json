@@ -1,9 +1,9 @@
 {
-  "name": "@galaxia/portal",
+  "name": "@galaxia/portal-chat",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Frontend del chat comunitario FHS v0.1. Vite + vanilla TypeScript + HTML5 + CSS3.",
+  "description": "Portal de chat web del cliente FHS v0.1 (Vite + vanilla TypeScript + HTML5 + CSS3). Separado del protocolo — ver apps/portal-tui para el cliente de terminal.",
   "scripts": {
     "dev": "vite",
     "build": "sh ../../helpers/scripts/shell/gen-version.sh 2>/dev/null || true; tsc && vite build",

@@ -7,7 +7,7 @@ Esta carpeta agrupa todos los artefactos de contenedorización del MVP FHS v0.1.
 ```
 containers/
 ├── navigator/         # Agent Backend (Fastify + Registry/Atlas + Runtime)
-├── portal/            # Frontend web (Vite + Nginx)
+├── portal-chat/        # Frontend web (Vite + Nginx)
 ├── ocr-mcp/          # Proveedor MCP OCR (Python + Tesseract)
 ├── llama-provider/   # Instrucciones para llama.cpp (nativo o contenedor)
 └── compose.yaml      # Orquestación completa con Podman Compose / Docker Compose
@@ -56,7 +56,7 @@ Si prefieres desarrollar localmente:
 npm run dev -w apps/navigator
 
 # Terminal 2
-npm run dev -w apps/portal
+npm run dev -w apps/portal-chat
 
 # Terminal 3 (OCR)
 cd containers/ocr-mcp
