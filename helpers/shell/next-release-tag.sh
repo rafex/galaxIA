@@ -10,15 +10,16 @@
 # Compatible POSIX sh (funciona en Alpine, macOS, Linux).
 set -eu
 
-LAST_TAG=$(git tag -l 'v*-alpha.*' --sort=-v:refname | head -1)
+TAGS=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*-alpha.[0-9]*' --sort=-v:refname)
+LAST_TAG=$(printf '%s\n' "$TAGS" | head -n 1)
 
 if [ -z "$LAST_TAG" ]; then
   echo "v0.1.0-alpha.1"
   exit 0
 fi
 
-BASE=$(echo "$LAST_TAG" | sed -E 's/^(v[0-9]+\.[0-9]+\.[0-9]+)-alpha\.[0-9]+$/\1/')
-N=$(echo "$LAST_TAG" | sed -E 's/^v[0-9]+\.[0-9]+\.[0-9]+-alpha\.([0-9]+)$/\1/')
+BASE=$(printf '%s\n' "$LAST_TAG" | sed 's/^\(v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)-alpha\.[0-9][0-9]*$/\1/')
+N=$(printf '%s\n' "$LAST_TAG" | sed 's/^v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*-alpha\.\([0-9][0-9]*\)$/\1/')
 
 if [ "$BASE" = "$LAST_TAG" ] || [ "$N" = "$LAST_TAG" ]; then
   echo "✗ ERROR: '$LAST_TAG' no matchea el formato esperado vX.Y.Z-alpha.N" >&2
