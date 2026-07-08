@@ -16,7 +16,7 @@ Docker.
 
 ```bash
 mkdir galaxia && cd galaxia
-REF=main  # o: v0.1.0-beta.1 (para una release reproducible)
+REF=main  # o: v0.1.0-alpha.1 (para una release reproducible)
 curl -O https://raw.githubusercontent.com/rafex/galaxIA/${REF}/containers/compose.release.yaml
 curl -O https://raw.githubusercontent.com/rafex/galaxIA/${REF}/containers/.env.example
 cp .env.example .env

@@ -33,8 +33,9 @@ promocion o cambie el proceso de release.
 - **Archivo de configuración:** `.github/workflows/publish-containers.yml` (DEC-0063, fase 4 del plan de distribución).
 - **Dónde ver el estado:** pestaña "Actions" (workflow "Publish container images to GHCR"); imágenes en `ghcr.io/rafex/galaxia-{atlas,navigator,portal-chat}`.
 - **Trigger:** push de un tag `v*`, o `workflow_dispatch` manual (con un input `tag` opcional para probar sin esperar a un tag real).
-- **Qué hace:** build multi-arch (`linux/amd64` + `linux/arm64`, vía `buildx`/QEMU — la topología real de este proyecto usa hardware ARM, `raspi4b-lan`) de las 3 `Containerfile` del core, push a GHCR con tag `:latest` + `:<tag>`. A diferencia de la publicación npm (continua, en cada push a `main`), esto solo corre en un release explícito — evita saturar GHCR con builds de cada commit.
+- **Qué hace:** build multi-arch (`linux/amd64` + `linux/arm64`, en runners nativos `ubuntu-24.04-arm` para arm64, no QEMU — la topología real de este proyecto usa hardware ARM, `raspi4b-lan`) de las 3 `Containerfile` del core, por digest en un job `build` (matriz app×plataforma), fusionados en una manifest list con tags `:latest`/`:<tag>` en un job `merge`. A diferencia de la publicación npm (continua, en cada push a `main`), esto solo corre en un release explícito — evita saturar GHCR con builds de cada commit.
 - **Auth:** `secrets.GITHUB_TOKEN` (permiso `packages: write`), sin secret adicional.
+- **Cortar un release:** `make release-tag` (helpers/mk/release.mk, DEC-0065) crea y pushea el siguiente tag `vX.Y.Z-alpha.N` — sube N automáticamente a partir del último tag existente (o `v0.1.0-alpha.1` si no hay ninguno).
 
 ### 3. Sitio público (`galax-ia.rafex.io`)
 

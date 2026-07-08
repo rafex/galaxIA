@@ -1021,3 +1021,17 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - `README.md`: enlace a `docs/instalacion.md`.
   - Verificado: `podman-compose -f compose.release.yaml config` resuelve correctamente con los defaults (sin `.env`).
   - Pendiente (acción explícita, no automática): primera corrida real de `publish-packages.yml`/`publish-containers.yml` (recomendado antes de tagear), y el propio tag `v0.1.0-beta.1` + GitHub Release adjuntando `compose.release.yaml`/`.env.example`.
+
+## DEC-0065 — `make release-tag`: corte de release incremental (vX.Y.Z-alpha.N)
+
+- **Fecha:** 2026-07-08
+- **Estado:** `accepted` — implementado y verificado
+- **Contexto:** con las 5 fases del plan de distribución en `main` (DEC-0060 a DEC-0064), faltaba el mecanismo real para cortar el primer release: crear y pushear el tag `v*` que dispara `publish-containers.yml` (DEC-0063). El usuario pidió que fuera un target de `make`, incremental — sin tener que calcular a mano el siguiente número cada vez.
+- **Decisión:** esquema `vX.Y.Z-alpha.N` — mientras el proyecto siga en fase alpha, cada release sube `N` (`v0.1.0-alpha.1`, `v0.1.0-alpha.2`...), sin comprometerse a un `X.Y.Z` estable todavía. Subir `X.Y.Z` (pasar a un release no-alpha) queda como decisión manual explícita, no algo que este target infiera solo.
+- **`helpers/shell/next-release-tag.sh`** (nuevo): calcula el siguiente tag — sin tags previos que matcheen `v*-alpha.*`, devuelve `v0.1.0-alpha.1`; con uno, sube `N` manteniendo `X.Y.Z` (usa `git tag --sort=-v:refname` para tomar el más alto, no el más reciente por fecha, evitando el caso de un tag viejo re-pusheado fuera de orden).
+- **`helpers/mk/release.mk`** (nuevo) + target `make release-tag`: valida que no haya cambios sin commitear (evita tagear un estado sucio), calcula el siguiente tag con el script de arriba, crea un tag anotado (`git tag -a`) y lo pushea — eso es todo lo que hace falta para disparar `publish-containers.yml`, que ya existía.
+- **Consecuencias:**
+  - Nuevo: `helpers/shell/next-release-tag.sh`, `helpers/mk/release.mk`.
+  - `Makefile`: `include helpers/mk/release.mk`, nueva sección en `make help`.
+  - `spec-native/pipelines/CD.md`: mención del target en la sección de GHCR; corregida una referencia desactualizada a QEMU (DEC-0063 ya usa runners nativos).
+  - Verificado: `next-release-tag.sh` probado contra un repo git aislado (sin tags → `v0.1.0-alpha.1`; con `v0.1.0-alpha.1`/`v0.1.0-alpha.7` existentes → `v0.1.0-alpha.2`/`v0.1.0-alpha.8` respectivamente); `make -n release-tag` confirma la receta expandida correctamente.
