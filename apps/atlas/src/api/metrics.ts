@@ -20,7 +20,7 @@ interface RecordSampleBody {
  * telemetría (SPEC-SATRATING-0001).
  */
 export async function setupMetricsApi(app: FastifyInstance, registry: Atlas) {
-  app.post("/api/fhs/metrics/sample", async (req, reply) => {
+  app.post("/api/fhs/metrics/sample", (req, reply) => {
     const body = req.body as RecordSampleBody;
     registry.recordSample(body.providerId, body.capability, body.sample);
     reply.status(204);

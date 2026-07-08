@@ -86,7 +86,7 @@ export async function setupWebSocket(app: FastifyInstance, registry: Atlas) {
     function handleMessage(msg: FhsMessage) {
       switch (msg.type) {
         case "hello": {
-          const hello = msg as HelloMessage;
+          const hello = msg;
           // DEC-0030: providerId es un did:key real (Ed25519) — la firma se
           // verifica contra la clave pública derivada del propio identificador,
           // sin directorio de claves aparte. Suplantar a otro nodo deja de ser
@@ -137,7 +137,7 @@ export async function setupWebSocket(app: FastifyInstance, registry: Atlas) {
           break;
         }
         case "register": {
-          const register = msg as RegisterMessage;
+          const register = msg;
           if (!providerId) {
             send({ type: "error", data: { code: FHS_ERROR_CODES.NOT_IDENTIFIED, message: "Send hello first" } });
             return;

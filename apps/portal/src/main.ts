@@ -16,4 +16,4 @@ async function loadVersion(): Promise<string> {
   }
 }
 
-loadVersion().then((version) => createApp(app, version));
+loadVersion().then((version) => createApp(app, version)).catch(console.error);

@@ -94,7 +94,7 @@ export class McpHost {
     ws.on("message", (raw) => {
       let msg: Record<string, unknown> & { requestId: string; type: string; code?: string; message?: string };
       try {
-        msg = JSON.parse(raw.toString());
+        msg = JSON.parse(String(raw));
       } catch {
         return; // ignorar mensajes no JSON
       }

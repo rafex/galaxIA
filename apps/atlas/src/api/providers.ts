@@ -1,12 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { Atlas } from "../atlas/registry.js";
 
-export async function setupProvidersApi(app: FastifyInstance, registry: Atlas) {
-  app.get("/api/fhs/nodes", async () => {
+export function setupProvidersApi(app: FastifyInstance, registry: Atlas) {
+  app.get("/api/fhs/nodes", () => {
     return registry.getNodes();
   });
 
-  app.get("/api/fhs/providers", async (req) => {
+  app.get("/api/fhs/providers", (req) => {
     const type = (req.query as { type?: string }).type;
     const providers = registry.getProviders(type as any);
     // SPEC-SATRATING-0001: adjunta fiabilidad/rating por capability — por
@@ -25,7 +25,7 @@ export async function setupProvidersApi(app: FastifyInstance, registry: Atlas) {
     });
   });
 
-  app.get("/api/fhs/models", async () => {
+  app.get("/api/fhs/models", () => {
     const providers = registry.getProviders("llm");
     const models: any[] = [];
     for (const p of providers) {
@@ -43,7 +43,7 @@ export async function setupProvidersApi(app: FastifyInstance, registry: Atlas) {
     return { models };
   });
 
-  app.get("/api/fhs/capabilities", async () => {
+  app.get("/api/fhs/capabilities", () => {
     const providers = registry.getProviders("mcp");
     const caps = new Set<string>();
     for (const p of providers) {
@@ -54,7 +54,7 @@ export async function setupProvidersApi(app: FastifyInstance, registry: Atlas) {
     return { capabilities: Array.from(caps) };
   });
 
-  app.post("/api/fhs/resolve", async (req) => {
+  app.post("/api/fhs/resolve", (req) => {
     const { kind, capabilities, scope } = req.body as {
       kind: "llm" | "mcp";
       capabilities?: string[];

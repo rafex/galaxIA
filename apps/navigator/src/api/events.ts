@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { EventBus } from "../sse/event-bus.js";
 import type { AgentSSEEvent } from "@rafex/galaxia-fhs-protocol";
 
-export async function setupEventsApi(app: FastifyInstance, eventBus: EventBus) {
+export function setupEventsApi(app: FastifyInstance, eventBus: EventBus) {
   app.get("/api/chat/:id/events", async (req, reply) => {
     const { id } = req.params as { id: string };
 

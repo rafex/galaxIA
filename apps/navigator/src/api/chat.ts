@@ -5,20 +5,20 @@ import { AtlasClient } from "../atlas-client.js";
 import { EventBus } from "../sse/event-bus.js";
 import { AgentRuntime } from "../agent/runtime.js";
 
-export async function setupChatApi(
+export function setupChatApi(
   app: FastifyInstance,
   atlasClient: AtlasClient,
   eventBus: EventBus
 ) {
   const runtimes = new Map<string, AgentRuntime>();
 
-  app.post("/api/chat", async (req, reply) => {
+  app.post("/api/chat", (req, reply) => {
     const body = req.body as {
       conversationId?: string;
       message: UserMessage;
       artifacts?: string[];
       preferences?: {
-        model?: "auto" | string;
+        model?: string;
         scope?: "local" | "network" | "community" | "external";
         allowExternalProviders?: boolean;
       };

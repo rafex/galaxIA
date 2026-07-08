@@ -70,6 +70,6 @@ export const IPFS_EPHEMERAL_BACKSTOP_MS = 3 * 60 * 60 * 1000;
 export function scheduleBackstopUnpin(cid: string, retention: "ephemeral" | "reuse"): void {
   if (retention === "reuse") return;
   setTimeout(() => {
-    unpinFromIpfs(cid);
+    void unpinFromIpfs(cid);
   }, IPFS_EPHEMERAL_BACKSTOP_MS).unref();
 }

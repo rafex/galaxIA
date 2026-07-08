@@ -6,7 +6,7 @@ export interface ApiOptions {
   artifacts?: string[];
   attachmentName?: string;
   preferences?: {
-    model?: "auto" | string;
+    model?: string;
     scope?: "local" | "network" | "community" | "external";
     allowExternalProviders?: boolean;
     ocrMode?: "confirm" | "auto";

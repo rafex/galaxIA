@@ -36,7 +36,7 @@ async function main() {
     tlsEnabled
       ? Fastify({
           logger: true,
-          https: { cert: readFileSync(TLS_CERT_PATH!), key: readFileSync(TLS_KEY_PATH!) },
+          https: { cert: readFileSync(TLS_CERT_PATH), key: readFileSync(TLS_KEY_PATH) },
         })
       : Fastify({ logger: true })
   ) as FastifyInstance;
@@ -52,7 +52,7 @@ async function main() {
   await setupProvidersApi(app, registry);
   await setupMetricsApi(app, registry);
 
-  app.get("/health", async () => ({
+  app.get("/health", () => ({
     ok: true,
     fhsVersion: FHS_VERSION,
     version: versionInfo.commit,
@@ -74,4 +74,4 @@ async function main() {
   }
 }
 
-main();
+void main();

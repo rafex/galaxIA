@@ -107,7 +107,7 @@ export class LlmGateway {
 
       ws.on("message", (raw) => {
         try {
-          const msg = JSON.parse(raw.toString());
+          const msg = JSON.parse(String(raw));
           if (msg.requestId !== requestId) return;
 
           if (msg.type === "dispatch.ack") {

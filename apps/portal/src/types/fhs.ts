@@ -9,7 +9,7 @@ export type ChatMessage =
 export interface ChatState {
   messages: ChatMessage[];
   isStreaming: boolean;
-  selectedModel: "auto" | string;
+  selectedModel: string;
   privacyScope: "local" | "network" | "community" | "external";
   ocrMode: "confirm" | "auto";
   /** "" = modo recomendado (matching determinístico + confirmación); un providerId = modo manual (SPEC-KB-0001) */
