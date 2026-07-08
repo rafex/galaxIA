@@ -21,9 +21,9 @@ promocion o cambie el proceso de release.
 - **Dónde ver el estado:** pestaña "Actions" del repo (workflow "Publish @rafex/galaxia-fhs-protocol to GitHub Packages"); paquete publicado visible en la pestaña "Packages" de `github.com/rafex/galaxIA`.
 - **Trigger:** push a `main` que modifique `packages/fhs-protocol/**`, o `workflow_dispatch` manual.
 - **Qué hace (DEC-0041):**
-  1. `make protocol-bump` — si la versión de `package.json` ya está publicada en GitHub Packages, la sube automáticamente (patch) usando `helpers/python/bump_protocol_version.py` (`uv run`). Ya no depende de que quien mergea se acuerde de subir el `version` a mano.
+  1. `make protocol-bump` — si la versión de `package.json` ya está publicada en GitHub Packages, la sube automáticamente (patch) usando `helpers/python/bump_package_version.py` (`uv run`). Ya no depende de que quien mergea se acuerde de subir el `version` a mano.
   2. Si el bump modificó `package.json`/`package-lock.json`, los commitea y pushea a `main` (`chore: bump ... [skip ci]`).
-  3. `make protocol-verify` — compila y corre `npm pack --dry-run`, verificando con `helpers/shell/verify-protocol-package.sh` que el tarball incluya `dist/*.js` (guarda contra el bug de la versión `0.1.0`, ver DEC-0040).
+  3. `make protocol-verify` — compila y corre `npm pack --dry-run`, verificando con `helpers/shell/verify-package.sh` que el tarball incluya `dist/*.js` (guarda contra el bug de la versión `0.1.0`, ver DEC-0040).
   4. `npm publish -w packages/fhs-protocol`.
 - **Auth:** usa el `GITHUB_TOKEN` automático de Actions (`permissions.contents: write` + `packages: write` declarados en el workflow) — no requiere un secret adicional. El bump/commit son intra-repo, por eso no hace falta un PAT con alcance a otros repos.
 - **Consumo hoy:** `galaxIA-satellite-star` ya consume `@rafex/galaxia-fhs-protocol` vía GitHub Packages (migrado en DEC-0040, ya no la rama git `fhs-protocol-dist`). Cómo y cuándo ese repo actualiza su dependencia **no es responsabilidad de `galaxIA`** — es el mismo principio de DEC-0026/DEC-0037 (el protocolo define el contrato, nunca gestiona a sus consumidores) llevado al ciclo de publicación: `galaxIA` publica versiones a un registro público, cualquier consumidor (`galaxIA-satellite-star` u otro) decide solo cuándo y cómo actualizarse.
