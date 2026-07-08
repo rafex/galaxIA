@@ -129,6 +129,19 @@ export interface ErrorEvent {
   data: { conversationId?: string; code: string; message: string };
 }
 
+/** TASK-FHS-0010 — failover automático a la siguiente tool candidata tras un `tool.error`. */
+export interface ProviderFailoverEvent {
+  type: "provider.failover";
+  data: {
+    conversationId: string;
+    capability: string;
+    failedProviderId: string;
+    failedProviderName: string;
+    nextProviderId: string;
+    nextProviderName: string;
+  };
+}
+
 export type AgentSSEEvent =
   | SessionEvent
   | AgentStatusEvent
@@ -144,4 +157,5 @@ export type AgentSSEEvent =
   | NodeLostEvent
   | NodeOnlineEvent
   | KbRecommendedEvent
+  | ProviderFailoverEvent
   | ErrorEvent;

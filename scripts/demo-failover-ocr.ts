@@ -25,8 +25,17 @@ import * as http from "node:http";
 import {
   generateIdentity,
   signPayload,
+  type AgentSSEEvent,
   type NodeIdentity,
 } from "@rafex/galaxia-fhs-protocol";
+
+/** Envoltorio mínimo de mensajes crudos del protocolo FHS (Atlas/tool WS) — este script mockea el wire format directamente, sin pasar por los tipos completos del SDK. */
+interface RawFhsMessage {
+  type?: string;
+  requestId?: string;
+  toolName?: string;
+  data?: { conversationId?: string };
+}
 
 // ─── Configuración ────────────────────────────────────────────────
 const ATLAS_URL = "ws://localhost:8081/fhs/v1/ws";
@@ -60,11 +69,11 @@ const MOCK_FILE_DATAURL =
 // ─── Logger ────────────────────────────────────────────────────────
 const VERBOSE = process.argv.includes("--verbose");
 
-function log(emoji: string, label: string, ...args: any[]) {
+function log(emoji: string, label: string, ...args: unknown[]) {
   console.log(`${emoji}  [${label}]`, ...args);
 }
 
-function vlog(label: string, ...args: any[]) {
+function vlog(label: string, ...args: unknown[]) {
   if (VERBOSE) console.log(`   [${label}]`, ...args);
 }
 
@@ -104,10 +113,10 @@ class MockOcrProvider {
       wss.on("connection", (ws: WebSocket) => {
         vlog(`TOOL:${this.cfg.name}`, "Nueva conexión FHS entrante");
 
-        ws.on("message", (raw) => {
-          let msg: any;
+        ws.on("message", (raw: Buffer) => {
+          let msg: RawFhsMessage;
           try {
-            msg = JSON.parse(raw.toString());
+            msg = JSON.parse(raw.toString()) as RawFhsMessage;
           } catch {
             return;
           }
@@ -204,8 +213,8 @@ class MockOcrProvider {
         );
       });
 
-      ws.on("message", (data) => {
-        const msg = JSON.parse(data.toString());
+      ws.on("message", (data: Buffer) => {
+        const msg = JSON.parse(data.toString()) as RawFhsMessage;
         vlog(`ATLAS:${this.cfg.name}`, `← ${msg.type}${msg.data ? " " + JSON.stringify(msg.data) : ""}`);
 
         if (msg.type === "welcome") {
@@ -301,21 +310,16 @@ class MockLlmProvider {
       wss.on("connection", (ws: WebSocket) => {
         vlog(`LLM:${this.cfg.name}`, "Nueva conexión FHS entrante");
 
-        ws.on("message", (raw) => {
-          let msg: any;
+        ws.on("message", (raw: Buffer) => {
+          let msg: RawFhsMessage;
           try {
-            msg = JSON.parse(raw.toString());
+            msg = JSON.parse(raw.toString()) as RawFhsMessage;
           } catch {
             return;
           }
           vlog(`LLM:${this.cfg.name}`, `← ${msg.type}`);
 
           if (msg.type === "chat.request") {
-            const userContent =
-              msg.request?.messages
-                ?.filter((m: any) => m.role === "user")
-                .pop()?.content || "";
-
             const responseText =
               `[LLM Mock] He procesado tu documento. ` +
               `El texto extraído indica que es un documento de prueba. ` +
@@ -370,8 +374,8 @@ class MockLlmProvider {
         );
       });
 
-      ws.on("message", (data) => {
-        const msg = JSON.parse(data.toString());
+      ws.on("message", (data: Buffer) => {
+        const msg = JSON.parse(data.toString()) as RawFhsMessage;
         vlog(`ATLAS:${this.cfg.name}`, `← ${msg.type}${msg.data ? " " + JSON.stringify(msg.data) : ""}`);
 
         if (msg.type === "welcome") {
@@ -432,12 +436,12 @@ class MockLlmProvider {
 // ─── Cliente de chat ──────────────────────────────────────────────
 interface ChatResult {
   providerName: string;
-  events: any[];
+  events: AgentSSEEvent[];
 }
 
 function sendChat(fileDataUrl: string, marker: string): Promise<ChatResult> {
   return new Promise((resolve, reject) => {
-    const events: any[] = [];
+    const events: AgentSSEEvent[] = [];
     let providerName = "desconocido";
     let conversationId: string | null = null;
     let ocrConfirmed = false;
@@ -465,8 +469,8 @@ function sendChat(fileDataUrl: string, marker: string): Promise<ChatResult> {
       );
     });
 
-    ws.on("message", (data) => {
-      const event = JSON.parse(data.toString());
+    ws.on("message", (data: Buffer) => {
+      const event = JSON.parse(data.toString()) as AgentSSEEvent;
       events.push(event);
 
       switch (event.type) {
@@ -536,12 +540,14 @@ function sendChat(fileDataUrl: string, marker: string): Promise<ChatResult> {
 }
 
 // ─── Main ──────────────────────────────────────────────────────────
-async function verifyRegistry(expectedCount: number) {
+async function verifyRegistry(_expectedCount: number) {
   try {
     const res = await fetch(`${ATLAS_HTTP}/api/fhs/providers?type=mcp`);
-    const providers: any[] = await res.json();
+    const providers = (await res.json()) as Array<{
+      service?: { capabilities?: Array<{ id: string }> };
+    }>;
     const ocrProviders = providers.filter((p) =>
-      p.service?.capabilities?.some((c: any) => c.id === "document.ocr")
+      p.service?.capabilities?.some((c) => c.id === "document.ocr")
     );
     log("\u{1F50D}", "ATLAS", `${ocrProviders.length} proveedor(es) OCR en el catálogo`);
     return ocrProviders;
@@ -590,7 +596,7 @@ async function main() {
   }
   try {
     const llmRes = await fetch(`${ATLAS_HTTP}/api/fhs/providers?type=llm`);
-    const llmProviders: any[] = await llmRes.json();
+    const llmProviders = (await llmRes.json()) as unknown[];
     log("\u{1F50D}", "ATLAS", `${llmProviders.length} proveedor(es) LLM en el catálogo`);
   } catch {
     log("\u26A0\uFE0F", "ATLAS", "No se pudo verificar proveedores LLM");
@@ -659,7 +665,7 @@ async function main() {
   console.log("═".repeat(60) + "\n");
 }
 
-main().catch((err) => {
-  console.error("\n\u274C Error en la demo:", err.message);
+main().catch((err: unknown) => {
+  console.error("\n\u274C Error en la demo:", err instanceof Error ? err.message : String(err));
   process.exit(1);
 });

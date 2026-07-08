@@ -20,9 +20,12 @@ const server = http.createServer((req, res) => {
   req.on("data", (chunk) => (body += chunk));
   req.on("end", () => {
     try {
-      const data = JSON.parse(body);
+      const data = JSON.parse(body) as {
+        model?: string;
+        messages?: Array<{ role: string; content?: string }>;
+      };
       const messages = data.messages || [];
-      const lastUser = messages.filter((m: any) => m.role === "user").pop();
+      const lastUser = messages.filter((m) => m.role === "user").pop();
       const text = lastUser?.content?.toLowerCase() || "";
       // Palabra completa, no substring — "ocr" como substring hacía falso
       // positivo con cualquier texto que contuviera "democrática" (contiene
@@ -30,7 +33,7 @@ const server = http.createServer((req, res) => {
       // real (SPEC-KB-0001/SPEC-RAG-0001).
       const useTool = /\b(ocr|imagen|foto)\b/.test(text);
 
-      const response: any = {
+      const response = {
         id: "mock-llm-1",
         object: "chat.completion",
         model: data.model || "qwen2.5-coder-3b",
@@ -60,7 +63,7 @@ const server = http.createServer((req, res) => {
 
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(response));
-    } catch (err) {
+    } catch {
       res.writeHead(400);
       res.end("Bad request");
     }

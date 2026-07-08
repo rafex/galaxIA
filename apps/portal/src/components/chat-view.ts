@@ -1,4 +1,4 @@
-import type { AgentSSEEvent, ChatMessage, ChatState } from "../types/fhs.js";
+import type { AgentSSEEvent, ChatMessage, ChatState, KbCitation, ProvenanceInfo } from "../types/fhs.js";
 import { connectToChat, type ChatConnection } from "../services/api.js";
 
 interface ModelOption {
@@ -579,7 +579,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     return div.innerHTML;
   }
 
-  function renderCitation(citation: any): string {
+  function renderCitation(citation: KbCitation): string {
     const pages =
       citation.pageStart != null
         ? ` (p. ${citation.pageStart}${citation.pageEnd != null ? `–${citation.pageEnd}` : ""})`
@@ -587,14 +587,14 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     return `${escapeHtml(citation.documentTitle)}${pages}`;
   }
 
-  function renderProvenance(provenance: any) {
+  function renderProvenance(provenance: ProvenanceInfo) {
     provenancePlaceholder.innerHTML = `
       <dl>
         <dt>Modelo</dt><dd>${escapeHtml(provenance.llm.model)}</dd>
         <dt>Razonamiento</dt><dd>${escapeHtml(provenance.llm.providerName)}</dd>
         ${provenance.tools
           .map(
-            (tool: any) => `
+            (tool) => `
           <dt>Tool</dt><dd>${escapeHtml(tool.capability)} @ ${escapeHtml(tool.providerName)}</dd>
           ${
             tool.citations && tool.citations.length > 0

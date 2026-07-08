@@ -6,13 +6,14 @@ import type {
   ToolCallRequestMessage,
   ToolListRequestMessage,
   ToolListResponseMessage,
+  ToolParameterSchema,
 } from "@rafex/galaxia-fhs-protocol";
 import { logTrace } from "../observability/trace.js";
 
 export interface LoadedTool {
   name: string;
   description?: string;
-  inputSchema?: Record<string, unknown>;
+  inputSchema?: ToolParameterSchema;
   providerId: string;
   providerName: string;
   capabilityId: string;
@@ -94,7 +95,7 @@ export class McpHost {
     ws.on("message", (raw: Buffer) => {
       let msg: Record<string, unknown> & { requestId: string; type: string; code?: string; message?: string };
       try {
-        msg = JSON.parse(String(raw));
+        msg = JSON.parse(String(raw)) as typeof msg;
       } catch {
         return; // ignorar mensajes no JSON
       }

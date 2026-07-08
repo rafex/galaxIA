@@ -1,14 +1,23 @@
 import type { FastifyInstance } from "fastify";
 import { Atlas } from "../atlas/registry.js";
 
+interface ModelListEntry {
+  modelId: string;
+  displayName: string;
+  providerId: string;
+  providerName: string;
+  capabilities: string[];
+  contextWindow?: number;
+}
+
 export function setupProvidersApi(app: FastifyInstance, registry: Atlas) {
   app.get("/api/fhs/nodes", () => {
     return registry.getNodes();
   });
 
   app.get("/api/fhs/providers", (req) => {
-    const type = (req.query as { type?: string }).type;
-    const providers = registry.getProviders(type as any);
+    const type = (req.query as { type?: "llm" | "mcp" }).type;
+    const providers = registry.getProviders(type);
     // SPEC-SATRATING-0001: adjunta fiabilidad/rating por capability — por
     // modelo si es tipo "llm", por capability declarada si es tipo "mcp".
     // null si nunca se registró una muestra (nodo recién conectado).
@@ -27,7 +36,7 @@ export function setupProvidersApi(app: FastifyInstance, registry: Atlas) {
 
   app.get("/api/fhs/models", () => {
     const providers = registry.getProviders("llm");
-    const models: any[] = [];
+    const models: ModelListEntry[] = [];
     for (const p of providers) {
       for (const m of p.service.models || []) {
         models.push({
@@ -55,7 +64,7 @@ export function setupProvidersApi(app: FastifyInstance, registry: Atlas) {
   });
 
   app.post("/api/fhs/resolve", (req) => {
-    const { kind, capabilities, scope } = req.body as {
+    const { kind, capabilities: _capabilities, scope: _scope } = req.body as {
       kind: "llm" | "mcp";
       capabilities?: string[];
       scope?: string;

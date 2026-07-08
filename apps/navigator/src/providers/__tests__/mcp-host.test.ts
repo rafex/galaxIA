@@ -1,18 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { EventEmitter } from "node:events";
-import WebSocket from "ws";
+import { describe, it, expect, beforeEach } from "vitest";
 import { McpHost, type LoadedTool } from "../mcp-host.js";
-
-function createMockWs() {
-  const emitter = new EventEmitter();
-  const ws = Object.assign(emitter, {
-    readyState: WebSocket.OPEN,
-    send: vi.fn(),
-    close: vi.fn(),
-    terminate: vi.fn(),
-  });
-  return ws as unknown as WebSocket;
-}
 
 describe("McpHost", () => {
   let host: McpHost;

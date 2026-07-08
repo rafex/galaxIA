@@ -1,9 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { WebSocket } from "@fastify/websocket";
 import {
-  type HelloMessage,
-  type RegisterMessage,
-  type PingMessage,
   type FhsMessage,
   HEARTBEAT_INTERVAL_SECONDS,
   FHS_ERROR_CODES,
@@ -28,7 +25,7 @@ function validateTimestamp(ts: number): true | string {
 }
 
 export function setupWebSocket(app: FastifyInstance, registry: Atlas) {
-  app.get("/fhs/v1/ws", { websocket: true }, (socket: WebSocket, req: FastifyRequest) => {
+  app.get("/fhs/v1/ws", { websocket: true }, (socket: WebSocket, _req: FastifyRequest) => {
     let providerId: string | null = null;
     let pingTimer: NodeJS.Timeout | null = null;
 

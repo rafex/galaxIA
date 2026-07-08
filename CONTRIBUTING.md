@@ -65,6 +65,11 @@ Abre un issue describiendo:
 - Prioriza claridad y consistencia con el código existente sobre
   abstracciones nuevas. No agregues configuración o manejo de errores para
   escenarios que no pueden ocurrir.
+- `any` está prohibido (`@typescript-eslint/no-explicit-any` es `error`, no
+  warning, en `eslint.config.mjs`) — usa `unknown` + type guard/cast puntual,
+  o el tipo real, en su lugar. Un dato no confiable (JSON.parse de un
+  WebSocket, `req.body`, `fetch().json()`) se tipa `unknown` en el borde y se
+  acota con un type guard o un cast a una interfaz mínima, nunca con `any`.
 
 ## Git hooks
 

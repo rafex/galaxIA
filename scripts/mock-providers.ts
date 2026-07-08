@@ -6,15 +6,15 @@ import WebSocket from "ws";
 
 const REGISTRY_URL = "ws://localhost:8083/fhs/v1/ws";
 
-function registerProvider(providerId: string, name: string, manifest: any) {
+function registerProvider(providerId: string, _name: string, manifest: Record<string, unknown>) {
   const ws = new WebSocket(REGISTRY_URL);
 
   ws.on("open", () => {
     ws.send(JSON.stringify({ type: "hello", providerId, timestamp: Date.now() }));
   });
 
-  ws.on("message", (data: any) => {
-    const msg = JSON.parse(data.toString());
+  ws.on("message", (data: Buffer) => {
+    const msg = JSON.parse(data.toString()) as { type?: string };
     console.log(`[${providerId}]`, msg.type, msg);
 
     if (msg.type === "welcome") {

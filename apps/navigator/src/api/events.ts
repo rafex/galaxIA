@@ -20,7 +20,7 @@ export function setupEventsApi(app: FastifyInstance, eventBus: EventBus) {
         try {
           reply.raw.write(`event: ${event.type}\n`);
           reply.raw.write(`data: ${JSON.stringify(event.data)}\n\n`);
-        } catch (err) {
+        } catch {
           // Client disconnected
           unsubscribe();
         }
