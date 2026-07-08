@@ -9,7 +9,7 @@
 # spec-native/DECISIONS.md DEC-0060 a DEC-0063).
 #
 # Uso:
-#   REF=main  # o: v0.1.0-beta.1 (para una release reproducible)
+#   REF=main  # o: v0.1.0-alpha.1 (para una release reproducible)
 #   curl -O https://raw.githubusercontent.com/rafex/galaxIA/${REF}/containers/compose.release.yaml
 #   curl -O https://raw.githubusercontent.com/rafex/galaxIA/${REF}/containers/.env.example
 #   cp .env.example .env   # y editar según docs/instalacion.md

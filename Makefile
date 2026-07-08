@@ -43,6 +43,6 @@ help:
 	@echo "  (cada uno también tiene -bump-check/-bump/-verify por separado, requiere GH_TOKEN)"
 	@echo ""
 	@echo "$(C_BOLD)Release (GHCR):$(C_RESET)"
-	@echo "  make release-tag        Crea y pushea el siguiente tag vX.Y.Z-beta.N (dispara publish-containers.yml)"
+	@echo "  make release-tag        Crea y pushea el siguiente tag vX.Y.Z-alpha.N (dispara publish-containers.yml)"
 	@echo ""
 	@echo "$(C_BOLD)Orquestación:$(C_RESET) usar $(C_CYAN)just$(C_RESET) (ver Justfile o ejecutar 'just --list')"

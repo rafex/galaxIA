@@ -1,8 +1,8 @@
-# helpers/mk/release.mk — corte de release (tag beta incremental)
+# helpers/mk/release.mk — corte de release (tag alpha incremental)
 # Depende de: helpers/mk/common.mk
 # Incluir con: include helpers/mk/release.mk
 #
-# El tag vX.Y.Z-beta.N es lo que dispara .github/workflows/publish-containers.yml
+# El tag vX.Y.Z-alpha.N es lo que dispara .github/workflows/publish-containers.yml
 # (push de tag v*, ver DEC-0063) — cortar un release es crear y pushear este
 # tag, nada más; los workflows ya existentes hacen el resto (build multi-arch
 # + push a GHCR).
