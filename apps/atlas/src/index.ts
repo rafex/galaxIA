@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import Fastify, { type FastifyInstance } from "fastify";
 import websocket from "@fastify/websocket";
 import { readFileSync } from "node:fs";

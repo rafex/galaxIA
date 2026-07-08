@@ -6,11 +6,11 @@ name: Publish @rafex/galaxia-fhs-protocol to GitHub Packages
 #
 # Automatización (DEC-0041, ver helpers/shell y helpers/python):
 # - Si la versión en package.json ya está publicada, el propio workflow la
-#   sube automáticamente (helpers/python/bump_protocol_version.py) y
+#   sube automáticamente (helpers/python/bump_package_version.py) y
 #   commitea el bump de vuelta a main — ya no depende de que quien mergea
 #   se acuerde de subir el número a mano.
 # - Antes de publicar, verifica que el tarball incluya dist/ compilado
-#   (helpers/shell/verify-protocol-package.sh) — la versión 0.1.0 se publicó
+#   (helpers/shell/verify-package.sh) — la versión 0.1.0 se publicó
 #   rota por esto exacto (ver DEC-0040), este chequeo evita que se repita.
 
 on:
