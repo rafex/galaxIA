@@ -1,3 +1,12 @@
+# Template, no un nginx.conf final — la imagen oficial nginx:alpine corre
+# `envsubst` sobre cualquier *.template en /etc/nginx/templates/ al
+# arrancar el contenedor, sustituyendo solo las variables que existen de
+# verdad como variable de entorno (ATLAS_URL/NAVIGATOR_URL, ver
+# Containerfile) — las variables propias de nginx ($host, $http_upgrade,
+# etc.) no están en el entorno del proceso, así que quedan intactas.
+# Esto es lo que permite que Atlas/Navigator vivan en otra máquina sin
+# reconstruir la imagen: solo hace falta pasar ATLAS_URL/NAVIGATOR_URL
+# distintos al arrancar el contenedor (ver docs/despliegue-multi-host.md).
 server {
     listen 80;
     server_name localhost;
@@ -12,7 +21,7 @@ server {
     # separados — /api/fhs/* (catálogo/métricas) y /fhs/v1/ws (registro de
     # nodos) van a Atlas; /api/chat* y el resto de /api van a Navigator.
     location /api/fhs {
-        proxy_pass http://atlas:8081;
+        proxy_pass ${ATLAS_URL};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -21,7 +30,7 @@ server {
     }
 
     location /fhs/v1/ws {
-        proxy_pass http://atlas:8081;
+        proxy_pass ${ATLAS_URL};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -29,7 +38,7 @@ server {
     }
 
     location /api/chat/ws {
-        proxy_pass http://navigator:8090;
+        proxy_pass ${NAVIGATOR_URL};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -38,7 +47,7 @@ server {
     }
 
     location /api {
-        proxy_pass http://navigator:8090;
+        proxy_pass ${NAVIGATOR_URL};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

@@ -66,6 +66,33 @@ Los defaults preservan el comportamiento de un solo host sin tocar nada. Para mu
 
 También se quitó `depends_on: atlas` de `star`/`satellite-ocr` en `compose.yaml` — con dependencia, `podman-compose` intentaba levantar `atlas` localmente en el bastion aunque solo se pidiera `star`, lo cual no tiene sentido cuando `atlas` vive en otra máquina.
 
+### Separar también el core: Atlas/Navigator/Portal en máquinas distintas
+
+Lo de arriba resuelve "los providers en otra máquina" — `apps/atlas`, `apps/navigator` y `apps/portal-chat` seguían asumiendo que viven juntos en el mismo host (mismo `docker network fhs`). Ya no hace falta: los tres son configurables por variable de entorno sin reconstruir ninguna imagen.
+
+- `apps/atlas`/`apps/navigator` ya eran 100% configurables (`PORT`, `HOST`, `ATLAS_URL`) desde antes.
+- `containers/portal-chat/nginx.conf.template` (antes `nginx.conf`, hardcodeado a `http://atlas:8081`/`http://navigator:8090`) ahora es un template real: la imagen `nginx:alpine` corre `envsubst` sobre él al arrancar, sustituyendo `${ATLAS_URL}`/`${NAVIGATOR_URL}` — variables de entorno del contenedor, no de nginx (`$host`, `$http_upgrade`, etc. quedan intactos porque no son variables de entorno del proceso).
+
+Para un despliegue real de tres máquinas (Atlas en una, Navigator en otra, Portal en una tercera):
+
+```bash
+# En la máquina de Atlas
+podman run -d -p 8081:8081 --name atlas ghcr.io/rafex/galaxia-atlas  # (o build local)
+
+# En la máquina de Navigator
+podman run -d -p 8090:8090 -e ATLAS_URL=http://<ip-atlas>:8081 ghcr.io/rafex/galaxia-navigator
+
+# En la máquina del Portal
+podman run -d -p 3000:80 \
+  -e ATLAS_URL=http://<ip-atlas>:8081 \
+  -e NAVIGATOR_URL=http://<ip-navigator>:8090 \
+  ghcr.io/rafex/galaxia-portal-chat
+```
+
+Los defaults (`http://atlas:8081`/`http://navigator:8090`) preservan el comportamiento de un solo host vía `docker-compose` sin tocar nada — ver `containers/compose.yaml`. El overlay TLS (`compose.tls.yaml`) usa el mismo mecanismo con defaults `https://` (ver `nginx-tls.conf.template`).
+
+**Riesgo conocido, no resuelto por este cambio:** nginx resuelve el hostname de `proxy_pass` **al arrancar** el contenedor, no de forma perezosa — si `ATLAS_URL`/`NAVIGATOR_URL` apunta a un hostname que no resuelve en ese momento (a diferencia de una IP, que nunca necesita DNS), el contenedor de portal-chat falla al arrancar con `host not found in upstream`. Con IPs directas (recomendado para multi-host real) esto no aplica.
+
 ## Ciclo de vida del registro entre hosts
 
 ```mermaid

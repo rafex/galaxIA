@@ -59,6 +59,12 @@ services:
     container_name: fhs-portal-chat
     ports:
       - "3000:80"
+    # Defaults para un solo host (Docker DNS) — sobreescribir en un .env
+    # cuando Atlas/Navigator viven en otra máquina de la red (ver
+    # docs/despliegue-multi-host.md), ej. ATLAS_URL=http://192.168.1.50:8081.
+    environment:
+      - ATLAS_URL=${ATLAS_URL:-http://atlas:8081}
+      - NAVIGATOR_URL=${NAVIGATOR_URL:-http://navigator:8090}
     depends_on:
       - navigator
       - atlas
