@@ -12,6 +12,7 @@
 | Nodo proveedor (genérico, cualquier tipo) | Node / Nodo | Término neutro cuando no importa si es Star o Satellite |
 | LLM provider | Star | Fuente de razonamiento/generación — central, como una estrella |
 | Tool provider | Satellite | Capacidad específica que orbita y aporta una función (OCR, búsqueda, etc.) |
+| Agent provider (loop de razonamiento propio) | Nova | Un evento de varias fases, no una sola llamada — razona en rondas antes de responder (DEC-0055) |
 | Registro (Registry) | Atlas | Mapa de nodos y capacidades |
 | Manifiesto (manifest) | Beacon | Lo que anuncia un nodo al conectarse |
 | Chat web | Portal | Entrada humana a la red |
@@ -28,11 +29,11 @@
 - **Storage Satellite** — archivos/documentos.
 - **Bridge Satellite** — conecta con otro protocolo o red.
 
-No hay subtipos de Star reservados todavía — un solo tipo de razonamiento por ahora.
+No hay subtipos de Star reservados todavía — un solo tipo de razonamiento por ahora. Ver **Nova** abajo — un tipo de nodo hermano, no un subtipo de Star.
 
-## Star vs. Satellite: por qué no son sinónimos
+## Star vs. Satellite vs. Nova: por qué no son sinónimos
 
-Un **Star** razona: recibe un mensaje y genera una respuesta (hoy, un LLM vía `star-example`). Un **Satellite** ejecuta una capacidad puntual y determinada: OCR, búsqueda, en el futuro RAG o una base de conocimiento. Cuando algo aplica a cualquiera de los dos por igual (el ciclo de vida de conexión, el heartbeat, el descubrimiento por mDNS), se usa **"nodo"** como término neutro — nunca "satélite" como paraguas genérico, que fue el uso inicial descartado en DEC-0024.
+Un **Star** razona: recibe un mensaje y genera una respuesta en una sola llamada, sin estado ni loop (hoy, un LLM vía `star-example`). Un **Satellite** ejecuta una capacidad puntual y determinada: OCR, búsqueda, en el futuro RAG o una base de conocimiento. Un **Nova** (DEC-0055) también razona, pero con un loop interno de varias rondas antes de responder — se pide explícitamente cuando la tarea lo justifica, nunca reemplaza la decisión determinística de quién orquesta (Navigator) sobre cuándo invocar cada nodo. Cuando algo aplica a cualquiera de los tres por igual (el ciclo de vida de conexión, el heartbeat, el descubrimiento por mDNS), se usa **"nodo"** como término neutro — nunca "satélite" como paraguas genérico, que fue el uso inicial descartado en DEC-0024.
 
 ## Frase de posicionamiento
 

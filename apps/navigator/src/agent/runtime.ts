@@ -112,7 +112,7 @@ export class AgentRuntime {
     artifacts?: string[],
     preExtractedText?: string,
     ragActive?: boolean,
-    kbProviderId?: string
+    kbProviderIds?: string[]
   ) {
     this.artifacts = preExtractedText ? [] : artifacts || [];
     this.emitStatus("classifying", "Analizando tu petición...");
@@ -166,17 +166,23 @@ export class AgentRuntime {
       // la tool disponible, el LLM puede igual decidir invocarla sin adjunto
       // y fallar (ver bug encontrado en la demo multi-host: el modelo llamaba
       // ocr_extract sobre un /tmp/ocr.png inexistente tras confirmar el uso).
-      const ocrToolIndex = loadedTools.findIndex((t) => t.capabilityId === "document.ocr");
-      if (ocrToolIndex >= 0) loadedTools.splice(ocrToolIndex, 1);
+      for (let i = loadedTools.length - 1; i >= 0; i--) {
+        if (loadedTools[i].capabilityId === "document.ocr") {
+          loadedTools.splice(i, 1);
+        }
+      }
     } else {
-      const ocrToolIndex = this.artifacts.length > 0
-        ? loadedTools.findIndex((t) => t.capabilityId === "document.ocr")
-        : -1;
+      const ocrTools = this.artifacts.length > 0
+        ? loadedTools.filter((t) => t.capabilityId === "document.ocr")
+        : [];
 
-      if (ocrToolIndex >= 0) {
-        const ocrTool = loadedTools[ocrToolIndex];
-        const ocrText = await this.runOcrDeterministically(ocrTool, preferences);
-        loadedTools.splice(ocrToolIndex, 1); // ya se ejecutó; no ofrecerla también al LLM
+      if (ocrTools.length > 0) {
+        const ocrText = await this.runOcrDeterministically(ocrTools, preferences);
+        for (let i = loadedTools.length - 1; i >= 0; i--) {
+          if (loadedTools[i].capabilityId === "document.ocr") {
+            loadedTools.splice(i, 1);
+          }
+        }
         userContent = ocrText
           ? `[Texto extraído automáticamente del archivo adjunto mediante OCR]\n${ocrText}\n\n[Pregunta del usuario]\n${message.content}`
           : `${message.content}\n\n(No se pudo extraer texto del archivo adjunto.)`;
@@ -194,13 +200,15 @@ export class AgentRuntime {
       }
     }
 
-    // SPEC-KB-0001: kbProviderId ya viene resuelto por chat-ws.ts — modo
-    // manual (preferences.kb) o modo recomendado ya confirmado por el
-    // usuario (kb.decision). Nunca el LLM decide qué KB usar.
-    if (kbProviderId) {
-      const kbContext = await this.queryKb(kbProviderId, message.content, preferences);
+    // SPEC-KB-0001/SPEC-KB-0002: kbProviderIds ya viene resuelto por
+    // chat-ws.ts — modo manual (preferences.kb, un solo id) o modo
+    // recomendado/límite ya confirmado por el usuario (kb.decision, uno o
+    // varios ids). Nunca el LLM decide qué KB(s) usar sin que el usuario
+    // haya visto y confirmado cuáles se van a consultar.
+    if (kbProviderIds && kbProviderIds.length > 0) {
+      const kbContext = await this.queryMultipleKbs(kbProviderIds, message.content, preferences);
       if (kbContext) {
-        userContent = `[Fragmentos relevantes de la base de conocimiento]\n${kbContext}\n\n${userContent}`;
+        userContent = `[Fragmentos relevantes de la(s) base(s) de conocimiento]\n${kbContext}\n\n${userContent}`;
       }
     }
 
@@ -304,15 +312,14 @@ export class AgentRuntime {
       for (const p of providers) {
         if (scope && !matchesScope(p.service, scope)) continue;
         const capability = p.service.capabilities.find((c) => c.id === cap);
-        if (capability && !seen.has(`${p.providerId}:${cap}`)) {
-          seen.add(`${p.providerId}:${cap}`);
+        if (capability && !seen.has(`${p.providerId}:${capability.id}`)) {
+          seen.add(`${p.providerId}:${capability.id}`);
           result.push({
             capability,
             providerId: p.providerId,
             providerName: p.name,
             service: p.service,
           });
-          break;
         }
       }
     }
@@ -335,13 +342,13 @@ export class AgentRuntime {
     const loadedTools = await this.mcpHost.loadToolsForCapabilities(
       toolProviders.map((t) => ({ providerId: t.providerId, providerName: t.providerName, service: t.service }))
     );
-    const ocrTool = loadedTools.find((t) => t.capabilityId === "document.ocr");
-    if (!ocrTool) {
+    const ocrTools = loadedTools.filter((t) => t.capabilityId === "document.ocr");
+    if (ocrTools.length === 0) {
       this.emitError("NO_OCR_PROVIDER", "No hay proveedores de OCR disponibles en tu scope");
       return null;
     }
 
-    const text = await this.runOcrDeterministically(ocrTool, preferences);
+    const text = await this.runOcrDeterministically(ocrTools, preferences);
     if (text) {
       this.emit({ type: "ocr.extracted", data: { filename, text } });
     }
@@ -356,7 +363,11 @@ export class AgentRuntime {
    * scope del usuario, simplemente no hay RAG disponible para esta
    * conversación — no es un error visible para el usuario.
    */
-  async indexDocumentForRag(text: string, preferences: ModelPreferences): Promise<boolean> {
+  async indexDocumentForRag(
+    text: string,
+    preferences: ModelPreferences,
+    source = "user-upload"
+  ): Promise<boolean> {
     const toolProviders = await this.resolveToolProviders(["document.index"], preferences.scope);
     const loadedTools = await this.mcpHost.loadToolsForCapabilities(
       toolProviders.map((t) => ({ providerId: t.providerId, providerName: t.providerName, service: t.service }))
@@ -368,7 +379,7 @@ export class AgentRuntime {
       await this.mcpHost.callTool(
         indexTool.providerId,
         indexTool.name,
-        { text, conversationId: this.conversationId },
+        { text, conversationId: this.conversationId, source },
         preferences.maxWaitMs,
         { conversationId: this.conversationId, capabilityId: indexTool.capabilityId }
       );
@@ -384,7 +395,13 @@ export class AgentRuntime {
    * 2+ es silenciosa", sin eventos tool.selected/running/completed como sí
    * emite OCR). Devuelve null si no hay rag-provider o no hay nada indexado.
    */
-  private async queryRagContext(query: string, preferences: ModelPreferences): Promise<string | null> {
+  private async queryRagContext(
+    query: string,
+    preferences: ModelPreferences,
+    topK = 3,
+    /** Etiqueta opcional por `source` (SPEC-KB-0002) — usado por la fusión multi-KB para citar de qué KB vino cada fragmento. */
+    labelSource?: (source: string) => string | undefined
+  ): Promise<string | null> {
     const toolProviders = await this.resolveToolProviders(["document.query"], preferences.scope);
     const loadedTools = await this.mcpHost.loadToolsForCapabilities(
       toolProviders.map((t) => ({ providerId: t.providerId, providerName: t.providerName, service: t.service }))
@@ -397,11 +414,13 @@ export class AgentRuntime {
       const { message: result, dispatchMs } = await this.mcpHost.callTool(
         queryTool.providerId,
         queryTool.name,
-        { query, conversationId: this.conversationId, top_k: 3 },
+        { query, conversationId: this.conversationId, top_k: topK },
         preferences.maxWaitMs,
         { conversationId: this.conversationId, capabilityId: queryTool.capabilityId }
       );
-      const parsed = JSON.parse(extractText(result)) as { chunks: Array<{ text: string; score: number }> };
+      const parsed = JSON.parse(extractText(result)) as {
+        chunks: Array<{ text: string; score: number; source?: string }>;
+      };
       this.atlasClient.recordSample({
         providerId: queryTool.providerId,
         capability: queryTool.capabilityId,
@@ -415,7 +434,12 @@ export class AgentRuntime {
         providerName: queryTool.providerName,
         toolName: queryTool.name,
       });
-      return parsed.chunks.map((c) => c.text).join("\n---\n");
+      return parsed.chunks
+        .map((c) => {
+          const label = c.source ? labelSource?.(c.source) : undefined;
+          return label ? `[Fuente: ${label}]\n${c.text}` : c.text;
+        })
+        .join("\n---\n");
     } catch {
       this.atlasClient.recordSample({
         providerId: queryTool.providerId,
@@ -426,159 +450,316 @@ export class AgentRuntime {
     }
   }
 
-  /**
-   * Modo "recomendado" de kb-provider (SPEC-KB-0001, DEC-0027): compara la
-   * pregunta contra `capability.description`/`tags` (DEC-0028) de cada KB
-   * registrada con un matching de texto determinístico — nunca el LLM
-   * decide. Devuelve la mejor coincidencia por encima de un umbral mínimo,
-   * o null si ninguna KB coincide razonablemente (nunca fuerza una
-   * elección de baja relevancia). `chat-ws.ts` pide confirmación al
-   * usuario antes de consultar la KB recomendada.
-   */
-  async recommendKb(
-    question: string,
+  /** Lista los nodos `mcp` con capability `kb.query` visibles en el scope dado. */
+  private async listKbProviders(
     scope?: PrivacyScope
-  ): Promise<{ providerId: string; providerName: string; description: string } | null> {
+  ): Promise<Array<{ providerId: string; providerName: string; description: string; tags: string[] }>> {
     const providers = await this.atlasClient.getProviders("mcp");
-    const questionTokens = tokenizeForMatching(question);
-
-    let best: { providerId: string; providerName: string; description: string; score: number } | null = null;
+    const result: Array<{ providerId: string; providerName: string; description: string; tags: string[] }> = [];
     for (const p of providers) {
       if (scope && !matchesScope(p.service, scope)) continue;
       const kbCapability = p.service.capabilities.find((c) => c.id === "kb.query");
       if (!kbCapability) continue;
+      result.push({
+        providerId: p.providerId,
+        providerName: p.name,
+        description: kbCapability.description || kbCapability.id,
+        tags: kbCapability.tags || [],
+      });
+    }
+    return result;
+  }
 
-      const descriptionText = [kbCapability.description, ...(kbCapability.tags || [])].filter(Boolean).join(" ");
-      const score = jaccardSimilarity(questionTokens, tokenizeForMatching(descriptionText));
-      if (score > 0.05 && (!best || score > best.score)) {
-        best = {
-          providerId: p.providerId,
-          providerName: p.name,
-          description: kbCapability.description || kbCapability.id,
-          score,
-        };
+  /**
+   * Umbral mínimo de similitud para considerar una KB "candidata" en el
+   * matching determinístico (SPEC-KB-0002, pregunta abierta #1, DEC-0054) —
+   * mismo valor ya usado por el modo "recomendado" de SPEC-KB-0001, para no
+   * introducir un segundo número arbitrario sin justificación adicional.
+   */
+  private static readonly KB_MATCH_THRESHOLD = 0.05;
+
+  /**
+   * Matching determinístico (Jaccard contra `capability.description`/`tags`,
+   * DEC-0028) — nunca el LLM decide en este paso. Devuelve las KBs que
+   * superan el umbral, mejor puntuada primero, acotadas a `maxCount`
+   * (SPEC-KB-0002 paso 4: top-N sobre un umbral, nunca todas las KBs).
+   */
+  private async recommendKbCandidates(
+    question: string,
+    scope: PrivacyScope | undefined,
+    maxCount: number
+  ): Promise<Array<{ providerId: string; providerName: string; description: string }>> {
+    const kbs = await this.listKbProviders(scope);
+    const questionTokens = tokenizeForMatching(question);
+
+    return kbs
+      .map((kb) => ({
+        ...kb,
+        score: jaccardSimilarity(questionTokens, tokenizeForMatching([kb.description, ...kb.tags].join(" "))),
+      }))
+      .filter((kb) => kb.score > AgentRuntime.KB_MATCH_THRESHOLD)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, maxCount)
+      .map(({ providerId, providerName, description }) => ({ providerId, providerName, description }));
+  }
+
+  /**
+   * Caso límite de SPEC-KB-0002 (paso 5): ninguna KB superó el umbral
+   * determinístico. En vez de un loop de razonamiento de varios pasos (cada
+   * paso es una nueva oportunidad de que el modelo no llene el formato
+   * esperado, DEC-0016/DEC-0017), se usa la misma disciplina ya aplicada al
+   * catálogo de parsers tolerantes (DEC-0050/SPEC-PARSER-0001): **una sola
+   * llamada al LLM + un parser determinístico y tolerante**, validado contra
+   * los ids realmente ofrecidos — nunca se acepta un id que no esté en la
+   * lista de candidatas. Si el parseo falla o el LLM no decide, el resultado
+   * determinístico es "ninguna" — nunca se adivina.
+   */
+  private async chooseKbViaTolerantParse(
+    question: string,
+    candidates: Array<{ providerId: string; providerName: string; description: string }>,
+    preferences: ModelPreferences
+  ): Promise<string | null> {
+    if (candidates.length === 0) return null;
+
+    const llm = await this.resolveLlm(preferences);
+    if (!llm) return null;
+
+    const candidateList = candidates.map((c) => `- id: "${c.providerId}" — ${c.description}`).join("\n");
+    const messages: LlmMessage[] = [
+      {
+        role: "system",
+        content:
+          "Tienes disponibles las siguientes bases de conocimiento:\n" +
+          candidateList +
+          "\n\nNinguna coincidió claramente con la pregunta según un análisis automático previo. " +
+          'Responde ÚNICAMENTE con un JSON de la forma {"kbId": "<id>"} si alguna aplica, ' +
+          'o {"kbId": null} si ninguna aplica. No agregues texto adicional, ni explicación, ni markdown.',
+      },
+      { role: "user", content: question },
+    ];
+
+    let content: string;
+    try {
+      const response = await this.callLlm(llm, messages, undefined, preferences.maxWaitMs);
+      content = response.message.content || "";
+    } catch {
+      return null;
+    }
+
+    const trimmed = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+    let parsed: any;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return null;
+    }
+    const kbId = parsed?.kbId;
+    if (typeof kbId !== "string") return null;
+    const known = new Set(candidates.map((c) => c.providerId));
+    return known.has(kbId) ? kbId : null;
+  }
+
+  /**
+   * Resuelve qué KB(s) consultar para una pregunta sin selección manual
+   * (SPEC-KB-0002) — top-N determinístico sobre el umbral; si ninguna
+   * califica, el LLM elige una sola vez entre TODAS las KBs registradas
+   * (paso 5), con el mismo parser tolerante ya usado para tool-calling.
+   * `chat-ws.ts` llama esto para construir la confirmación `kb.recommended`
+   * — nunca se consulta nada sin que el usuario la haya visto antes.
+   */
+  async resolveKbCandidates(
+    question: string,
+    preferences: ModelPreferences
+  ): Promise<{
+    candidates: Array<{ providerId: string; providerName: string; description: string }>;
+    chosenByLlm: boolean;
+  }> {
+    const maxCount = preferences.kbMaxPerQuestion ?? 1;
+    const topN = await this.recommendKbCandidates(question, preferences.scope, maxCount);
+    if (topN.length > 0) return { candidates: topN, chosenByLlm: false };
+
+    const allKbs = await this.listKbProviders(preferences.scope);
+    const chosenId = await this.chooseKbViaTolerantParse(question, allKbs, preferences);
+    if (!chosenId) return { candidates: [], chosenByLlm: false };
+
+    const chosen = allKbs.find((kb) => kb.providerId === chosenId)!;
+    return {
+      candidates: [{ providerId: chosen.providerId, providerName: chosen.providerName, description: chosen.description }],
+      chosenByLlm: true,
+    };
+  }
+
+  /**
+   * Consulta N KBs (SPEC-KB-0002) y fusiona sus resultados reutilizando el
+   * motor de RAG de la conversación — cada resultado se indexa en el RAG
+   * con `source: "kb:<providerId>"` (una llamada `document_index` por KB, el
+   * bridge acumula en vez de reemplazar, ver DEC-0054) y se resuelve con una
+   * sola `document_query` sobre el índice combinado, en vez de inventar un
+   * motor de reranking nuevo (DEC-0026/DEC-0037). Todas las KBs consultadas
+   * quedan registradas en `usedTools` — incluso si alguna no aporta ningún
+   * fragmento al resultado final — porque el requisito no negociable de
+   * SPEC-KB-0002 es mostrar qué se consultó, no solo qué se usó.
+   */
+  private async queryMultipleKbs(
+    kbProviderIds: string[],
+    query: string,
+    preferences: ModelPreferences
+  ): Promise<string | null> {
+    const providers = await this.atlasClient.getProviders("mcp");
+    const providerNames = new Map<string, string>();
+    let anyIndexed = false;
+
+    for (const kbProviderId of kbProviderIds) {
+      const target = providers.find((p) => p.providerId === kbProviderId);
+      if (!target) continue;
+      providerNames.set(kbProviderId, target.name);
+
+      const loadedTools = await this.mcpHost.loadToolsForCapabilities([
+        { providerId: target.providerId, providerName: target.name, service: target.service },
+      ]);
+      const kbTool = loadedTools.find((t) => t.capabilityId === "kb.query");
+      if (!kbTool) continue;
+
+      const startTime = Date.now();
+      try {
+        const { message: result, dispatchMs } = await this.mcpHost.callTool(
+          kbTool.providerId,
+          kbTool.name,
+          { query, top_k: 3 },
+          preferences.maxWaitMs,
+          { conversationId: this.conversationId, capabilityId: kbTool.capabilityId }
+        );
+        const parsed = JSON.parse(extractText(result)) as { chunks: KbQueryChunk[] };
+        this.atlasClient.recordSample({
+          providerId: kbTool.providerId,
+          capability: kbTool.capabilityId,
+          sample: { dispatchMs, totalMs: Date.now() - startTime, success: true, at: Date.now() },
+        });
+
+        const citations = (parsed.chunks || []).map((c) => c.citation).filter((c): c is KbCitation => !!c);
+        this.usedTools.push({
+          capability: kbTool.capabilityId,
+          providerId: kbTool.providerId,
+          providerName: kbTool.providerName,
+          toolName: kbTool.name,
+          citations: citations.length > 0 ? citations : undefined,
+        });
+
+        if (parsed.chunks && parsed.chunks.length > 0) {
+          const text = parsed.chunks
+            .map((c) => (c.citation ? `[Fuente: ${c.citation.documentTitle}]\n${c.text}` : c.text))
+            .join("\n---\n");
+          const indexed = await this.indexDocumentForRag(text, preferences, `kb:${kbProviderId}`);
+          if (indexed) anyIndexed = true;
+        }
+      } catch {
+        this.atlasClient.recordSample({
+          providerId: kbTool.providerId,
+          capability: kbTool.capabilityId,
+          sample: { dispatchMs: null, totalMs: Date.now() - startTime, success: false, at: Date.now() },
+        });
       }
     }
 
-    return best ? { providerId: best.providerId, providerName: best.providerName, description: best.description } : null;
+    if (!anyIndexed) return null;
+
+    // Fusión: una sola consulta sobre el índice combinado (todas las KBs +
+    // cualquier documento del usuario ya indexado en esta conversación).
+    // top_k proporcional al número de KBs consultadas para no perder
+    // fragmentos relevantes de cada una al fusionar.
+    const fused = await this.queryRagContext(
+      query,
+      preferences,
+      Math.max(3, kbProviderIds.length * 2),
+      (source) => (source.startsWith("kb:") ? providerNames.get(source.slice(3)) : undefined)
+    );
+    return fused;
   }
 
   /**
-   * Consulta una KB específica (`kb.query`) — no está scoped por
-   * `conversationId` (a diferencia de RAG): cualquier conversación que
-   * consulte este nodo ve el mismo corpus (SPEC-KB-0001).
-   */
-  private async queryKb(kbProviderId: string, query: string, preferences: ModelPreferences): Promise<string | null> {
-    const providers = await this.atlasClient.getProviders("mcp");
-    const target = providers.find((p) => p.providerId === kbProviderId);
-    if (!target) return null;
-
-    const loadedTools = await this.mcpHost.loadToolsForCapabilities([
-      { providerId: target.providerId, providerName: target.name, service: target.service },
-    ]);
-    const kbTool = loadedTools.find((t) => t.capabilityId === "kb.query");
-    if (!kbTool) return null;
-
-    const startTime = Date.now();
-    try {
-      const { message: result, dispatchMs } = await this.mcpHost.callTool(
-        kbTool.providerId,
-        kbTool.name,
-        { query, top_k: 3 },
-        preferences.maxWaitMs,
-        { conversationId: this.conversationId, capabilityId: kbTool.capabilityId }
-      );
-      const parsed = JSON.parse(extractText(result)) as { chunks: KbQueryChunk[] };
-      this.atlasClient.recordSample({
-        providerId: kbTool.providerId,
-        capability: kbTool.capabilityId,
-        sample: { dispatchMs, totalMs: Date.now() - startTime, success: true, at: Date.now() },
-      });
-      if (!parsed.chunks || parsed.chunks.length === 0) return null;
-
-      const citations = parsed.chunks.map((c) => c.citation).filter((c): c is KbCitation => !!c);
-      this.usedTools.push({
-        capability: kbTool.capabilityId,
-        providerId: kbTool.providerId,
-        providerName: kbTool.providerName,
-        toolName: kbTool.name,
-        citations: citations.length > 0 ? citations : undefined,
-      });
-      // Cada fragmento se etiqueta con su fuente cuando hay citación
-      // disponible — el LLM puede así atribuir la respuesta en el texto
-      // (prompting, no lógica nueva de protocolo, DEC-0048).
-      return parsed.chunks
-        .map((c) => (c.citation ? `[Fuente: ${c.citation.documentTitle}]\n${c.text}` : c.text))
-        .join("\n---\n");
-    } catch {
-      this.atlasClient.recordSample({
-        providerId: kbTool.providerId,
-        capability: kbTool.capabilityId,
-        sample: { dispatchMs: null, totalMs: Date.now() - startTime, success: false, at: Date.now() },
-      });
-      return null;
-    }
-  }
-
-  /**
-   * Ejecuta document.ocr directamente contra el provider, sin pasar por una
+   * Ejecuta document.ocr directamente contra los providers, sin pasar por una
    * decisión del LLM. Emite los mismos eventos que executeToolCall para que
    * el frontend muestre la misma actividad (tool.selected/running/completed).
-   * Devuelve el texto extraído, o null si falla (degradación graceful).
+   * Itera sobre la lista de tools en orden — si una falla, intenta la
+   * siguiente automáticamente (failover), emitiendo `provider.failover`.
+   * Devuelve el texto extraído, o null si todas fallan (degradación graceful).
    */
-  private async runOcrDeterministically(tool: LoadedTool, preferences: ModelPreferences): Promise<string | null> {
+  private async runOcrDeterministically(
+    tools: LoadedTool[],
+    preferences: ModelPreferences
+  ): Promise<string | null> {
+    if (tools.length === 0) return null;
     const artifact = this.artifacts[0];
     if (!artifact) return null;
 
-    this.emit({
-      type: "tool.selected",
-      data: { capability: tool.capabilityId, providerId: tool.providerId, providerName: tool.providerName },
-    });
-    this.emit({ type: "tool.running", data: { name: tool.name, providerId: tool.providerId } });
-    const startTime = Date.now();
+    for (let i = 0; i < tools.length; i++) {
+      const tool = tools[i];
 
-    let ipfsCid: string | undefined;
-    let ipfsRetention: "ephemeral" | "reuse" | undefined;
-    try {
-      const built = await this.buildFileArtifact(artifact, preferences);
-      ipfsCid = built.ipfsCid;
-      ipfsRetention = built.ipfsRetention;
-      const args = { file: built.file };
-      const { message: result, dispatchMs } = await this.mcpHost.callTool(
-        tool.providerId,
-        tool.name,
-        args,
-        preferences.maxWaitMs,
-        { conversationId: this.conversationId, capabilityId: tool.capabilityId }
-      );
-      const duration = Date.now() - startTime;
-      const textResult = extractText(result);
+      this.emit({
+        type: "tool.selected",
+        data: { capability: tool.capabilityId, providerId: tool.providerId, providerName: tool.providerName },
+      });
+      this.emit({ type: "tool.running", data: { name: tool.name, providerId: tool.providerId } });
+      const startTime = Date.now();
 
-      this.emit({ type: "tool.completed", data: { name: tool.name, duration, success: true } });
-      this.atlasClient.recordSample({
-        providerId: tool.providerId,
-        capability: tool.capabilityId,
-        sample: { dispatchMs, totalMs: duration, success: true, at: Date.now() },
-      });
-      this.usedTools.push({
-        capability: tool.capabilityId,
-        providerId: tool.providerId,
-        providerName: tool.providerName,
-        toolName: tool.name,
-      });
-      if (ipfsCid && ipfsRetention !== "reuse") void unpinFromIpfs(ipfsCid);
-      return textResult;
-    } catch (err: any) {
-      const duration = Date.now() - startTime;
-      this.emit({ type: "tool.error", data: { name: tool.name, error: err.message } });
-      this.atlasClient.recordSample({
-        providerId: tool.providerId,
-        capability: tool.capabilityId,
-        sample: { dispatchMs: null, totalMs: duration, success: false, at: Date.now() },
-      });
-      if (ipfsCid && ipfsRetention !== "reuse") void unpinFromIpfs(ipfsCid);
-      return null;
+      let ipfsCid: string | undefined;
+      let ipfsRetention: "ephemeral" | "reuse" | undefined;
+      try {
+        const built = await this.buildFileArtifact(artifact, preferences);
+        ipfsCid = built.ipfsCid;
+        ipfsRetention = built.ipfsRetention;
+        const args = { file: built.file };
+        const { message: result, dispatchMs } = await this.mcpHost.callTool(
+          tool.providerId,
+          tool.name,
+          args,
+          preferences.maxWaitMs,
+          { conversationId: this.conversationId, capabilityId: tool.capabilityId }
+        );
+        const duration = Date.now() - startTime;
+        const textResult = extractText(result);
+
+        this.emit({ type: "tool.completed", data: { name: tool.name, duration, success: true } });
+        this.atlasClient.recordSample({
+          providerId: tool.providerId,
+          capability: tool.capabilityId,
+          sample: { dispatchMs, totalMs: duration, success: true, at: Date.now() },
+        });
+        this.usedTools.push({
+          capability: tool.capabilityId,
+          providerId: tool.providerId,
+          providerName: tool.providerName,
+          toolName: tool.name,
+        });
+        if (ipfsCid && ipfsRetention !== "reuse") void unpinFromIpfs(ipfsCid);
+        return textResult;
+      } catch (err: any) {
+        const duration = Date.now() - startTime;
+        this.emit({ type: "tool.error", data: { name: tool.name, error: err.message } });
+        this.atlasClient.recordSample({
+          providerId: tool.providerId,
+          capability: tool.capabilityId,
+          sample: { dispatchMs: null, totalMs: duration, success: false, at: Date.now() },
+        });
+        if (ipfsCid && ipfsRetention !== "reuse") void unpinFromIpfs(ipfsCid);
+
+        if (i < tools.length - 1) {
+          const next = tools[i + 1];
+          this.emit({
+            type: "provider.failover",
+            data: {
+              capability: tool.capabilityId,
+              failedProviderId: tool.providerId,
+              failedProviderName: tool.providerName,
+              nextProviderId: next.providerId,
+              nextProviderName: next.providerName,
+            },
+          });
+        }
+      }
     }
+
+    return null;
   }
 
   /**

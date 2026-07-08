@@ -39,7 +39,7 @@
 - [x] Indicador visual de "pensando" mientras se espera la respuesta del LLM
 - [x] Documentar spec de `rag-provider` (SPEC-RAG-0001) — sin implementar, próxima iniciativa candidata
 - [x] Actualizar toda la documentación (`docs/`, `spec-native/`) para eliminar referencias obsoletas (Qwen 0.5B, puerto 43110, `containers/ocr-mcp` en Python, SDK MCP)
-- [ ] Preparar script de demo de failover OCR para la ponencia
+- [x] Preparar script de demo de failover OCR para la ponencia
 - [x] Actualizar TRACEABILITY.md al cerrar la iniciativa
 
 ## Notas
