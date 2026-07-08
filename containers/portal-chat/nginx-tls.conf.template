@@ -1,6 +1,10 @@
-# Variante TLS de nginx.conf — solo para la PoC (certificado autofirmado).
-# Ver docs/tls-autofirmado.md para cómo activarla. No sustituye a nginx.conf
-# automáticamente: hay que copiarla explícitamente o montarla por volumen.
+# Variante TLS de nginx.conf.template — solo para la PoC (certificado
+# autofirmado). Ver docs/tls-autofirmado.md para cómo activarla — la
+# monta compose.tls.yaml en /etc/nginx/templates/, reemplazando a
+# nginx.conf.template (mismo mecanismo de envsubst-al-arrancar, ver el
+# comentario en nginx.conf.template). ATLAS_URL/NAVIGATOR_URL deben
+# incluir el esquema https:// aquí (compose.tls.yaml los provee con ese
+# default).
 
 server {
     listen 80;
@@ -25,7 +29,7 @@ server {
 
     # DEC-0035: Atlas y Navigator son servicios separados — ver nginx.conf.
     location /api/fhs {
-        proxy_pass https://atlas:8081;
+        proxy_pass ${ATLAS_URL};
         # Autofirmado: no hay CA que verificar. No usar en producción.
         proxy_ssl_verify off;
         proxy_http_version 1.1;
@@ -36,7 +40,7 @@ server {
     }
 
     location /fhs/v1/ws {
-        proxy_pass https://atlas:8081;
+        proxy_pass ${ATLAS_URL};
         proxy_ssl_verify off;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -45,7 +49,7 @@ server {
     }
 
     location /api/chat/ws {
-        proxy_pass https://navigator:8090;
+        proxy_pass ${NAVIGATOR_URL};
         proxy_ssl_verify off;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -55,7 +59,7 @@ server {
     }
 
     location /api {
-        proxy_pass https://navigator:8090;
+        proxy_pass ${NAVIGATOR_URL};
         # Autofirmado: no hay CA que verificar. No usar en producción.
         proxy_ssl_verify off;
         proxy_http_version 1.1;
