@@ -93,6 +93,15 @@ jobs:
       - name: Instalar dependencias del workspace
         run: npm ci
 
+      - name: Compilar fhs-protocol
+        # dist/ está gitignored — atlas/navigator/portal-chat importan
+        # @rafex/galaxia-fhs-protocol contra ese dist/, así que su propio
+        # build/verify falla en un checkout limpio sin este paso (mismo
+        # motivo que DEC-0042 documentó para el CI de PRs; no se había
+        # necesitado aquí hasta que este workflow empezó a procesar algo
+        # más que fhs-protocol, DEC-0062).
+        run: npm run build -w packages/fhs-protocol
+
       - name: Determinar qué paquetes cambiaron
         id: changed
         run: |
