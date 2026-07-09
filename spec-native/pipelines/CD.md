@@ -14,18 +14,18 @@ promocion o cambie el proceso de release.
 
 ## Pipelines activos
 
-### 1. Publicar los 4 paquetes distribuibles a GitHub Packages
+### 1. Publicar los 4 paquetes distribuibles a GitHub Packages + npmjs.org
 
 - **Plataforma de CD:** GitHub Actions.
-- **Archivo de configuración:** `.github/workflows/publish-packages.yml` (generalizado de `publish-fhs-protocol.yml` en DEC-0061/0062, fases 2-3 del plan de distribución — antes solo `packages/fhs-protocol` se publicaba).
+- **Archivo de configuración:** `.github/workflows/publish-packages.yml` (generalizado de `publish-fhs-protocol.yml` en DEC-0061/0062, fases 2-3 del plan de distribución; extendido a npmjs.org en DEC-0066, fase 6 — antes solo `packages/fhs-protocol` se publicaba, y solo a GitHub Packages).
 - **Paquetes:** `@rafex/galaxia-fhs-protocol` (`packages/fhs-protocol`), `@galaxia/atlas`, `@galaxia/navigator`, `@galaxia/portal-chat`.
-- **Dónde ver el estado:** pestaña "Actions" del repo (workflow "Publish packages to GitHub Packages"); paquetes publicados visibles en la pestaña "Packages" de `github.com/rafex/galaxIA`.
+- **Dónde ver el estado:** pestaña "Actions" del repo (workflow "Publish packages to GitHub Packages + npmjs.org"); paquetes publicados visibles en la pestaña "Packages" de `github.com/rafex/galaxIA` y en `npmjs.com/package/<nombre>`.
 - **Trigger:** push a `main` que modifique cualquiera de los 4 workspaces, o `workflow_dispatch` manual (con un input `package` para publicar solo uno, o los 4 por default).
-- **Qué hace (DEC-0041, generalizado en DEC-0062):**
+- **Qué hace (DEC-0041, generalizado en DEC-0062, extendido en DEC-0066):**
   1. Determina qué paquetes cambiaron realmente en el push (`git diff` contra el commit anterior) — un push que solo toca `apps/atlas` no dispara bump/publish de los otros 3.
-  2. Para cada paquete cambiado, en un solo job secuencial (no en paralelo, para no competir por el mismo push a `main`): `helpers/python/bump_package_version.py <workspace>` (sube el patch si la versión actual ya está publicada), commit+push si hubo bump, `helpers/shell/verify-package.sh <workspace>` (verifica que el tarball incluya `dist/*.js`, guarda contra el bug de la versión `0.1.0` de fhs-protocol, ver DEC-0040), y `npm publish -w <workspace>`.
-- **Auth:** usa el `GITHUB_TOKEN` automático de Actions (`permissions.contents: write` + `packages: write` declarados en el workflow) — no requiere un secret adicional. El bump/commit son intra-repo, por eso no hace falta un PAT con alcance a otros repos.
-- **Consumo hoy:** `galaxIA-satellite-star` ya consume `@rafex/galaxia-fhs-protocol` vía GitHub Packages (migrado en DEC-0040, ya no la rama git `fhs-protocol-dist`). Cómo y cuándo ese repo (u otro operador instalando `@galaxia/atlas`/`navigator`/`portal-chat` vía `npx`) actualiza su dependencia **no es responsabilidad de `galaxIA`** — es el mismo principio de DEC-0026/DEC-0037 (el protocolo define el contrato, nunca gestiona a sus consumidores) llevado al ciclo de publicación: `galaxIA` publica versiones a un registro público, cualquier consumidor decide solo cuándo y cómo actualizarse.
+  2. Para cada paquete cambiado, en un solo job secuencial (no en paralelo, para no competir por el mismo push a `main`): `helpers/python/bump_package_version.py <workspace>` (sube el patch si la versión actual ya está publicada **en GitHub Packages** — fuente de verdad para el bump), commit+push si hubo bump, `helpers/shell/verify-package.sh <workspace>` (verifica que el tarball incluya `dist/*.js`, guarda contra el bug de la versión `0.1.0` de fhs-protocol, ver DEC-0040), `npm publish -w <workspace> --registry https://npm.pkg.github.com`, y `npm publish -w <workspace> --registry https://registry.npmjs.org --access public` — misma versión en ambos registros, siempre.
+- **Auth:** `GITHUB_TOKEN` automático de Actions para GitHub Packages (`permissions.contents: write` + `packages: write`); `secrets.NPM_TOKEN` (token de automatización de npmjs.org, creado por el usuario) para el segundo publish.
+- **Consumo hoy:** `galaxIA-satellite-star` ya consume `@rafex/galaxia-fhs-protocol` (hoy vía GitHub Packages; con npmjs.org disponible, puede migrar cuando quiera — no es automático). Cómo y cuándo cualquier consumidor (`galaxIA-satellite-star`, un operador instalando `@galaxia/atlas`/`navigator`/`portal-chat` vía `npx`) actualiza su dependencia **no es responsabilidad de `galaxIA`** — mismo principio de DEC-0026/DEC-0037 (el protocolo define el contrato, nunca gestiona a sus consumidores) llevado al ciclo de publicación.
 
 ### 2. Imágenes de contenedor a GHCR (Atlas/Navigator/portal-chat)
 
@@ -83,7 +83,7 @@ No hay gates de promoción automatizados (no hay ambientes intermedios que atrav
 ## Variables y secretos
 
 - El workflow de publicación usa `secrets.GITHUB_TOKEN`, provisto automáticamente por GitHub Actions — no requiere configurar ningún secret manualmente en el repo.
-- No hay otras variables de entorno relevantes para estos pipelines.
+- `secrets.NPM_TOKEN` (DEC-0066): token de automatización de npmjs.org (tipo "Automation", scope de publicación), configurado manualmente por el usuario en Settings → Secrets del repo — necesario para el segundo `npm publish` de `publish-packages.yml`.
 
 ## Rollback
 

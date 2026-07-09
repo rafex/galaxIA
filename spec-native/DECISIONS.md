@@ -1035,3 +1035,19 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - `Makefile`: `include helpers/mk/release.mk`, nueva sección en `make help`.
   - `spec-native/pipelines/CD.md`: mención del target en la sección de GHCR; corregida una referencia desactualizada a QEMU (DEC-0063 ya usa runners nativos).
   - Verificado: `next-release-tag.sh` probado contra un repo git aislado (sin tags → `v0.1.0-alpha.1`; con `v0.1.0-alpha.1`/`v0.1.0-alpha.7` existentes → `v0.1.0-alpha.2`/`v0.1.0-alpha.8` respectivamente); `make -n release-tag` confirma la receta expandida correctamente.
+
+## DEC-0066 — Publicación a npmjs.org además de GitHub Packages (Fase 6 del plan de distribución)
+
+- **Fecha:** 2026-07-09
+- **Estado:** `accepted` — implementado, pendiente de verificación real (ver Riesgos)
+- **Contexto:** el plan de distribución original (DEC-0060 a DEC-0065) publicaba los 4 paquetes solo a GitHub Packages, dejando npmjs.org explícitamente pendiente ("para más adelante"). El usuario creó `NPM_TOKEN` y pidió activar la publicación real a npmjs.org.
+- **Decisión — mismo push, ambos registros, no un flujo separado:** se extendió `publish-packages.yml` en vez de crear un workflow aparte — GitHub Packages queda como fuente de verdad para decidir si hace falta un bump de versión (`bump_package_version.py` sigue consultando solo ese registro), y la misma versión se publica a npmjs.org inmediatamente después, en el mismo job. Evita que los dos registros queden con versiones distintas del mismo paquete.
+- **Decisión — los 4 paquetes, no solo el protocolo:** paridad completa con GitHub Packages — `@rafex/galaxia-fhs-protocol` y las 3 apps (`@galaxia/atlas`/`navigator`/`portal-chat`) se publican a ambos registros.
+- **`--access public` explícito:** npmjs.org trata cualquier paquete con scope (`@rafex/*`, `@galaxia/*`) como privado por default — publicar así sin ese flag falla o requiere una organización de pago. Verificado antes de activar esto que los 4 nombres estaban libres en npmjs.org (`npm view <paquete> --registry https://registry.npmjs.org` → 404 en los 4).
+- **Auth:** `secrets.NPM_TOKEN` (token de automatización creado por el usuario en npmjs.org), escrito a `~/.npmrc` como `//registry.npmjs.org/:_authToken=...` en el job — convive con la auth de GitHub Packages que `actions/setup-node` ya configura, porque cada `npm publish` especifica su `--registry` explícitamente.
+- **Riesgo explícito, no resuelto por este cambio:** esta publicación dual no se ha corrido contra npmjs.org real todavía — la primera corrida real (recomendado: `workflow_dispatch` con un solo paquete) es la verificación pendiente, mismo patrón que DEC-0062/DEC-0063.
+- **Consecuencias:**
+  - `.github/workflows/publish-packages.yml`: publica a ambos registros; comentario de cabecera actualizado.
+  - `spec-native/pipelines/CD.md`: sección 1 actualizada (paquetes/auth/consumo), nueva entrada en "Variables y secretos" para `NPM_TOKEN`.
+  - Verificado: sintaxis YAML válida; los 4 nombres de paquete confirmados libres en npmjs.org antes de activar la publicación.
+  - Pendiente (acción explícita, no automática): primera corrida real contra npmjs.org.
