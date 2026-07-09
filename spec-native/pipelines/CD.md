@@ -42,7 +42,7 @@ promocion o cambie el proceso de release.
 - **Plataforma de CD:** GitHub Actions + GitHub Pages.
 - **Archivo de configuración:** `.github/workflows/jekyll-gh-pages.yml`.
 - **Dónde ver el estado:** pestaña "Actions"; sitio publicado en `galax-ia.rafex.io`.
-- **Trigger:** push a `main`, o `workflow_dispatch` manual.
+- **Trigger:** push a `main` que modifique `site/**`, o `workflow_dispatch` manual.
 - **Qué hace:** construye `site/` con Jekyll y lo despliega a GitHub Pages. Sin ambientes intermedios (staging) ni aprobación manual — cualquier push a `main` que afecte el sitio se publica de inmediato.
 
 ## Ambientes
