@@ -1,23 +1,31 @@
-name: Publish packages to GitHub Packages
+name: Publish packages to GitHub Packages + npmjs.org
 
 # CD (entrega continua), no CI — ver spec-native/pipelines/CD.md.
-# Publica los 4 paquetes distribuibles del monorepo a GitHub Packages en
-# cada push a main que toque alguno: @rafex/galaxia-fhs-protocol (protocolo),
-# @galaxia/atlas, @galaxia/navigator, @galaxia/portal-chat (DEC-0061, fase 2
-# del plan de distribución — antes solo el protocolo se publicaba, DEC-0040/
-# DEC-0041). Generalizado de publish-fhs-protocol.yml: un solo job procesa
-# solo los paquetes cuyos archivos cambiaron en el push (o los 4, si se
-# dispara manualmente sin filtrar), en vez de un workflow por paquete.
+# Publica los 4 paquetes distribuibles del monorepo a GitHub Packages y a
+# npmjs.org en cada push a main que toque alguno: @rafex/galaxia-fhs-protocol
+# (protocolo), @galaxia/atlas, @galaxia/navigator, @galaxia/portal-chat
+# (DEC-0061/DEC-0066, fases 2 y 6 del plan de distribución — antes solo el
+# protocolo se publicaba, y solo a GitHub Packages, DEC-0040/DEC-0041).
+# Generalizado de publish-fhs-protocol.yml: un solo job procesa solo los
+# paquetes cuyos archivos cambiaron en el push (o los 4, si se dispara
+# manualmente sin filtrar), en vez de un workflow por paquete.
 #
 # Automatización (DEC-0041, ver helpers/shell y helpers/python):
-# - Si la versión en package.json ya está publicada, el propio workflow la
-#   sube automáticamente (helpers/python/bump_package_version.py) y
-#   commitea el bump de vuelta a main — ya no depende de que quien mergea
-#   se acuerde de subir el número a mano.
+# - Si la versión en package.json ya está publicada (en GitHub Packages —
+#   fuente de verdad para el bump, npmjs.org sigue la misma versión), el
+#   propio workflow la sube automáticamente
+#   (helpers/python/bump_package_version.py) y commitea el bump de vuelta
+#   a main — ya no depende de que quien mergea se acuerde de subir el
+#   número a mano.
 # - Antes de publicar, verifica que el tarball incluya dist/ compilado
 #   (helpers/shell/verify-package.sh) — la versión 0.1.0 de fhs-protocol se
 #   publicó rota por esto exacto (ver DEC-0040), este chequeo evita que se
 #   repita en cualquiera de los 4 paquetes.
+# - npmjs.org requiere --access public explícito la primera vez que se
+#   publica un paquete con scope (@rafex/*, @galaxia/*) — por default los
+#   paquetes con scope se asumen privados (requiere una org de pago), y
+#   estos 4 nombres están libres en npmjs.org (verificado antes de activar
+#   esto, DEC-0066).
 
 on:
   push:
@@ -119,9 +127,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Además del registro de GitHub Packages ya configurado por
+          # actions/setup-node (registry-url), habilita auth para
+          # registry.npmjs.org — cada `npm publish` elige el registro
+          # explícitamente con --registry, así que ambas líneas conviven
+          # sin pisarse.
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
 
           for pkg in ${{ steps.changed.outputs.packages }}; do
             echo "::group::$pkg"
@@ -149,6 +165,9 @@ jobs:
             make "${TARGET}-verify"
 
             echo "→ Publicando a GitHub Packages..."
-            npm publish -w "$pkg"
+            npm publish -w "$pkg" --registry https://npm.pkg.github.com
+
+            echo "→ Publicando a npmjs.org..."
+            npm publish -w "$pkg" --registry https://registry.npmjs.org --access public
             echo "::endgroup::"
           done
