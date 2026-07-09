@@ -1051,3 +1051,14 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - `spec-native/pipelines/CD.md`: sección 1 actualizada (paquetes/auth/consumo), nueva entrada en "Variables y secretos" para `NPM_TOKEN`.
   - Verificado: sintaxis YAML válida; los 4 nombres de paquete confirmados libres en npmjs.org antes de activar la publicación.
   - Pendiente (acción explícita, no automática): primera corrida real contra npmjs.org.
+
+## DEC-0067 — `publish-packages.yml`: compilar `fhs-protocol` antes de verificar/publicar las 3 apps
+
+- **Fecha:** 2026-07-09
+- **Estado:** `accepted` — implementado y verificado
+- **Contexto:** primera corrida real de `publish-packages.yml` sobre un paquete de app (`workflow_dispatch`, `apps/atlas`) tras activar npmjs.org (DEC-0066) — falló: `make atlas-verify` no pudo compilar `apps/atlas` porque `dist/` de `packages/fhs-protocol` (gitignored) no existía en el checkout limpio del runner. Mismo motivo exacto que DEC-0042 documentó para el CI de PRs — nunca se había disparado en este workflow porque hasta ahora solo procesaba `packages/fhs-protocol` (que no depende de sí mismo).
+- **Decisión:** agregar `npm run build -w packages/fhs-protocol` justo después de `npm ci`, antes del loop de bump/verify/publish — igual que ya hace `ci.yml` para los mismos jobs.
+- **Consecuencias:**
+  - `.github/workflows/publish-packages.yml`: nuevo paso "Compilar fhs-protocol".
+  - Verificado localmente reproduciendo el fallo exacto (`rm -rf packages/fhs-protocol/dist` + `make atlas-verify` → mismo error `Cannot find module '@rafex/galaxia-fhs-protocol'`) y confirmando que compilar primero lo resuelve.
+  - Pendiente: repetir la corrida real (`workflow_dispatch`, `apps/atlas`) para confirmar que el fix funciona en el runner y que la publicación a npmjs.org llega a buen puerto.
