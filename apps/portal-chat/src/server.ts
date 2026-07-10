@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Servidor estático+proxy de portal-chat para la ruta de distribución npm
-// (`npx @galaxia/portal-chat`) — reemplaza el rol de
+// (`npx @rafex/galaxia-portal-chat`) — reemplaza el rol de
 // containers/portal-chat/nginx.conf.template para quien no usa contenedores.
 // Mismo mapeo de rutas: /api/fhs + /fhs/v1/ws -> Atlas, resto de /api ->
 // Navigator (DEC-0035), configurable por ATLAS_URL/NAVIGATOR_URL para que

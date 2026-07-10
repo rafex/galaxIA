@@ -18,14 +18,14 @@ promocion o cambie el proceso de release.
 
 - **Plataforma de CD:** GitHub Actions.
 - **Archivo de configuración:** `.github/workflows/publish-packages.yml` (generalizado de `publish-fhs-protocol.yml` en DEC-0061/0062, fases 2-3 del plan de distribución; extendido a npmjs.org en DEC-0066, fase 6 — antes solo `packages/fhs-protocol` se publicaba, y solo a GitHub Packages).
-- **Paquetes:** `@rafex/galaxia-fhs-protocol` (`packages/fhs-protocol`), `@galaxia/atlas`, `@galaxia/navigator`, `@galaxia/portal-chat`.
+- **Paquetes:** `@rafex/galaxia-fhs-protocol` (`packages/fhs-protocol`), `@rafex/galaxia-atlas`, `@rafex/galaxia-navigator`, `@rafex/galaxia-portal-chat`.
 - **Dónde ver el estado:** pestaña "Actions" del repo (workflow "Publish packages to GitHub Packages + npmjs.org"); paquetes publicados visibles en la pestaña "Packages" de `github.com/rafex/galaxIA` y en `npmjs.com/package/<nombre>`.
 - **Trigger:** push a `main` que modifique cualquiera de los 4 workspaces, o `workflow_dispatch` manual (con un input `package` para publicar solo uno, o los 4 por default).
 - **Qué hace (DEC-0041, generalizado en DEC-0062, extendido en DEC-0066):**
   1. Determina qué paquetes cambiaron realmente en el push (`git diff` contra el commit anterior) — un push que solo toca `apps/atlas` no dispara bump/publish de los otros 3.
   2. Para cada paquete cambiado, en un solo job secuencial (no en paralelo, para no competir por el mismo push a `main`): `helpers/python/bump_package_version.py <workspace>` (sube el patch si la versión actual ya está publicada **en GitHub Packages** — fuente de verdad para el bump), commit+push si hubo bump, `helpers/shell/verify-package.sh <workspace>` (verifica que el tarball incluya `dist/*.js`, guarda contra el bug de la versión `0.1.0` de fhs-protocol, ver DEC-0040), `npm publish -w <workspace> --registry https://npm.pkg.github.com`, y `npm publish -w <workspace> --registry https://registry.npmjs.org --access public` — misma versión en ambos registros, siempre.
 - **Auth:** `GITHUB_TOKEN` automático de Actions para GitHub Packages (`permissions.contents: write` + `packages: write`); `secrets.NPM_TOKEN` (token de automatización de npmjs.org, creado por el usuario) para el segundo publish.
-- **Consumo hoy:** `galaxIA-satellite-star` ya consume `@rafex/galaxia-fhs-protocol` (hoy vía GitHub Packages; con npmjs.org disponible, puede migrar cuando quiera — no es automático). Cómo y cuándo cualquier consumidor (`galaxIA-satellite-star`, un operador instalando `@galaxia/atlas`/`navigator`/`portal-chat` vía `npx`) actualiza su dependencia **no es responsabilidad de `galaxIA`** — mismo principio de DEC-0026/DEC-0037 (el protocolo define el contrato, nunca gestiona a sus consumidores) llevado al ciclo de publicación.
+- **Consumo hoy:** `galaxIA-satellite-star` ya consume `@rafex/galaxia-fhs-protocol` (hoy vía GitHub Packages; con npmjs.org disponible, puede migrar cuando quiera — no es automático). Cómo y cuándo cualquier consumidor (`galaxIA-satellite-star`, un operador instalando `@rafex/galaxia-atlas`/`navigator`/`portal-chat` vía `npx`) actualiza su dependencia **no es responsabilidad de `galaxIA`** — mismo principio de DEC-0026/DEC-0037 (el protocolo define el contrato, nunca gestiona a sus consumidores) llevado al ciclo de publicación.
 
 ### 2. Imágenes de contenedor a GHCR (Atlas/Navigator/portal-chat)
 
@@ -52,7 +52,7 @@ promocion o cambie el proceso de release.
 | GitHub Packages (fhs-protocol/atlas/navigator/portal-chat) | `main` (cuando cambia el workspace correspondiente) | Sí | No |
 | GHCR (imágenes atlas/navigator/portal-chat) | tag `v*` | Sí | No |
 | Sitio público (GitHub Pages) | `main` | Sí | No |
-| Core (Atlas/Navigator/Portal) | N/A | No — despliegue manual (`just container-up`/`podman-compose`, o `npx @galaxia/atlas`/`navigator`/`portal-chat`) contra el bastion/laptop del operador | No aplica, es despliegue manual |
+| Core (Atlas/Navigator/Portal) | N/A | No — despliegue manual (`just container-up`/`podman-compose`, o `npx @rafex/galaxia-atlas`/`navigator`/`portal-chat`) contra el bastion/laptop del operador | No aplica, es despliegue manual |
 | Providers (`galaxIA-satellite-star`) | N/A | No — despliegue manual, mismo mecanismo que el core | No aplica |
 
 No hay ambiente de "staging" — el proyecto es una PoC de un solo operador (no un servicio SaaS multiusuario todavía), así que el único destino real de los contenedores del core/providers es la topología multi-host laptop+bastion descrita en `docs/despliegue-multi-host.md`.

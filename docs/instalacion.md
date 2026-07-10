@@ -48,23 +48,23 @@ Atlas en una máquina, sin los otros dos). Requiere Node 20+.
 
 ```bash
 # Atlas (Registry) — puerto 8081 por default
-npx @galaxia/atlas
+npx @rafex/galaxia-atlas
 
 # Navigator (Agent Runtime) — puerto 8090 por default, necesita saber
 # dónde está Atlas
-ATLAS_URL=http://localhost:8081 npx @galaxia/navigator
+ATLAS_URL=http://localhost:8081 npx @rafex/galaxia-navigator
 
 # Portal-chat (cliente web) — puerto 3000 por default, necesita saber
 # dónde están Atlas y Navigator
 ATLAS_URL=http://localhost:8081 NAVIGATOR_URL=http://localhost:8090 \
-  npx @galaxia/portal-chat
+  npx @rafex/galaxia-portal-chat
 ```
 
 Cada uno se configura por variable de entorno — `PORT`/`HOST` en los tres,
 `ATLAS_URL` en Navigator y Portal-chat, `NAVIGATOR_URL` en Portal-chat (ver
 tabla completa en `docs/arquitectura.md`).
 
-**Nota sobre `@galaxia/atlas`:** depende de `better-sqlite3` (binding
+**Nota sobre `@rafex/galaxia-atlas`:** depende de `better-sqlite3` (binding
 nativo). Si `npm`/`npx` no encuentra un prebuild para tu plataforma exacta,
 compila en el momento — necesita `python3`, `make`, `g++` instalados. No es
 "cero dependencias del sistema" garantizado en todas las plataformas; si
@@ -94,14 +94,14 @@ Ejemplo con `npx` en tres máquinas:
 
 ```bash
 # Máquina A (Atlas)
-npx @galaxia/atlas
+npx @rafex/galaxia-atlas
 
 # Máquina B (Navigator)
-ATLAS_URL=http://<ip-A>:8081 npx @galaxia/navigator
+ATLAS_URL=http://<ip-A>:8081 npx @rafex/galaxia-navigator
 
 # Máquina C (Portal-chat)
 ATLAS_URL=http://<ip-A>:8081 NAVIGATOR_URL=http://<ip-B>:8090 \
-  npx @galaxia/portal-chat
+  npx @rafex/galaxia-portal-chat
 ```
 
 Con contenedores, el mismo patrón vía `-e ATLAS_URL=...`/`-e

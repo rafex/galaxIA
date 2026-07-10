@@ -1,5 +1,5 @@
 {
-  "name": "@galaxia/portal-tui",
+  "name": "@rafex/galaxia-portal-tui",
   "version": "0.1.0",
   "private": true,
   "type": "module",
