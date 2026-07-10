@@ -52,3 +52,8 @@ Thumbs.db
 # Logs
 *.log
 /tmp/
+
+/data/
+
+# Generado por build:schemas (fhs-protocol) — como dist/, no se versiona
+packages/fhs-protocol/schemas/

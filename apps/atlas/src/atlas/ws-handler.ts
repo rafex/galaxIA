@@ -2,29 +2,44 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { WebSocket } from "@fastify/websocket";
 import {
   type FhsMessage,
+  type NodeIdentity,
   HEARTBEAT_INTERVAL_SECONDS,
   FHS_ERROR_CODES,
+  FHS_VERSION,
+  MAX_REPLAY_AGE_MS,
+  MAX_CLOCK_SKEW_MS,
   verifySignature,
+  signPayload,
+  helloSignaturePayload,
+  registerSignaturePayload,
+  welcomeSignaturePayload,
 } from "@rafex/galaxia-fhs-protocol";
 import { Atlas } from "./registry.js";
 import { validateManifest } from "./manifest-validation.js";
 
-const MAX_REPLAY_AGE_SECONDS = 30;
-const MAX_CLOCK_SKEW_SECONDS = 5;
-
+// Todo timestamp del protocolo va en MILISEGUNDOS (Date.now()) — antes esta
+// validación operaba en segundos mientras todos los providers reales enviaban
+// ms, y ningún registro pasaba (revisión del protocolo, 2026-07-10). Las
+// ventanas viven ahora en el propio protocolo (constants.ts).
 function validateTimestamp(ts: number): true | string {
-  const now = Math.floor(Date.now() / 1000);
-  const age = now - ts;
-  if (age > MAX_REPLAY_AGE_SECONDS) {
-    return `Timestamp demasiado antiguo (${age}s > ${MAX_REPLAY_AGE_SECONDS}s) — posible reenvío`;
+  const age = Date.now() - ts;
+  if (age > MAX_REPLAY_AGE_MS) {
+    return `Timestamp demasiado antiguo (${age}ms > ${MAX_REPLAY_AGE_MS}ms) — posible reenvío. Recuerda: timestamp en milisegundos (Date.now())`;
   }
-  if (age < -MAX_CLOCK_SKEW_SECONDS) {
-    return `Timestamp en el futuro (${-age}s > ${MAX_CLOCK_SKEW_SECONDS}s) — reloj desincronizado`;
+  if (age < -MAX_CLOCK_SKEW_MS) {
+    return `Timestamp en el futuro (${-age}ms > ${MAX_CLOCK_SKEW_MS}ms) — reloj desincronizado. Recuerda: timestamp en milisegundos (Date.now())`;
   }
   return true;
 }
 
-export function setupWebSocket(app: FastifyInstance, registry: Atlas) {
+// Compatibilidad de versión (negociación en hello, revisión 2026-07-10): en
+// 0.x cualquier cambio de minor puede romper — solo se acepta la versión
+// exacta. Ausente = nodo pre-negociación, se asume compatible.
+function isVersionCompatible(v: string | undefined): boolean {
+  return v === undefined || v === FHS_VERSION;
+}
+
+export function setupWebSocket(app: FastifyInstance, registry: Atlas, identity: NodeIdentity) {
   app.get("/fhs/v1/ws", { websocket: true }, (socket: WebSocket, _req: FastifyRequest) => {
     let providerId: string | null = null;
     let pingTimer: NodeJS.Timeout | null = null;
@@ -90,7 +105,18 @@ export function setupWebSocket(app: FastifyInstance, registry: Atlas) {
           // posible con solo conectarse y reutilizar su providerId (DEC-0009
           // ya lo mitigaba parcialmente a nivel de conexión activa; esto lo
           // hace criptográficamente imposible sin la clave privada real).
-          const helloPayload = `${hello.providerId}:${hello.timestamp}`;
+          if (!isVersionCompatible(hello.fhsVersion)) {
+            send({
+              type: "error",
+              data: {
+                code: FHS_ERROR_CODES.UNSUPPORTED_VERSION,
+                message: `Este Registry habla FHS ${FHS_VERSION}; el nodo anunció ${hello.fhsVersion ?? "?"}`,
+              },
+            });
+            socket.close(4010, "unsupported-version");
+            return;
+          }
+          const helloPayload = helloSignaturePayload(hello.providerId, hello.timestamp);
           if (!hello.signature || !verifySignature(hello.providerId, helloPayload, hello.signature)) {
             send({
               type: "error",
@@ -126,10 +152,18 @@ export function setupWebSocket(app: FastifyInstance, registry: Atlas) {
           }
           providerId = hello.providerId;
           registry.registerConnection(providerId, socket);
+          // welcome firmado (revisión 2026-07-10): el Atlas se autentica con
+          // su propia identidad did:key — un nodo puede verificar que no está
+          // entregando su manifiesto a un Registry impostor en la misma LAN.
+          const welcomeTs = Date.now();
           send({
             type: "welcome",
-            registryId: "registry-001",
+            registryId: identity.did,
             leaseSeconds: registry.leaseSeconds,
+            heartbeatSeconds: HEARTBEAT_INTERVAL_SECONDS,
+            fhsVersion: FHS_VERSION,
+            timestamp: welcomeTs,
+            signature: signPayload(identity.privateKey, welcomeSignaturePayload(identity.did, welcomeTs)),
           });
           break;
         }
@@ -141,9 +175,26 @@ export function setupWebSocket(app: FastifyInstance, registry: Atlas) {
           }
           // DEC-0030: register también viaja firmado — el hello ya probó la
           // identidad, pero register lleva su propio timestamp y podría
-          // reenviarse/alterarse por separado.
-          const registerPayload = `${providerId}:${register.timestamp}`;
-          if (!register.signature || !verifySignature(providerId, registerPayload, register.signature)) {
+          // reenviarse/alterarse por separado. Desde la revisión 2026-07-10
+          // la firma ancla además el hash canónico del manifiesto — sin él,
+          // un MITM podía sustituir el manifiesto (endpoint incluido)
+          // conservando una firma válida. El payload legado sin hash se
+          // acepta como deprecado hasta v0.2.
+          const registerPayload = registerSignaturePayload(providerId, register.timestamp, register.manifest);
+          const legacyPayload = `${providerId}:${register.timestamp}`;
+          let signatureOk = false;
+          if (register.signature) {
+            if (verifySignature(providerId, registerPayload, register.signature)) {
+              signatureOk = true;
+            } else if (verifySignature(providerId, legacyPayload, register.signature)) {
+              signatureOk = true;
+              app.log.warn(
+                { providerId },
+                "register con firma legada (no cubre el manifiesto) — deprecado, se rechazará en FHS v0.2"
+              );
+            }
+          }
+          if (!signatureOk) {
             send({
               type: "error",
               data: {
@@ -181,14 +232,15 @@ export function setupWebSocket(app: FastifyInstance, registry: Atlas) {
           const accepted = registry.registerOrUpdate(providerId, register.manifest);
           send({
             type: "registered",
-            leaseExpires: Math.floor(Date.now() / 1000) + registry.leaseSeconds,
+            // ms, como todo timestamp del protocolo (revisión 2026-07-10).
+            leaseExpires: Date.now() + registry.leaseSeconds * 1000,
             acceptedServices: accepted,
           });
           break;
         }
         case "ping": {
           if (providerId) registry.touchConnection(providerId);
-          send({ type: "pong", timestamp: Math.floor(Date.now() / 1000) });
+          send({ type: "pong", timestamp: Date.now() });
           break;
         }
       }

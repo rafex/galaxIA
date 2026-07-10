@@ -27,6 +27,7 @@ export interface AtlasStore {
       endpoint: { url: string; protocol: string; transport?: string };
       capabilities: Signal[];
       models?: ModelInfo[];
+      visibility?: PublishedService["visibility"];
       status?: string;
     }>,
     timestamp: number
@@ -81,6 +82,7 @@ export class MemoryAtlasStore implements AtlasStore {
       endpoint: { url: string; protocol: string; transport?: string };
       capabilities: Signal[];
       models?: ModelInfo[];
+      visibility?: PublishedService["visibility"];
       status?: string;
     }>,
     timestamp: number
@@ -96,6 +98,7 @@ export class MemoryAtlasStore implements AtlasStore {
       capabilities: svc.capabilities,
       status: (svc.status || "available") as PublishedService["status"],
       models: svc.models,
+      visibility: svc.visibility,
       updatedAt: timestamp,
     }));
   }

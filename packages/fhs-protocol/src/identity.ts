@@ -6,7 +6,7 @@
  * directorio de claves separado ni distribución previa.
  */
 
-import { generateKeyPairSync, createPublicKey, createPrivateKey, sign as cryptoSign, verify as cryptoVerify } from "node:crypto";
+import { generateKeyPairSync, createPublicKey, createPrivateKey, createHash, sign as cryptoSign, verify as cryptoVerify } from "node:crypto";
 import type { KeyObject } from "node:crypto";
 
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -97,6 +97,67 @@ export function loadIdentity(privateKeyPem: string): NodeIdentity {
   const publicKey = createPublicKey(privateKey);
   const rawPublicKey = (publicKey.export({ type: "spki", format: "der" }) as Buffer).subarray(-32);
   return { did: publicKeyToDid(rawPublicKey), publicKey, privateKey, privateKeyPem };
+}
+
+/**
+ * Serialización JSON canónica (llaves ordenadas recursivamente, sin espacios)
+ * — necesaria para que dos implementaciones calculen el mismo hash del mismo
+ * manifiesto sin importar el orden de inserción de llaves de su lenguaje.
+ * Los `undefined` se omiten (igual que `JSON.stringify`).
+ */
+export function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "null";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
+  }
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`);
+  return `{${entries.join(",")}}`;
+}
+
+/** SHA-256 (hex) de la forma canónica de un objeto — usado para anclar el manifiesto a la firma de `register`. */
+export function sha256CanonicalHex(value: unknown): string {
+  return createHash("sha256").update(canonicalJson(value), "utf8").digest("hex");
+}
+
+// ── Payloads de firma estandarizados (revisión del protocolo, 2026-07-10) ──
+// Cualquier implementación (TS, Python, Rust...) debe construir exactamente
+// estas cadenas antes de firmar/verificar. `timestamp` siempre en ms.
+
+/** Payload de `hello`: prueba posesión de la clave del `providerId`. */
+export function helloSignaturePayload(providerId: string, timestamp: number): string {
+  return `${providerId}:${timestamp}`;
+}
+
+/**
+ * Payload de `register`: además de identidad y frescura, ancla el contenido
+ * del manifiesto — sin el hash, un MITM podía sustituir el manifiesto entero
+ * (endpoint incluido) conservando una firma válida.
+ */
+export function registerSignaturePayload(providerId: string, timestamp: number, manifest: unknown): string {
+  return `${providerId}:${timestamp}:${sha256CanonicalHex(manifest)}`;
+}
+
+/**
+ * Payload de `welcome`: el Registry (Atlas) también se autentica — su
+ * `registryId` es un did:key propio y firma su saludo, para que un nodo no
+ * entregue su manifiesto a un Atlas impostor en la misma LAN.
+ */
+export function welcomeSignaturePayload(registryId: string, timestamp: number): string {
+  return `${registryId}:${timestamp}`;
+}
+
+/**
+ * Payload de invocación (`chat.request`/`tool.call`/`tool.list`): el
+ * invocador (Navigator u otro agente) prueba su identidad ante el provider —
+ * sin esto, cualquier peer de la LAN podía consumir el LLM/tools de un nodo.
+ */
+export function invokeSignaturePayload(callerId: string, requestId: string, timestamp: number): string {
+  return `${callerId}:${requestId}:${timestamp}`;
 }
 
 /** Firma un payload (ej. `${providerId}:${timestamp}`) con la clave privada del nodo. */

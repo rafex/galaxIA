@@ -8,7 +8,25 @@ import type {
   ToolListResponseMessage,
   ToolParameterSchema,
 } from "@rafex/galaxia-fhs-protocol";
+import { signPayload, invokeSignaturePayload, type ToolCancelMessage } from "@rafex/galaxia-fhs-protocol";
+import { getNavigatorIdentity } from "../identity.js";
 import { logTrace } from "../observability/trace.js";
+
+/**
+ * Firma de invocador (revisión del protocolo 2026-07-10): añade
+ * callerId/timestamp/signature a un tool.call/tool.list — el provider puede
+ * exigirlos y responder UNAUTHORIZED a peers anónimos de la LAN.
+ */
+function withCallerAuth<T extends { requestId: string }>(msg: T): T {
+  const identity = getNavigatorIdentity();
+  const timestamp = Date.now();
+  return {
+    ...msg,
+    timestamp,
+    callerId: identity.did,
+    signature: signPayload(identity.privateKey, invokeSignaturePayload(identity.did, msg.requestId, timestamp)),
+  };
+}
 
 export interface LoadedTool {
   name: string;
@@ -156,7 +174,7 @@ export class McpHost {
     const providerClient: McpProviderClient = { providerId, providerName, service, ws, tools: [], pending };
 
     const listRequestId = randomUUID();
-    const listMsg: ToolListRequestMessage = { type: "tool.list", requestId: listRequestId };
+    const listMsg: ToolListRequestMessage = withCallerAuth<ToolListRequestMessage>({ type: "tool.list", requestId: listRequestId });
     const { message: listResponse } = await this.sendAndWait(providerClient, listMsg, listRequestId) as { message: ToolListResponseMessage };
 
     providerClient.tools = (listResponse.tools || []).map((tool) => ({
@@ -206,7 +224,7 @@ export class McpHost {
       throw new Error(`FHS tool provider no conectado: ${providerId}`);
     }
     const requestId = randomUUID();
-    const msg: ToolCallRequestMessage = { type: "tool.call", requestId, toolName, arguments: args };
+    const msg: ToolCallRequestMessage = withCallerAuth<ToolCallRequestMessage>({ type: "tool.call", requestId, toolName, arguments: args });
     return this.sendAndWait(client, msg, requestId, timeoutMs, trace);
   }
 
@@ -228,6 +246,13 @@ export class McpHost {
     return new Promise((resolve, reject) => {
       const startedAt = Date.now();
       const timeout = setTimeout(() => {
+        // Cancelación best-effort (revisión 2026-07-10): avisa al nodo que
+        // nadie espera ya esta Mission antes de abandonarla — sin esto sigue
+        // quemando CPU comunitaria hasta terminar.
+        if (client.ws.readyState === WebSocket.OPEN) {
+          const cancel: ToolCancelMessage = { type: "tool.cancel", requestId, timestamp: Date.now() };
+          client.ws.send(JSON.stringify(cancel));
+        }
         const pendingEntry = client.pending.get(requestId);
         client.pending.delete(requestId);
         if (trace) {

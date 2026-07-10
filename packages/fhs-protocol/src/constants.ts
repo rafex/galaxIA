@@ -4,6 +4,23 @@
 
 export const FHS_VERSION = "0.1";
 
+/**
+ * Unidad canónica de todo `timestamp` del protocolo: **milisegundos** desde
+ * epoch Unix (lo que devuelve `Date.now()`). Antes de fijarlo aquí, la doc
+ * mostraba segundos en `hello` y milisegundos en `dispatch.ack.queuedAt`, y
+ * el Atlas validaba en segundos mientras todos los providers reales enviaban
+ * ms — ningún provider podía registrarse (hallazgo de la revisión del
+ * protocolo, 2026-07-10). Milisegundos gana porque es lo que ya enviaba todo
+ * el ecosistema.
+ */
+export const TIMESTAMP_UNIT = "milliseconds" as const;
+
+/** Ventana anti-replay: edad máxima aceptada de un mensaje firmado (ms). */
+export const MAX_REPLAY_AGE_MS = 30_000;
+
+/** Desfase de reloj tolerado hacia el futuro entre nodos (ms). */
+export const MAX_CLOCK_SKEW_MS = 5_000;
+
 /** Duración del lease de registro en segundos. */
 export const DEFAULT_LEASE_SECONDS = 30;
 
@@ -36,6 +53,12 @@ export const FHS_ERROR_CODES = {
   UNSUPPORTED_CAPABILITY: "UNSUPPORTED_CAPABILITY",
   INTERNAL_ERROR: "INTERNAL_ERROR",
   PARSE_ERROR: "PARSE_ERROR",
+  /** El invocador no probó su identidad o está vetado (revisión 2026-07-10). */
+  UNAUTHORIZED: "UNAUTHORIZED",
+  /** El `fhsVersion` anunciado en `hello` no es compatible con este Registry. */
+  UNSUPPORTED_VERSION: "UNSUPPORTED_VERSION",
+  /** La petición fue cancelada por quien la originó (`chat.cancel`/`tool.cancel`). */
+  CANCELLED: "CANCELLED",
 } as const;
 
 export type FhsErrorCode = (typeof FHS_ERROR_CODES)[keyof typeof FHS_ERROR_CODES];

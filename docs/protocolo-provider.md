@@ -81,6 +81,9 @@ Todo provider debe usar estos códigos en `chat.error` / `tool.error` en vez de 
 | `UPSTREAM_TIMEOUT` | El servicio real respondió más lento que el timeout configurado |
 | `INVALID_ARGUMENTS` | Los argumentos de `tool.call`/`chat.request` no cumplen el schema de la tool/modelo |
 | `UNSUPPORTED_CAPABILITY` | Se pidió una capability o modelo que el provider no tiene registrado |
+| `UNAUTHORIZED` | El invocador no envió `callerId`/`signature` válidos (si el provider los exige) o está vetado (revisión 2026-07-10) |
+| `UNSUPPORTED_VERSION` | El `fhsVersion` anunciado en `hello` no es compatible (lo emite el Registry) |
+| `CANCELLED` | La petición fue abortada tras recibir `chat.cancel`/`tool.cancel` de quien la originó |
 | `INTERNAL_ERROR` | Cualquier otro fallo no clasificado — debe ser la excepción, no la norma |
 
 Ejemplo:
@@ -104,7 +107,11 @@ requestId | conversationId (si viaja en el mensaje) | tipo (chat/tool) | resulta
 Un provider nuevo puede conectarse a Atlas (Registry) sin ningún cambio en `apps/atlas` si cumple:
 
 - [ ] Implementa el ciclo de vida completo (`Connecting → Identifying → Registering → Ready`) del diagrama de arriba.
-- [ ] Genera (o carga) una identidad Ed25519 real, deriva su `providerId` como `did:key:z...`, y firma `hello`/`register` con la clave privada (DEC-0030) — persiste la clave privada entre reinicios, no la regenera en cada arranque.
+- [ ] Genera (o carga) una identidad Ed25519 real, deriva su `providerId` como `did:key:z...`, y firma `hello`/`register` con la clave privada (DEC-0030) — persiste la clave privada entre reinicios, no la regenera en cada arranque. **Todo `timestamp` en milisegundos** (`Date.now()`); la firma de `register` cubre el hash canónico del manifiesto (`registerSignaturePayload`, revisión 2026-07-10 — el payload legado sin hash está deprecado hasta v0.2).
+- [ ] Anuncia su `fhsVersion` en `hello` y maneja `error { code: "UNSUPPORTED_VERSION" }` sin reintentar en bucle.
+- [ ] (Recomendado) Verifica la firma del `welcome` (`welcomeSignaturePayload`) antes de enviar su manifiesto — protege contra un Registry impostor en la misma LAN.
+- [ ] (Recomendado) Exige `callerId`/`signature` en `chat.request`/`tool.call` y responde `UNAUTHORIZED` a invocadores anónimos o con firma inválida.
+- [ ] Maneja `chat.cancel`/`tool.cancel` abortando el trabajo si puede (respondiendo con código `CANCELLED`) — en hardware comunitario, seguir procesando una petición abandonada es el peor uso posible del recurso.
 - [ ] El heartbeat corre en una tarea/timer independiente del procesamiento de peticiones (dispatcher concurrente).
 - [ ] Envía `dispatch.ack { requestId, queuedAt }` inmediatamente al encolar cada `chat.request`/`tool.call` en su dispatcher, antes de empezar a procesar (ver "Regla central: el dispatcher concurrente" arriba).
 - [ ] El manifiesto incluye todos los campos obligatorios de la tabla de arriba, incluidos los de privacidad.

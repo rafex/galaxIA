@@ -1,49 +1,71 @@
 /**
  * Script para registrar proveedores mock en el Registry FHS.
  * Uso: npx tsx scripts/mock-providers.ts
+ *
+ * Cada mock genera una identidad Ed25519 efímera (did:key real) y firma
+ * hello/register — el Atlas verifica firmas desde DEC-0030/DEC-0057, un mock
+ * sin firma sería rechazado con INVALID_SIGNATURE.
  */
 import WebSocket from "ws";
+import {
+  generateIdentity,
+  signPayload,
+  helloSignaturePayload,
+  registerSignaturePayload,
+  FHS_VERSION,
+} from "@rafex/galaxia-fhs-protocol";
 
 const REGISTRY_URL = "ws://localhost:8083/fhs/v1/ws";
 
-function registerProvider(providerId: string, _name: string, manifest: Record<string, unknown>) {
+function registerProvider(name: string, buildManifest: (providerId: string) => Record<string, unknown>) {
+  const identity = generateIdentity();
+  const providerId = identity.did;
+  const manifest = buildManifest(providerId);
   const ws = new WebSocket(REGISTRY_URL);
 
+  const sendRegister = () => {
+    const timestamp = Date.now();
+    ws.send(
+      JSON.stringify({
+        type: "register",
+        providerId,
+        manifest,
+        timestamp,
+        signature: signPayload(identity.privateKey, registerSignaturePayload(providerId, timestamp, manifest)),
+      })
+    );
+  };
+
   ws.on("open", () => {
-    ws.send(JSON.stringify({ type: "hello", providerId, timestamp: Date.now() }));
+    const timestamp = Date.now();
+    ws.send(
+      JSON.stringify({
+        type: "hello",
+        providerId,
+        timestamp,
+        fhsVersion: FHS_VERSION,
+        signature: signPayload(identity.privateKey, helloSignaturePayload(providerId, timestamp)),
+      })
+    );
   });
 
   ws.on("message", (data: Buffer) => {
     const msg = JSON.parse(data.toString()) as { type?: string };
-    console.log(`[${providerId}]`, msg.type, msg);
+    console.log(`[${name}]`, msg.type, msg);
 
     if (msg.type === "welcome") {
-      ws.send(
-        JSON.stringify({
-          type: "register",
-          providerId,
-          manifest,
-          timestamp: Date.now(),
-        })
-      );
+      sendRegister();
     }
   });
 
   ws.on("error", (err) => {
-    console.error(`[${providerId}] error`, err.message);
+    console.error(`[${name}] error`, err.message);
   });
 
   // Renovar registro periódicamente
   setInterval(() => {
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(
-        JSON.stringify({
-          type: "register",
-          providerId,
-          manifest,
-          timestamp: Date.now(),
-        })
-      );
+      sendRegister();
     }
   }, 25000);
 
@@ -55,10 +77,10 @@ function registerProvider(providerId: string, _name: string, manifest: Record<st
   }, 10000);
 }
 
-const llmManifest = {
+registerProvider("Mac mini de Raúl", (id) => ({
   fhsVersion: "0.1",
   provider: {
-    id: "did:key:macmini-raul",
+    id,
     name: "Mac mini de Raúl",
     type: "llm",
     visibility: "community",
@@ -76,12 +98,13 @@ const llmManifest = {
       toolCalling: { supported: false },
     },
   ],
-};
+  privacy: { retention: "none", trainingUse: false },
+}));
 
-const ocrManifest = {
+registerProvider("OCR FHS Provider", (id) => ({
   fhsVersion: "0.1",
   provider: {
-    id: "did:key:ocr-provider-01",
+    id,
     name: "OCR FHS Provider",
     type: "mcp",
     visibility: "community",
@@ -98,9 +121,7 @@ const ocrManifest = {
       languages: ["es", "en"],
     },
   ],
-};
-
-registerProvider("did:key:macmini-raul", "Mac mini de Raúl", llmManifest);
-registerProvider("did:key:ocr-provider-01", "OCR FHS Provider", ocrManifest);
+  privacy: { retention: "none" },
+}));
 
 console.log("Mock providers registered. Press Ctrl+C to exit.");

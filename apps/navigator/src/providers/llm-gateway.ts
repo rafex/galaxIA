@@ -12,7 +12,34 @@ import type {
   ChatCompletedMessage,
   ChatErrorMessage,
 } from "@rafex/galaxia-fhs-protocol";
+import { signPayload, invokeSignaturePayload, type ChatCancelMessage } from "@rafex/galaxia-fhs-protocol";
+import { getNavigatorIdentity } from "../identity.js";
 import { logTrace } from "../observability/trace.js";
+
+// Invocación firmada (revisión del protocolo 2026-07-10): el Navigator prueba
+// su identidad ante el provider en cada chat.request — el provider puede
+// exigirla y responder UNAUTHORIZED a peers anónimos de la LAN.
+function signedChatRequest(requestId: string, request: GenerateRequest): ChatRequestMessage {
+  const identity = getNavigatorIdentity();
+  const timestamp = Date.now();
+  return {
+    type: "chat.request",
+    requestId,
+    request,
+    timestamp,
+    callerId: identity.did,
+    signature: signPayload(identity.privateKey, invokeSignaturePayload(identity.did, requestId, timestamp)),
+  };
+}
+
+// Cancelación best-effort al abandonar por timeout: sin esto, el nodo sigue
+// quemando CPU minutos después de que nadie espera la respuesta.
+function sendCancel(ws: WebSocket, requestId: string) {
+  if (ws.readyState === WebSocket.OPEN) {
+    const msg: ChatCancelMessage = { type: "chat.cancel", requestId, timestamp: Date.now() };
+    ws.send(JSON.stringify(msg));
+  }
+}
 
 /** Envoltorio mínimo para narrowing de mensajes FHS crudos antes de castear al tipo específico. */
 interface FhsMessageEnvelope {
@@ -98,18 +125,14 @@ export class LlmGateway {
       };
 
       const timeout = setTimeout(() => {
+        sendCancel(ws, requestId);
         ws.close();
         emitTrace(false, "TIMEOUT");
         reject(new Error("Timeout esperando respuesta del LLM vía FHS"));
       }, timeoutMs ?? 310_000);
 
       ws.on("open", () => {
-        const msg: ChatRequestMessage = {
-          type: "chat.request",
-          requestId,
-          request: { ...request, stream: false },
-        };
-        ws.send(JSON.stringify(msg));
+        ws.send(JSON.stringify(signedChatRequest(requestId, { ...request, stream: false })));
       });
 
       ws.on("message", (raw: Buffer) => {
@@ -185,12 +208,7 @@ export class LlmGateway {
       });
 
     ws.on("open", () => {
-      const msg: ChatRequestMessage = {
-        type: "chat.request",
-        requestId,
-        request: { ...request, stream: true },
-      };
-      ws.send(JSON.stringify(msg));
+      ws.send(JSON.stringify(signedChatRequest(requestId, { ...request, stream: true })));
     });
 
     ws.on("message", (raw: Buffer) => {
@@ -223,6 +241,7 @@ export class LlmGateway {
     });
 
     const timeout = setTimeout(() => {
+      sendCancel(ws, requestId);
       enqueue({ kind: "error", message: "Timeout esperando stream FHS" });
       ws.close();
     }, 310_000);

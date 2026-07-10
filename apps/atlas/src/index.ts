@@ -48,8 +48,13 @@ async function main() {
   const registry = new Atlas(eventBus, ATLAS_DB_PATH);
   registry.startHealthChecks();
 
+  // La identidad del Atlas ya no es solo para mDNS: firma el `welcome`
+  // (revisión del protocolo 2026-07-10) para que un nodo pueda verificar que
+  // no entrega su manifiesto a un Registry impostor — se carga siempre.
+  const identity = loadOrCreateIdentity(IDENTITY_KEY_PATH);
+
   // Registra rutas directamente (websocket no funciona bien dentro de un plugin anidado)
-  setupWebSocket(app, registry);
+  setupWebSocket(app, registry, identity);
   setupProvidersApi(app, registry);
   setupMetricsApi(app, registry);
 
@@ -69,7 +74,6 @@ async function main() {
   }
 
   if (MDNS_ENABLED) {
-    const identity = loadOrCreateIdentity(IDENTITY_KEY_PATH);
     announceRegistry(identity, PORT, tlsEnabled);
     app.log.info(`Anunciando Atlas por mDNS (did: ${identity.did})`);
   }

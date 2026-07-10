@@ -106,9 +106,9 @@ sequenceDiagram
     participant P as Provider
     participant R as Registry (Agent Backend)
 
-    P->>R: hello { providerId, timestamp }
-    R-->>P: welcome { registryId, leaseSeconds: 30 }
-    P->>R: register { providerId, manifest }
+    P->>R: hello { providerId, timestamp, fhsVersion, signature }
+    R-->>P: welcome { registryId (did:key), leaseSeconds: 30, timestamp, signature }
+    P->>R: register { providerId, manifest, timestamp, signature }
     R-->>P: registered { leaseExpires, acceptedServices }
     R->>R: broadcast node.online a runtimes activos
 
@@ -131,7 +131,7 @@ Esto solo detecta **si el socket sigue vivo** (proceso caído, red partida) — 
 
 ### Timeout configurable del lado del cliente (DEC-0010)
 
-Quien inicia una Mission o una conversación con una Star puede indicar `preferences.maxWaitMs` — cuánto tiempo está dispuesto a esperar antes de abandonar, en vez del default fijo del stack (~300s, pensado para hardware comunitario lento). Es un límite de paciencia del cliente, no una señal de salud del nodo: si se cumple, el Agent Server simplemente deja de esperar esa respuesta y libera la conversación, sin importar si el nodo sigue procesando o no — el nodo no se entera de que el cliente abandonó (no hay mensaje de cancelación en el protocolo), así que puede seguir gastando recursos en una petición ya abandonada.
+Quien inicia una Mission o una conversación con una Star puede indicar `preferences.maxWaitMs` — cuánto tiempo está dispuesto a esperar antes de abandonar, en vez del default fijo del stack (~300s, pensado para hardware comunitario lento). Es un límite de paciencia del cliente, no una señal de salud del nodo: si se cumple, el Agent Server simplemente deja de esperar esa respuesta y libera la conversación, sin importar si el nodo sigue procesando o no. Desde la revisión 2026-07-10 el Agent Server además envía `chat.cancel`/`tool.cancel { requestId }` (best-effort) al abandonar — el nodo debería abortar el trabajo si puede (respondiendo `chat.error`/`tool.error` con código `CANCELLED`) para no seguir quemando CPU comunitaria en una petición que ya nadie espera; ignorar la cancelación no rompe el protocolo.
 
 **Recomendación para quien implemente UI sobre este campo:** el rango razonable de `maxWaitMs` es alto (varios minutos), no segundos — el hardware comunitario que federa esta red (equipos reutilizados, sin GPU dedicada) puede tardar minutos en una sola inferencia u OCR. Un timeout bajo (ej. 10-30s) no es una opción realista de "impaciencia legítima", es indistinguible de cancelar la petición casi siempre — cualquier control de UI para este campo debería partir de un piso cercano al default (~300s) hacia arriba, no hacia abajo.
 
@@ -139,26 +139,35 @@ Quien inicia una Mission o una conversación con una Star puede indicar `prefere
 
 **Registro de nodo**
 
+> **Unidades de `timestamp` — regla global:** todo `timestamp` del protocolo va en **milisegundos** desde epoch Unix (lo que devuelve `Date.now()` en JS). Antes de fijarlo (revisión 2026-07-10) la doc mezclaba segundos y milisegundos y el Registry validaba en segundos mientras los providers enviaban ms — ningún registro pasaba la ventana anti-replay. Las ventanas viven en el protocolo: `MAX_REPLAY_AGE_MS` (30 000) y `MAX_CLOCK_SKEW_MS` (5 000).
+
 ```json
 {
   "type": "hello",
   "providerId": "did:key:z6MkiqnzSFKAqXxjRUNnEku2wD3Gzas28sqByzQYaqEjkZhF",
-  "timestamp": 1719700000,
+  "timestamp": 1719700000123,
+  "fhsVersion": "0.1",
   "signature": "base64(firma Ed25519 de \"providerId:timestamp\" con la clave privada del nodo)"
 }
 ```
 
-Sin `signature` válida (verificable con la clave pública derivada del propio `providerId`), el Registry responde `error { code: "INVALID_SIGNATURE" }` (DEC-0030).
+Sin `signature` válida (verificable con la clave pública derivada del propio `providerId`), el Registry responde `error { code: "INVALID_SIGNATURE" }` (DEC-0030). `fhsVersion` es la negociación de versión (revisión 2026-07-10): si el Registry no habla esa versión responde `error { code: "UNSUPPORTED_VERSION" }` y cierra, en vez de fallar de formas opacas después; omitirlo se interpreta como "la versión del Registry".
 
 Respuesta:
 
 ```json
 {
   "type": "welcome",
-  "registryId": "registry-001",
-  "leaseSeconds": 30
+  "registryId": "did:key:z6Mk...RegistryDid",
+  "leaseSeconds": 30,
+  "heartbeatSeconds": 10,
+  "fhsVersion": "0.1",
+  "timestamp": 1719700000456,
+  "signature": "base64(firma Ed25519 de \"registryId:timestamp\" con la clave del Registry)"
 }
 ```
+
+El `welcome` viaja **firmado por el Registry** (revisión 2026-07-10): `registryId` es el did:key propio del Atlas y la firma permite al nodo verificar que no está entregando su manifiesto a un Registry impostor en la misma LAN — misma identidad que ya firmaba el anuncio mDNS (DEC-0032).
 
 **Publicar servicios**
 
@@ -167,17 +176,19 @@ Respuesta:
   "type": "register",
   "providerId": "did:key:z6MkiqnzSFKAqXxjRUNnEku2wD3Gzas28sqByzQYaqEjkZhF",
   "manifest": { /* ver manifiesto-llm.md o manifiesto-mcp.md */ },
-  "timestamp": 1719700000,
-  "signature": "base64(firma Ed25519 de \"providerId:timestamp\")"
+  "timestamp": 1719700000789,
+  "signature": "base64(firma Ed25519 de \"providerId:timestamp:sha256hex(manifiesto canónico)\")"
 }
 ```
+
+La firma de `register` ancla el **contenido del manifiesto** (revisión 2026-07-10): el payload firmado incluye el SHA-256 (hex) de la serialización JSON canónica del manifiesto (llaves ordenadas recursivamente, sin espacios — ver `canonicalJson`/`registerSignaturePayload` en el paquete del protocolo). Sin el hash, un intermediario podía sustituir el manifiesto completo (endpoint incluido) conservando una firma válida. El payload legado `providerId:timestamp` se acepta como **deprecado** hasta FHS v0.2.
 
 Respuesta:
 
 ```json
 {
   "type": "registered",
-  "leaseExpires": 1719700030,
+  "leaseExpires": 1719700030000,
   "acceptedServices": 2
 }
 ```
@@ -191,7 +202,7 @@ Respuesta:
 Respuesta:
 
 ```json
-{ "type": "pong", "timestamp": 1719700005 }
+{ "type": "pong", "timestamp": 1719700005000 }
 ```
 
 **Notificaciones del Registry**
@@ -290,25 +301,31 @@ sequenceDiagram
 **Chat (LLM)**
 
 ```
-Agent Server → Provider:  chat.request   { requestId, request: GenerateRequest }
+Agent Server → Provider:  chat.request   { requestId, request, callerId, timestamp, signature }
 Provider → Agent Server:  dispatch.ack   { requestId, queuedAt }  (opcional, ver abajo)
 Provider → Agent Server:  chat.delta     { requestId, delta: string }
 Provider → Agent Server:  chat.completed { requestId, response: GenerateResponse }
 Provider → Agent Server:  chat.error     { requestId, code, message }
+Agent Server → Provider:  chat.cancel    { requestId }  (best-effort, ver abajo)
 ```
 
 **Tools (OCR, MCP)**
 
 ```
-Agent Server → Provider:  tool.list         { requestId }
+Agent Server → Provider:  tool.list         { requestId, callerId, timestamp, signature }
 Provider → Agent Server:  tool.list.response  { requestId, tools: [...] }
-Agent Server → Provider:  tool.call         { requestId, toolName, arguments }
+Agent Server → Provider:  tool.call         { requestId, toolName, arguments, callerId, timestamp, signature }
 Provider → Agent Server:  dispatch.ack      { requestId, queuedAt }  (opcional, ver abajo)
 Provider → Agent Server:  tool.result       { requestId, toolName, content: [...] }
 Provider → Agent Server:  tool.error        { requestId, toolName, code, message }
+Agent Server → Provider:  tool.cancel       { requestId }  (best-effort, ver abajo)
 ```
 
 `requestId` es obligatorio y debe repetirse igual en la respuesta — es la base de la trazabilidad operacional (ver más abajo).
+
+**Autenticación del invocador (revisión 2026-07-10):** `callerId` es el did:key del Agent Server (u otro agente) y `signature` es Ed25519 base64 sobre `callerId:requestId:timestamp` (`invokeSignaturePayload`). Sin esto, cualquier peer de la LAN podía consumir el LLM/tools de un nodo gratis y de forma anónima. Los campos son opcionales por compatibilidad, pero un provider **puede exigirlos** y responder `chat.error`/`tool.error` con código `UNAUTHORIZED` a invocadores anónimos, vetados o con firma inválida — la misma ventana anti-replay de registro (`MAX_REPLAY_AGE_MS`/`MAX_CLOCK_SKEW_MS`) aplica al `timestamp` del invocador.
+
+**Cancelación best-effort (`chat.cancel`/`tool.cancel`, revisión 2026-07-10):** quien originó la petición avisa que dejó de esperar (timeout `maxWaitMs`, failover, usuario que cerró). El provider debería abortar el trabajo si puede y responder `chat.error`/`tool.error` con código `CANCELLED`; ignorar el mensaje no rompe el protocolo — es una optimización de cortesía para no quemar CPU comunitaria en peticiones que ya nadie espera.
 
 **`dispatch.ack` — el "mosquito" confirmando que ya tomó la petición**
 
