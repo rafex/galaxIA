@@ -3,7 +3,7 @@ name: Publish packages to GitHub Packages + npmjs.org
 # CD (entrega continua), no CI — ver spec-native/pipelines/CD.md.
 # Publica los 4 paquetes distribuibles del monorepo a GitHub Packages y a
 # npmjs.org en cada push a main que toque alguno: @rafex/galaxia-fhs-protocol
-# (protocolo), @galaxia/atlas, @galaxia/navigator, @galaxia/portal-chat
+# (protocolo), @rafex/galaxia-atlas, @rafex/galaxia-navigator, @rafex/galaxia-portal-chat
 # (DEC-0061/DEC-0066, fases 2 y 6 del plan de distribución — antes solo el
 # protocolo se publicaba, y solo a GitHub Packages, DEC-0040/DEC-0041).
 # Generalizado de publish-fhs-protocol.yml: un solo job procesa solo los
@@ -22,7 +22,7 @@ name: Publish packages to GitHub Packages + npmjs.org
 #   publicó rota por esto exacto (ver DEC-0040), este chequeo evita que se
 #   repita en cualquiera de los 4 paquetes.
 # - npmjs.org requiere --access public explícito la primera vez que se
-#   publica un paquete con scope (@rafex/*, @galaxia/*) — por default los
+#   publica un paquete con scope (@rafex/*) — por default los
 #   paquetes con scope se asumen privados (requiere una org de pago), y
 #   estos 4 nombres están libres en npmjs.org (verificado antes de activar
 #   esto, DEC-0066).

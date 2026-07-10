@@ -1062,3 +1062,15 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - `.github/workflows/publish-packages.yml`: nuevo paso "Compilar fhs-protocol".
   - Verificado localmente reproduciendo el fallo exacto (`rm -rf packages/fhs-protocol/dist` + `make atlas-verify` → mismo error `Cannot find module '@rafex/galaxia-fhs-protocol'`) y confirmando que compilar primero lo resuelve.
   - Pendiente: repetir la corrida real (`workflow_dispatch`, `apps/atlas`) para confirmar que el fix funciona en el runner y que la publicación a npmjs.org llega a buen puerto.
+
+## DEC-0068 — Renombrar los paquetes de apps al scope `@rafex/` (galaxia-atlas/navigator/portal-chat/portal-tui)
+
+- **Fecha:** 2026-07-09
+- **Estado:** `accepted` — implementado y verificado
+- **Contexto:** la primera corrida real de `publish-packages.yml` (tras el fix de DEC-0067) falló con `403 Forbidden — The requested installation does not exist` al publicar `@galaxia/atlas` a GitHub Packages. Causa estructural: GitHub Packages exige que el scope del paquete coincida con el owner del repo (`rafex`) — el scope `@galaxia` no existe como organización del usuario. El mismo problema aplicaba de forma latente en npmjs.org (el scope debe ser tu usuario o una org propia).
+- **Decisión (confirmada por el usuario, entre las opciones de renombrar vs. crear una org `galaxia` en GitHub+npmjs):** renombrar las apps al scope del owner con prefijo de proyecto — `@galaxia/atlas` → `@rafex/galaxia-atlas`, `@galaxia/navigator` → `@rafex/galaxia-navigator`, `@galaxia/portal-chat` → `@rafex/galaxia-portal-chat`, y `@galaxia/portal-tui` → `@rafex/galaxia-portal-tui` (private, renombrado solo por consistencia). Mismo patrón que `@rafex/galaxia-fhs-protocol` (que siempre publicó bien) y que las imágenes GHCR (`ghcr.io/rafex/galaxia-*`).
+- **Los nombres de `bin` no cambian:** `galaxia-atlas`/`galaxia-navigator`/`galaxia-portal-chat` — el comando ejecutable no lleva scope, solo cambia el nombre a instalar (`npx @rafex/galaxia-atlas`).
+- **Consecuencias:**
+  - `apps/{atlas,navigator,portal-chat,portal-tui}/package.json` (`name`), `package-lock.json` (regenerado), `apps/portal-chat/src/server.ts` (comentario), `helpers/mk/protocol.mk` (mensajes), `.github/workflows/publish-packages.yml` (comentarios), `docs/instalacion.md` (comandos `npx`), `spec-native/pipelines/CD.md`. Entradas históricas de DECISIONS/ROADMAP/TRACEABILITY con los nombres viejos se dejan tal cual (registro de su momento).
+  - Verificado: `npm run lint`/`typecheck`/`test`/`build --workspaces` limpios; `make atlas-bump-check` consulta el nombre nuevo correctamente contra GitHub Packages; `npm pack` + instalación en proyecto aislado + `npx galaxia-atlas` arrancando y respondiendo `/health` con el nombre nuevo.
+  - Pendiente: primera publicación real exitosa de los 3 paquetes de apps (GitHub Packages + npmjs.org) tras mergear este rename.
