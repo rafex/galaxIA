@@ -66,6 +66,13 @@ Los defaults preservan el comportamiento de un solo host sin tocar nada. Para mu
 
 También se quitó `depends_on: atlas` de `star`/`satellite-ocr` en `compose.yaml` — con dependencia, `podman-compose` intentaba levantar `atlas` localmente en el bastion aunque solo se pidiera `star`, lo cual no tiene sentido cuando `atlas` vive en otra máquina.
 
+> **Trampa real encontrada en el bastion (DEC-0075, `podman-compose` 1.3.0):** esa versión (la que trae Debian/apt) **no interpola** la sintaxis `${VAR:-default}` dentro de `environment:` cuando `VAR` no está exportada en el shell que invoca `podman-compose` — pasa el string literal `${ATLAS_URL:-http://atlas:8081}` como valor de la variable de entorno del contenedor. Con `portal-chat`, esto rompe el `envsubst` del template de nginx (`the closing bracket in "ATLAS_URL" variable is missing`) porque el valor sustituido contiene a su vez un `${...}` sin cerrar correctamente para el parser de nginx. **Workaround:** exportar los valores explícitamente antes de invocar `podman-compose` (o `just container-up-core`), aunque sean iguales al default:
+> ```bash
+> export ATLAS_URL=http://atlas:8081 NAVIGATOR_URL=http://navigator:8090
+> just container-up-core
+> ```
+> `docker compose` v2+ y versiones más nuevas de `podman-compose` sí interpolan `${VAR:-default}` correctamente sin este paso — la trampa es específica de la versión vieja empaquetada por la distro.
+
 ### Separar también el core: Atlas/Navigator/Portal en máquinas distintas
 
 Lo de arriba resuelve "los providers en otra máquina" — `apps/atlas`, `apps/navigator` y `apps/portal-chat` seguían asumiendo que viven juntos en el mismo host (mismo `docker network fhs`). Ya no hace falta: los tres son configurables por variable de entorno sin reconstruir ninguna imagen.
