@@ -143,10 +143,10 @@ jobs:
 
           # Además del registro de GitHub Packages ya configurado por
           # actions/setup-node (registry-url), habilita auth para
-          # registry.npmjs.org — cada `npm publish` elige el registro
-          # explícitamente con --registry, así que ambas líneas conviven
-          # sin pisarse.
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
+          # registry.npmjs.org. OJO: setup-node apunta NPM_CONFIG_USERCONFIG
+          # a su propio .npmrc temporal — escribir en ~/.npmrc sería
+          # invisible para npm (DEC-0070, addendum 3).
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
 
           for pkg in ${{ steps.changed.outputs.packages }}; do
             echo "::group::$pkg"
@@ -187,13 +187,17 @@ jobs:
             #    mecanismos apuntan a npmjs. Se verifica en el propio log de
             #    npm a qué registro fue, para fallar rápido y claro si npm
             #    vuelve a cambiar de opinión.
-            # `npm pkg set -w` es un no-op silencioso en el npm 10 del runner
-            # (run 29138559277 — publishConfig siguió apuntando a GH) — se
-            # edita el package.json directamente con jq, que no puede fallar
-            # en silencio.
-            jq '.publishConfig.registry = "https://registry.npmjs.org"' "$pkg/package.json" > /tmp/pkg.json && mv /tmp/pkg.json "$pkg/package.json"
+            # La config que de verdad manda aquí es la POR SCOPE: setup-node
+            # con registry-url de GitHub Packages escribe
+            # `@rafex:registry=https://npm.pkg.github.com` en su .npmrc, y en
+            # npm la config de scope le gana al --registry genérico y al
+            # publishConfig.registry (run 29138772605: publishConfig ya era
+            # npmjs y aun así publicó a GH). Se sobreescribe el registro del
+            # scope en las tres capas: package.json (jq), publishConfig y
+            # flag de CLI por scope.
+            jq '.publishConfig = {"registry": "https://registry.npmjs.org", "@rafex:registry": "https://registry.npmjs.org"}' "$pkg/package.json" > /tmp/pkg.json && mv /tmp/pkg.json "$pkg/package.json"
             echo "publishConfig efectivo: $(jq -c .publishConfig "$pkg/package.json")"
-            (cd "$pkg" && set -o pipefail && npm publish --registry https://registry.npmjs.org --access public 2>&1 | tee /tmp/npmjs-publish.log)
+            (cd "$pkg" && set -o pipefail && npm publish --registry https://registry.npmjs.org --@rafex:registry=https://registry.npmjs.org --access public 2>&1 | tee /tmp/npmjs-publish.log)
             if ! grep -q "Publishing to https://registry.npmjs.org" /tmp/npmjs-publish.log; then
               echo "::error::El publish a npmjs.org fue a otro registro — ver log arriba" >&2
               exit 1
