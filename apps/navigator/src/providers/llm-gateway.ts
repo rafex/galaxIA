@@ -160,7 +160,13 @@ export class LlmGateway {
             ws.close();
             const dispatchMs = ackAt ? ackAt - startedAt : null;
             emitTrace(true);
-            resolve({ response: (msg as ChatCompletedMessage).response, dispatchMs });
+            // `toolCalls` es obligatorio en el tipo, pero nada lo garantiza
+            // en el wire — un provider que lo omite crasheaba runtime.ts
+            // (`response.toolCalls.length`) con una excepción no capturada:
+            // la conversación quedaba colgada sin ningún error visible para
+            // el usuario (encontrado con scripts/e2e-smoke.ts, DEC-0073).
+            const response = (msg as ChatCompletedMessage).response;
+            resolve({ response: { ...response, toolCalls: response.toolCalls ?? [] }, dispatchMs });
           } else if (msg.type === "chat.error") {
             clearTimeout(timeout);
             ws.close();
@@ -230,9 +236,10 @@ export class LlmGateway {
         if (msg.type === "chat.delta") {
           enqueue({ kind: "delta", text: (msg as ChatDeltaMessage).delta });
         } else if (msg.type === "chat.completed") {
+          const response = (msg as ChatCompletedMessage).response;
           enqueue({
             kind: "completed",
-            response: (msg as ChatCompletedMessage).response,
+            response: { ...response, toolCalls: response.toolCalls ?? [] },
           });
           ws.close();
         } else if (msg.type === "chat.error") {
