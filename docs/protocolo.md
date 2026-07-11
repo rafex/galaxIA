@@ -181,7 +181,7 @@ El `welcome` viaja **firmado por el Registry** (revisión 2026-07-10): `registry
 }
 ```
 
-La firma de `register` ancla el **contenido del manifiesto** (revisión 2026-07-10): el payload firmado incluye el SHA-256 (hex) de la serialización JSON canónica del manifiesto (llaves ordenadas recursivamente, sin espacios — ver `canonicalJson`/`registerSignaturePayload` en el paquete del protocolo). Sin el hash, un intermediario podía sustituir el manifiesto completo (endpoint incluido) conservando una firma válida. El payload legado `providerId:timestamp` se acepta como **deprecado** hasta FHS v0.2.
+La firma de `register` ancla el **contenido del manifiesto** (revisión 2026-07-10): el payload firmado incluye el SHA-256 (hex) de la serialización JSON canónica del manifiesto (llaves ordenadas recursivamente, sin espacios — ver `canonicalJson`/`registerSignaturePayload` en el paquete del protocolo). Sin el hash, un intermediario podía sustituir el manifiesto completo (endpoint incluido) conservando una firma válida. Es **obligatorio**: el payload legado `providerId:timestamp` (sin hash) ya no se acepta — el Registry responde `error { code: "INVALID_SIGNATURE" }` (DEC-0076, retirado en alpha por no tener consumidores externos que proteger).
 
 Respuesta:
 

@@ -1211,8 +1211,9 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
 2. **Priorizar inmediatamente la migración de `galaxIA-satellite-star`** (issue #1 de ese repo) — es el mismo trabajo que ya estaba planeado, simplemente sin la red de seguridad del fallback corriendo en paralelo mientras tanto.
 3. **Como principio general para esta etapa del proyecto** (mientras siga en 0.x sin usuarios externos confirmados): preferir romper y arreglar el propio ecosistema sobre cargar deuda de compatibilidad — revisar esta postura en cuanto exista un primer consumidor externo real, momento en el que sí empezaría a tener sentido un ciclo de deprecación formal con ventana de tiempo.
 
-### Explícitamente no decidido aquí
+### Ejecución (confirmada por el usuario, 2026-07-11)
 
-Este documento es un análisis, no una ejecución — no se ha tocado código. Requiere confirmación explícita del usuario antes de:
-- Retirar el fallback de `ws-handler.ts` (rompe el `star`/`satellite-ocr` corriendo ahora mismo en `bastion-wifi` hasta que se migren).
-- Iniciar la migración de `galaxIA-satellite-star` a los payloads nuevos.
+- **Fallback retirado**: `ws-handler.ts` ya solo acepta `registerSignaturePayload` (con hash del manifiesto) — el payload legado responde `INVALID_SIGNATURE`. Verificado con una prueba negativa directa (firma legada → rechazada) y con el smoke E2E completo (`scripts/e2e-smoke.ts`) en verde.
+- **Consecuencia inmediata esperada**: el `star`/`satellite-ocr` de `galaxIA-satellite-star` corriendo en `bastion-wifi` (ver DEC-0075) dejan de poder registrarse hasta migrar — es el costo aceptado explícitamente en este análisis, no un efecto secundario no previsto.
+- **Migración de `galaxIA-satellite-star` ejecutada en paralelo** (issue #1 de ese repo): los 5 examples (`star-example`, `satellite-ocr-example`, `rag-provider`, `kb-provider`, `nova-example`) migrados a `helloSignaturePayload`/`registerSignaturePayload`/`welcomeSignaturePayload`, con verificación de la firma del `welcome` antes de registrar.
+- **Consecuencias de código:** `apps/atlas/src/atlas/ws-handler.ts`, `packages/fhs-protocol/src/messages.ts`, `docs/protocolo.md`, `docs/protocolo-provider.md` (repo `galaxIA`); los 5 `examples/*/src/index.ts` de `galaxIA-satellite-star`.
