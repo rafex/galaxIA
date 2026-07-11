@@ -267,7 +267,7 @@ export class McpHost {
           });
         }
         reject(new Error(`Timeout esperando respuesta FHS de ${client.providerId}`));
-      }, clampTimeoutMs(timeoutMs, CALL_TIMEOUT_MS));
+      }, clampTimeoutMs(timeoutMs, CALL_TIMEOUT_MS)); // lgtm[js/resource-exhaustion]: acotado a [1s, 10min] en ws-security.ts, CodeQL no sigue el clamp interprocedural
       client.pending.set(requestId, {
         startedAt,
         trace,

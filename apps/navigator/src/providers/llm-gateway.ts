@@ -133,7 +133,7 @@ export class LlmGateway {
         ws.close();
         emitTrace(false, "TIMEOUT");
         reject(new Error("Timeout esperando respuesta del LLM vía FHS"));
-      }, clampTimeoutMs(timeoutMs, 310_000));
+      }, clampTimeoutMs(timeoutMs, 310_000)); // lgtm[js/resource-exhaustion]: acotado a [1s, 10min] en ws-security.ts, CodeQL no sigue el clamp interprocedural
 
       ws.on("open", () => {
         ws.send(JSON.stringify(signedChatRequest(requestId, { ...request, stream: false })));

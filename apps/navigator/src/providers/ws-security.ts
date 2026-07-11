@@ -38,6 +38,9 @@ export function wsOptions(url: string): WebSocket.ClientOptions | undefined {
           "Solo para la PoC de LAN de confianza (docs/tls-autofirmado.md) — configura TLS_CA_CERT_PATH en vez de esto para fijar el certificado esperado."
       );
     }
+    // lgtm[js/disabling-certificate-validation]: opt-in explícito y no-default
+    // (FHS_TLS_INSECURE=true), documentado en docs/tls-autofirmado.md — quien
+    // puede fijar el certificado usa TLS_CA_CERT_PATH arriba, que sí verifica.
     return { rejectUnauthorized: false };
   }
 
