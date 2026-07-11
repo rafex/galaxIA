@@ -177,14 +177,22 @@ jobs:
             npm publish -w "$pkg" --registry https://npm.pkg.github.com
 
             echo "→ Publicando a npmjs.org..."
-            # publishConfig.registry del package.json (GitHub Packages) tiene
-            # prioridad sobre --registry de la CLI — el primer intento real de
-            # publish dual (2026-07-10, run 29100658504) mandó "npmjs" de
-            # nuevo a npm.pkg.github.com y falló con E409 "Cannot publish
-            # over existing version". Hay que reescribir publishConfig antes
-            # del segundo publish y restaurarlo después (DEC-0070).
+            # Dos trampas de npm 10 encontradas en runs reales (DEC-0070):
+            # 1) publishConfig.registry pisa el --registry de la CLI (run
+            #    29100658504), y 2) `npm publish -w` ignora incluso el
+            #    publishConfig reescrito del workspace (run 29138370429 — el
+            #    fix de `npm pkg set` solo no bastó). Solución a prueba de
+            #    versiones: reescribir publishConfig Y publicar parado dentro
+            #    del paquete, sin -w, con el flag explícito — los tres
+            #    mecanismos apuntan a npmjs. Se verifica en el propio log de
+            #    npm a qué registro fue, para fallar rápido y claro si npm
+            #    vuelve a cambiar de opinión.
             npm pkg set publishConfig.registry=https://registry.npmjs.org -w "$pkg"
-            npm publish -w "$pkg" --registry https://registry.npmjs.org --access public
+            (cd "$pkg" && set -o pipefail && npm publish --registry https://registry.npmjs.org --access public 2>&1 | tee /tmp/npmjs-publish.log)
+            if ! grep -q "Publishing to https://registry.npmjs.org" /tmp/npmjs-publish.log; then
+              echo "::error::El publish a npmjs.org fue a otro registro — ver log arriba" >&2
+              exit 1
+            fi
             git checkout -- "$pkg/package.json"
             echo "::endgroup::"
           done
