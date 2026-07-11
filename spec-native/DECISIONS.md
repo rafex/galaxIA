@@ -1167,3 +1167,52 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   2. `podman-compose` 1.3.0 (versión empaquetada por Debian/apt, la que trae el bastion) no interpola `${VAR:-default}` en `environment:` cuando `VAR` no está exportada en el shell — pasa el string literal, rompiendo el `envsubst` de nginx en `portal-chat` (`the closing bracket in "ATLAS_URL" variable is missing`). Documentado como trampa conocida con workaround (exportar las variables antes de invocar) en `docs/despliegue-multi-host.md`, no un bug de `compose.yaml` (sintaxis spec-compliant, la limitación es de esa versión de la herramienta).
 - **También encontrado (entorno, no código):** el sandbox de macOS donde corre este agente bloquea todo tráfico LAN entrante (incluso puertos publicados por podman) — descartada la topología "laptop=macOS + bastion" para este agente; la verificación se hizo con todo el stack corriendo en el bastion (single-host, pero hardware físico real, que era el requisito real del issue #1).
 - **Consecuencias:** `Justfile`, `docs/despliegue-multi-host.md`.
+
+## DEC-0076 — Análisis: ¿vale la pena mantener retrocompatibilidad en un protocolo alpha? (propuesta, pendiente confirmación explícita)
+
+- **Fecha:** 2026-07-11
+- **Estado:** `proposed` — análisis solicitado por el usuario tras verificar en hardware real que un `star` con payload legado se registra contra el Atlas endurecido (DEC-0069). Ninguna acción tomada todavía; requiere decisión explícita para ejecutar.
+
+### Qué retrocompatibilidad existe realmente hoy
+
+Es importante separar dos cosas que DEC-0069 mezcla bajo la etiqueta "compatibilidad", porque tienen implicaciones muy distintas:
+
+1. **Campos nuevos opcionales** (`hello.fhsVersion`, `CallerAuth` en `chat.request`/`tool.call`/`tool.list`, firma del `welcome`, `chat.cancel`/`tool.cancel`). Esto **no es deuda de compatibilidad** — es diseño aditivo normal de cualquier versión de un protocolo: un provider que no los envía simplemente no obtiene esas garantías nuevas, pero no hay dos "modos" de código que mantener. No hay nada que "decidir retirar" aquí.
+2. **El único mecanismo real de retrocompatibilidad**: el *fallback* de firma legada en `register` (`apps/atlas/src/atlas/ws-handler.ts:184-195`). Acepta `signPayload(providerId:timestamp)` (sin el hash del manifiesto) además del payload nuevo, con un `warn` en el log, documentado como "deprecado hasta FHS v0.2". Esto **sí es deuda real**: es una rama de código activa que reabre a propósito la vulnerabilidad exacta que DEC-0069 cerró (manifiesto sustituible por un MITM sin invalidar la firma) para cualquier provider que siga en el payload viejo.
+
+### Quién depende del fallback, hoy, de verdad
+
+Se rastreó cada consumidor real del protocolo:
+
+- `galaxIA-satellite-star` (`star-example`, `satellite-ocr-example`, `rag-provider`, `kb-provider`, `nova-example`) — **el único código que usa el payload legado**, y es un repo hermano bajo el mismo control del mismo mantenedor (no un tercero). Su migración ya está trackeada como [issue #1 de ese repo](https://github.com/rafex/galaxIA-satellite-star/issues/1), abierta en esta misma sesión.
+- Nadie más. `@rafex/galaxia-fhs-protocol` recién tuvo su **primera publicación real** a npmjs.org esta sesión (DEC-0070/0071) — no hay ventana de tiempo en la que un tercero externo haya podido integrar contra la versión vieja del payload todavía.
+- El protocolo está en `0.1.x` (alpha, nunca alcanzó v1.0) — no hay una promesa de estabilidad semver que romper.
+
+**Conclusión del rastreo: no hay ningún consumidor legado que proteger que no sea el propio mantenedor.** La retrocompatibilidad no está protegiendo a un tercero — está protegiendo contra tener que migrar un repo propio, ya planeado, ya con issue abierto.
+
+### Costo de mantener el fallback
+
+- **Seguridad activa comprometida a propósito**: cualquier provider (incluido uno malicioso que descubra el payload legado leyendo el código fuente, que es público) puede seguir registrándose sin que su manifiesto esté protegido contra sustitución — el hueco que DEC-0069 se supone que cerró sigue abierto mientras el fallback exista.
+- **Señal de seguridad falsa**: un operador que lea "DEC-0069 cierra el manifiesto contra MITM" puede creer que la protección es incondicional, cuando en realidad depende de que el provider conectado haya migrado.
+- **Deuda con vencimiento que alguien debe recordar cobrar**: "hasta v0.2" no es una fecha, es una promesa que requiere que alguien, en el futuro, se acuerde de volver a este código y quitarlo — el propio DECISIONS.md de este proyecto documenta muchos casos de deuda "temporal" que nunca se retomó sin un recordatorio activo.
+- **Complejidad de código innecesaria**: doble verificación de firma, log condicional, comentario que referencia una versión futura que no existe todavía como milestone real.
+
+### Costo de retirarlo ahora (sin esperar a v0.2)
+
+- El `star`/`satellite-ocr`/etc. de `galaxIA-satellite-star` **dejarían de poder registrarse** hasta migrar — pero esa migración ya es el siguiente paso reconocido (issue #1 de ese repo), no trabajo nuevo que este análisis esté inventando.
+- La demo que se acaba de levantar en `bastion-wifi` necesitaría el `star-example` parcheado antes de volver a registrarse — cambio de una tarde, no de una campaña de migración de terceros.
+- Cero usuarios reales afectados, porque no existen (ver sección anterior).
+
+### Recomendación
+
+Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales** y que el único "legado" es el propio repo hermano con su migración ya planeada: **no tiene sentido cargar con una ventana de deprecación formal ("hasta v0.2") para proteger a nadie.** La recomendación es:
+
+1. **Retirar el fallback de firma legada ahora** (eliminar el bloque `legacyPayload`/`else if` en `ws-handler.ts`, y el texto "deprecado hasta v0.2" de `docs/protocolo.md`/`docs/protocolo-provider.md`/`messages.ts`) en vez de mantenerlo hasta un v0.2 hipotético.
+2. **Priorizar inmediatamente la migración de `galaxIA-satellite-star`** (issue #1 de ese repo) — es el mismo trabajo que ya estaba planeado, simplemente sin la red de seguridad del fallback corriendo en paralelo mientras tanto.
+3. **Como principio general para esta etapa del proyecto** (mientras siga en 0.x sin usuarios externos confirmados): preferir romper y arreglar el propio ecosistema sobre cargar deuda de compatibilidad — revisar esta postura en cuanto exista un primer consumidor externo real, momento en el que sí empezaría a tener sentido un ciclo de deprecación formal con ventana de tiempo.
+
+### Explícitamente no decidido aquí
+
+Este documento es un análisis, no una ejecución — no se ha tocado código. Requiere confirmación explícita del usuario antes de:
+- Retirar el fallback de `ws-handler.ts` (rompe el `star`/`satellite-ocr` corriendo ahora mismo en `bastion-wifi` hasta que se migren).
+- Iniciar la migración de `galaxIA-satellite-star` a los payloads nuevos.
