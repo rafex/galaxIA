@@ -197,7 +197,12 @@ jobs:
             # flag de CLI por scope.
             jq '.publishConfig = {"registry": "https://registry.npmjs.org", "@rafex:registry": "https://registry.npmjs.org"}' "$pkg/package.json" > /tmp/pkg.json && mv /tmp/pkg.json "$pkg/package.json"
             echo "publishConfig efectivo: $(jq -c .publishConfig "$pkg/package.json")"
-            (cd "$pkg" && set -o pipefail && npm publish --registry https://registry.npmjs.org --@rafex:registry=https://registry.npmjs.org --access public 2>&1 | tee /tmp/npmjs-publish.log)
+            # Userconfig limpio SOLO para este publish: el .npmrc temporal de
+            # setup-node siguió interfiriendo incluso con el token añadido
+            # (ENEEDAUTH, run 29138983772) — reemplazarlo entero por uno que
+            # solo conoce npmjs elimina todas sus capas de una vez.
+            printf '//registry.npmjs.org/:_authToken=%s\n' "${NPM_TOKEN}" > /tmp/npmjs-userconfig
+            (cd "$pkg" && set -o pipefail && NPM_CONFIG_USERCONFIG=/tmp/npmjs-userconfig npm publish --registry https://registry.npmjs.org --access public 2>&1 | tee /tmp/npmjs-publish.log)
             if ! grep -q "Publishing to https://registry.npmjs.org" /tmp/npmjs-publish.log; then
               echo "::error::El publish a npmjs.org fue a otro registro — ver log arriba" >&2
               exit 1
