@@ -1074,3 +1074,30 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - `apps/{atlas,navigator,portal-chat,portal-tui}/package.json` (`name`), `package-lock.json` (regenerado), `apps/portal-chat/src/server.ts` (comentario), `helpers/mk/protocol.mk` (mensajes), `.github/workflows/publish-packages.yml` (comentarios), `docs/instalacion.md` (comandos `npx`), `spec-native/pipelines/CD.md`. Entradas históricas de DECISIONS/ROADMAP/TRACEABILITY con los nombres viejos se dejan tal cual (registro de su momento).
   - Verificado: `npm run lint`/`typecheck`/`test`/`build --workspaces` limpios; `make atlas-bump-check` consulta el nombre nuevo correctamente contra GitHub Packages; `npm pack` + instalación en proyecto aislado + `npx galaxia-atlas` arrancando y respondiendo `/health` con el nombre nuevo.
   - Pendiente: primera publicación real exitosa de los 3 paquetes de apps (GitHub Packages + npmjs.org) tras mergear este rename.
+
+## DEC-0069 — Endurecimiento del protocolo FHS v0.1 tras la revisión integral (timestamps ms, firmas ancladas, welcome firmado, invocación autenticada, cancelación, negociación de versión)
+
+- **Fecha:** 2026-07-10
+- **Estado:** `accepted` — implementado
+- **Contexto:** una revisión integral del protocolo (viabilidad, facilidad de implementación, mejoras y fallos, pedida por el usuario) encontró un bug crítico y varios huecos de seguridad/diseño:
+  1. **Unidades de `timestamp` inconsistentes (crítico):** la validación anti-replay de DEC-0057 en Atlas operaba en segundos mientras todos los providers reales (star-example, demos) enviaban `Date.now()` en ms — **ningún registro de provider pasaba** contra el Atlas de `main`. El protocolo nunca especificaba unidades y la propia doc mezclaba segundos (`hello`) y ms (`queuedAt`).
+  2. La firma de `register` cubría solo `providerId:timestamp` — un MITM podía sustituir el manifiesto completo (endpoint incluido) conservando una firma válida.
+  3. `welcome` sin firma (`registryId: "registry-001"` decorativo) — un Atlas impostor en la LAN podía cosechar manifiestos.
+  4. `chat.request`/`tool.call` sin autenticación de invocador — cualquier peer de la LAN podía consumir cómputo de un provider, anónimamente. No existía código `UNAUTHORIZED`.
+  5. Sin mensaje de cancelación — un nodo seguía quemando CPU minutos después de que el cliente abandonara por `maxWaitMs` (el peor uso posible de hardware comunitario).
+  6. Sin negociación de versión (`fhsVersion` decorativo).
+  7. Reglas 6 (scope) y 8 (veto) del protocolo eran stubs `return true` en el Navigator.
+  8. `flattenManifest` generaba sub-ids `did/.../<kind>` que dejaban de ser did:key verificables.
+  9. Sin especificación formal para implementadores no-TS (SDKs Python/Rust/Java).
+- **Decisión:**
+  - **Milisegundos** (`Date.now()`) como unidad canónica de todo `timestamp` — `TIMESTAMP_UNIT`, `MAX_REPLAY_AGE_MS` (30 000) y `MAX_CLOCK_SKEW_MS` (5 000) viven ahora en `constants.ts` del protocolo; Atlas valida en ms.
+  - **Payloads de firma estandarizados** en `identity.ts` (`helloSignaturePayload`, `registerSignaturePayload`, `welcomeSignaturePayload`, `invokeSignaturePayload`) + `canonicalJson`/`sha256CanonicalHex` (serialización canónica con llaves ordenadas — portable a otros lenguajes). La firma de `register` ancla el hash del manifiesto; el payload legado se acepta **deprecado hasta v0.2** (warning en logs del Atlas).
+  - **`welcome` firmado:** `registryId` es el did:key del Atlas (la misma identidad que ya firmaba mDNS, DEC-0032) + `timestamp`/`signature`/`fhsVersion`/`heartbeatSeconds`.
+  - **Invocación autenticada (`CallerAuth`):** `callerId`/`timestamp`/`signature` opcionales en `chat.request`/`tool.call`/`tool.list`; el Navigator tiene identidad propia (`.fhs-identity-navigator.pem`, env `NAVIGATOR_IDENTITY_KEY_PATH`) y firma todas sus invocaciones. Nuevos códigos `UNAUTHORIZED`, `UNSUPPORTED_VERSION`, `CANCELLED`.
+  - **`chat.cancel`/`tool.cancel`** best-effort — el Navigator los envía al abandonar por timeout (llm-gateway y mcp-host).
+  - **Negociación de versión:** `hello.fhsVersion` opcional; Atlas rechaza versiones distintas con `UNSUPPORTED_VERSION` (en 0.x, solo versión exacta).
+  - **Scope/veto reales en Navigator:** `matchesScope` compara la jerarquía local<network<community<external contra `PublishedService.visibility` (nuevo campo, propagado por Atlas desde el manifiesto; ausente = "external", nunca se cuela en scopes estrechos); `authorize` aplica la lista de veto del operador vía `FHS_VETOED_PROVIDERS` (el veto por usuario llegará con SPEC-AUTH-0001).
+  - **Sub-ids de nodos multi como DID URL con fragmento** (`did:key:z...#llm`) — siguen siendo verificables recortando el fragmento.
+  - **JSON Schemas generados del código** (`ts-json-schema-generator` 2.9.0, `build:schemas`) publicados en el paquete (`schemas/fhs-protocol.schema.json`, gitignored como `dist/`) — fuente formal para SDKs en otros lenguajes.
+- **Compatibilidad:** todos los campos nuevos son opcionales; la única ruptura real es la corrección de unidades — que en la práctica *repara* a los providers existentes (ya enviaban ms). La firma legada de `register` sigue aceptándose hasta v0.2. **`galaxIA-satellite-star` debe actualizarse** para usar los payloads nuevos y (opcionalmente) verificar welcome/exigir CallerAuth.
+- **Consecuencias:** `packages/fhs-protocol/src/{constants,identity,messages,manifest,types}.ts` + tests nuevos (`__tests__/identity.test.ts`), `apps/atlas/src/{index.ts,atlas/{ws-handler,registry,db}.ts}`, `apps/navigator/src/{identity.ts (nuevo),providers/{llm-gateway,mcp-host}.ts,agent/runtime.ts}`, `scripts/{mock-providers,demo-failover-ocr}.ts`, `docs/{protocolo,protocolo-provider}.md`. Verificado: lint/typecheck/test limpios en los 6 workspaces (84 tests).

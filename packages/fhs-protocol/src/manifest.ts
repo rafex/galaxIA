@@ -81,10 +81,15 @@ export function* flattenManifest(
   if (manifest.provider.type === "multi") {
     const base = { ...manifest.provider, type: "multi" as const };
     for (const service of (manifest as MultiBeacon).services) {
+      // Fragmento de DID URL (`did:key:z...#llm`) en vez de `/<kind>` — el
+      // resultado sigue siendo una DID URL válida (RFC 3986 fragment sobre el
+      // did base), así que verificar firmas de un sub-servicio es recortar el
+      // fragmento; con `/` el id dejaba de ser un did:key verificable
+      // (revisión del protocolo, 2026-07-10).
       const provider: NodeProfile = {
         ...base,
         type: service.kind,
-        id: `${base.id}/${service.kind}`,
+        id: `${base.id}#${service.kind}`,
       };
       yield {
         provider,

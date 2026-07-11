@@ -4,36 +4,65 @@
 
 import type { Beacon } from "./manifest.js";
 import type { ArtifactRef } from "./types.js";
-import type { ToolParameterSchema } from "./llm.js";
+import type { ToolParameterSchema, GenerateRequest, GenerateResponse } from "./llm.js";
 
 export interface BaseMessage {
   type: string;
+  /** Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts. */
   timestamp?: number;
 }
 
 export interface HelloMessage extends BaseMessage {
   type: "hello";
   providerId: string;
+  /** Milisegundos desde epoch Unix. */
   timestamp: number;
+  /** Ed25519 base64 sobre `helloSignaturePayload(providerId, timestamp)`. */
   signature?: string;
+  /**
+   * Versión del protocolo que habla el nodo (negociación, revisión
+   * 2026-07-10). Si el Registry no la soporta responde `error` con
+   * `UNSUPPORTED_VERSION` en vez de fallar de formas opacas después.
+   * Opcional por compatibilidad: ausente = se asume la versión del Registry.
+   */
+  fhsVersion?: string;
 }
 
 export interface WelcomeMessage extends BaseMessage {
   type: "welcome";
+  /** did:key del Registry — con firma, deja de ser un string decorativo. */
   registryId: string;
   leaseSeconds: number;
+  /** Intervalo de heartbeat que este Registry espera (segundos) — permite ajustarlo sin recompilar nodos. */
+  heartbeatSeconds?: number;
+  /** Versión del protocolo que habla el Registry. */
+  fhsVersion?: string;
+  /**
+   * Ed25519 base64 sobre `welcomeSignaturePayload(registryId, timestamp)` —
+   * el nodo puede verificar que no está entregando su manifiesto a un
+   * Registry impostor (revisión 2026-07-10).
+   */
+  signature?: string;
 }
 
 export interface RegisterMessage extends BaseMessage {
   type: "register";
   providerId: string;
   manifest: Beacon;
+  /** Milisegundos desde epoch Unix. */
   timestamp: number;
+  /**
+   * Ed25519 base64 sobre `registerSignaturePayload(providerId, timestamp,
+   * manifest)` — la firma ancla el contenido del manifiesto (hash SHA-256
+   * canónico), no solo identidad+frescura. El payload legado
+   * `${providerId}:${timestamp}` se acepta como deprecado hasta v0.2.
+   */
   signature?: string;
 }
 
 export interface RegisteredMessage extends BaseMessage {
   type: "registered";
+  /** Milisegundos desde epoch Unix (como todo timestamp del protocolo). */
   leaseExpires: number;
   acceptedServices: number;
 }
@@ -77,7 +106,7 @@ export interface NodeUpdatedMessage extends BaseMessage {
 export interface RegistryErrorMessage extends BaseMessage {
   type: "error";
   data: {
-    code: "NOT_IDENTIFIED" | "ALREADY_REGISTERED" | "INVALID_MANIFEST" | "INVALID_SIGNATURE" | "PARSE_ERROR";
+    code: "NOT_IDENTIFIED" | "ALREADY_REGISTERED" | "INVALID_MANIFEST" | "INVALID_SIGNATURE" | "PARSE_ERROR" | "UNSUPPORTED_VERSION" | "UNAUTHORIZED";
     message: string;
   };
 }
@@ -102,10 +131,35 @@ export type FhsMessage = RegistryInboundMessage | RegistryOutboundMessage;
 // Chat protocol (Agent Server ↔ LLM Provider over FHS WebSocket)
 // ============================================================
 
-export interface ChatRequestMessage extends BaseMessage {
+/**
+ * Campos de autenticación del invocador (revisión 2026-07-10) — presentes en
+ * `chat.request`, `tool.call` y `tool.list`. Sin ellos, cualquier peer de la
+ * LAN podía consumir el cómputo de un provider. Opcionales por
+ * compatibilidad; un provider puede exigirlos y responder `UNAUTHORIZED`.
+ */
+export interface CallerAuth {
+  /** did:key del invocador (Navigator u otro agente). */
+  callerId?: string;
+  /** Ed25519 base64 sobre `invokeSignaturePayload(callerId, requestId, timestamp)`. */
+  signature?: string;
+}
+
+export interface ChatRequestMessage extends BaseMessage, CallerAuth {
   type: "chat.request";
   requestId: string;
-  request: import("./llm.js").GenerateRequest;
+  request: GenerateRequest;
+}
+
+/**
+ * Cancelación best-effort (revisión 2026-07-10): quien originó un
+ * `chat.request` avisa que dejó de esperar (timeout, failover, usuario que
+ * cerró) para que el nodo no siga quemando CPU — el recurso más escaso en
+ * hardware comunitario. El provider debe abortar si puede y responder
+ * `chat.error` con código `CANCELLED`; ignorarlo no rompe el protocolo.
+ */
+export interface ChatCancelMessage extends BaseMessage {
+  type: "chat.cancel";
+  requestId: string;
 }
 
 export interface ChatDeltaMessage extends BaseMessage {
@@ -117,7 +171,7 @@ export interface ChatDeltaMessage extends BaseMessage {
 export interface ChatCompletedMessage extends BaseMessage {
   type: "chat.completed";
   requestId: string;
-  response: import("./llm.js").GenerateResponse;
+  response: GenerateResponse;
 }
 
 export interface ChatErrorMessage extends BaseMessage {
@@ -141,7 +195,7 @@ export interface DispatchAckMessage extends BaseMessage {
   queuedAt: number;
 }
 
-export type LlmProviderInboundMessage = ChatRequestMessage;
+export type LlmProviderInboundMessage = ChatRequestMessage | ChatCancelMessage;
 
 export type LlmProviderOutboundMessage =
   | ChatDeltaMessage
@@ -157,11 +211,17 @@ export type LlmProviderMessage =
 // Tool call protocol (Agent Server ↔ MCP/Tool Provider over FHS WebSocket)
 // ============================================================
 
-export interface ToolCallRequestMessage extends BaseMessage {
+export interface ToolCallRequestMessage extends BaseMessage, CallerAuth {
   type: "tool.call";
   requestId: string;
   toolName: string;
   arguments: Record<string, unknown>;
+}
+
+/** Cancelación best-effort de un `tool.call` — misma semántica que `chat.cancel`. */
+export interface ToolCancelMessage extends BaseMessage {
+  type: "tool.cancel";
+  requestId: string;
 }
 
 export interface ToolCallResultMessage extends BaseMessage {
@@ -185,7 +245,7 @@ export interface ToolCallErrorMessage extends BaseMessage {
   message: string;
 }
 
-export interface ToolListRequestMessage extends BaseMessage {
+export interface ToolListRequestMessage extends BaseMessage, CallerAuth {
   type: "tool.list";
   requestId: string;
 }
@@ -202,7 +262,8 @@ export interface ToolListResponseMessage extends BaseMessage {
 
 export type ToolProviderInboundMessage =
   | ToolCallRequestMessage
-  | ToolListRequestMessage;
+  | ToolListRequestMessage
+  | ToolCancelMessage;
 
 export type ToolProviderOutboundMessage =
   | ToolCallResultMessage

@@ -25,6 +25,8 @@ import * as http from "node:http";
 import {
   generateIdentity,
   signPayload,
+  helloSignaturePayload,
+  registerSignaturePayload,
   type AgentSSEEvent,
   type NodeIdentity,
 } from "@rafex/galaxia-fhs-protocol";
@@ -202,7 +204,7 @@ class MockOcrProvider {
 
       ws.on("open", () => {
         const helloTs = Date.now();
-        const helloPayload = `${this.id}:${helloTs}`;
+        const helloPayload = helloSignaturePayload(this.id, helloTs);
         ws.send(
           JSON.stringify({
             type: "hello",
@@ -219,13 +221,10 @@ class MockOcrProvider {
 
         if (msg.type === "welcome") {
           const registerTs = Date.now();
-          const registerPayload = `${this.id}:${registerTs}`;
-          ws.send(
-            JSON.stringify({
-              type: "register",
-              providerId: this.id,
-              signature: signPayload(this.identity.privateKey, registerPayload),
-              manifest: {
+          // La firma de register ancla el hash canónico del manifiesto
+          // (revisión del protocolo 2026-07-10) — el manifiesto se construye
+          // primero para poder firmarlo.
+          const manifest = {
                 fhsVersion: "0.1",
                 provider: {
                   id: this.id,
@@ -252,7 +251,13 @@ class MockOcrProvider {
                 privacy: {
                   retention: "session",
                 },
-              },
+          };
+          ws.send(
+            JSON.stringify({
+              type: "register",
+              providerId: this.id,
+              signature: signPayload(this.identity.privateKey, registerSignaturePayload(this.id, registerTs, manifest)),
+              manifest,
               timestamp: registerTs,
             })
           );
@@ -363,7 +368,7 @@ class MockLlmProvider {
 
       ws.on("open", () => {
         const helloTs = Date.now();
-        const helloPayload = `${this.id}:${helloTs}`;
+        const helloPayload = helloSignaturePayload(this.id, helloTs);
         ws.send(
           JSON.stringify({
             type: "hello",
@@ -380,13 +385,7 @@ class MockLlmProvider {
 
         if (msg.type === "welcome") {
           const registerTs = Date.now();
-          const registerPayload = `${this.id}:${registerTs}`;
-          ws.send(
-            JSON.stringify({
-              type: "register",
-              providerId: this.id,
-              signature: signPayload(this.identity.privateKey, registerPayload),
-              manifest: {
+          const manifest = {
                 fhsVersion: "0.1",
                 provider: {
                   id: this.id,
@@ -411,7 +410,13 @@ class MockLlmProvider {
                   retention: "session",
                   trainingUse: false,
                 },
-              },
+          };
+          ws.send(
+            JSON.stringify({
+              type: "register",
+              providerId: this.id,
+              signature: signPayload(this.identity.privateKey, registerSignaturePayload(this.id, registerTs, manifest)),
+              manifest,
               timestamp: registerTs,
             })
           );

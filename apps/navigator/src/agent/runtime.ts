@@ -1021,15 +1021,41 @@ function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
   return union === 0 ? 0 : intersection / union;
 }
 
-function matchesScope(_service: PublishedService, _scope: PrivacyScope): boolean {
-  // Para la PoC, asumimos que todos los proveedores locales están en scope.
-  // En versiones futuras, el manifiesto declararía el scope explícitamente.
-  return true;
+// Regla 6 del protocolo (scope de privacidad), implementada de verdad desde
+// la revisión 2026-07-10 — antes era un stub que retornaba true. Los ámbitos
+// forman una jerarquía: un usuario que pide scope "local" solo acepta nodos
+// locales; "external" acepta todo. Los servicios registrados antes de que
+// Atlas propagara `visibility` no traen el campo — se tratan como "external"
+// (el ámbito más restrictivo para el usuario: solo se usan si el usuario
+// aceptó explícitamente el scope más amplio), nunca se cuelan en "local".
+const SCOPE_RANK: Record<PrivacyScope, number> = {
+  local: 0,
+  network: 1,
+  community: 2,
+  external: 3,
+};
+
+function matchesScope(service: PublishedService, scope: PrivacyScope): boolean {
+  const serviceScope: PrivacyScope = service.visibility ?? "external";
+  return SCOPE_RANK[serviceScope] <= SCOPE_RANK[scope];
 }
 
-function authorize(_providerId: string, _scope?: PrivacyScope): boolean {
-  // Para la PoC, autorizamos siempre. En producción, verificar vetos y políticas.
-  return true;
+// Regla 8 del protocolo (veto de proveedores): lista de dids vetados por el
+// operador vía FHS_VETOED_PROVIDERS (separados por coma). El veto por usuario
+// individual llegará con identidad de usuario (SPEC-AUTH-0001); mientras
+// tanto el operador del Navigator ya puede excluir nodos concretos. Los ids
+// de sub-servicio de nodos multi llevan fragmento (`did#llm`) — el veto
+// aplica al did base.
+const vetoedProviders = new Set(
+  (process.env.FHS_VETOED_PROVIDERS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+);
+
+function authorize(providerId: string, _scope?: PrivacyScope): boolean {
+  const baseDid = providerId.split("#")[0];
+  return !vetoedProviders.has(baseDid) && !vetoedProviders.has(providerId);
 }
 
 const EXTENSION_BY_MIME: Record<string, string> = {

@@ -210,6 +210,13 @@ export interface PublishedService {
   capabilities: Signal[];
   status: ServiceStatus;
   models?: ModelInfo[];
+  /**
+   * Ámbito declarado por el nodo (`NodeProfile.visibility`), propagado al
+   * servicio publicado para que el Agent Server pueda aplicar el scope de
+   * privacidad del usuario (regla 6 del protocolo) sin volver a pedir el
+   * manifiesto. Ausente en registros previos a la revisión 2026-07-10.
+   */
+  visibility?: NodeVisibility;
   privacy?: PrivacyPolicy;
   authentication?: AuthenticationInfo;
   updatedAt: number;

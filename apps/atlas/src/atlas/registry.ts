@@ -121,6 +121,9 @@ export class Atlas {
         endpoint: entry.endpoint,
         capabilities: entry.capabilities || [],
         models: entry.models,
+        // Propaga el ámbito declarado por el nodo para que el Agent Server
+        // pueda aplicar el scope de privacidad del usuario (regla 6).
+        visibility: entry.provider.visibility,
         status: "available",
         updatedAt: now,
       });
