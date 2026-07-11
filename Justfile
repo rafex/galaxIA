@@ -40,11 +40,11 @@ container-restart: container-down container-up
 # ── Contenedores individuales ──────────────────────────────────────────────
 
 container-up-core:
-    @echo "→ Levantando atlas + navigator + portal..."
+    @echo "→ Levantando atlas + navigator + portal-chat..."
     {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} up -d --build \
       --build-arg COMMIT_HASH={{commit-hash}} \
       --build-arg BUILD_DATE={{build-date}} \
-      atlas navigator portal
+      atlas navigator portal-chat
 
 container-up-atlas:
     @echo "→ Levantando atlas (Registry)..."
@@ -76,10 +76,10 @@ TLS_COMPOSE_FILE := justfile_directory() + "/containers/compose.tls.yaml"
 tls-gen-cert ip_laptop="127.0.0.1" ip_bastion="127.0.0.1":
     helpers/scripts/shell/generate-dev-cert.sh {{ip_laptop}} {{ip_bastion}}
 
-# Levanta atlas + navigator + portal con TLS (requiere tls-gen-cert antes)
+# Levanta atlas + navigator + portal-chat con TLS (requiere tls-gen-cert antes)
 container-up-core-tls:
-    @echo "→ Levantando atlas + navigator + portal (TLS)..."
+    @echo "→ Levantando atlas + navigator + portal-chat (TLS)..."
     {{COMPOSE_CMD}} -f {{COMPOSE_FILE}} -f {{TLS_COMPOSE_FILE}} up -d --build \
       --build-arg COMMIT_HASH={{commit-hash}} \
       --build-arg BUILD_DATE={{build-date}} \
-      atlas navigator portal
+      atlas navigator portal-chat
