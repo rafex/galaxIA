@@ -59,6 +59,14 @@ export const FHS_ERROR_CODES = {
   UNSUPPORTED_VERSION: "UNSUPPORTED_VERSION",
   /** La petición fue cancelada por quien la originó (`chat.cancel`/`tool.cancel`). */
   CANCELLED: "CANCELLED",
+  /**
+   * Backpressure (DEC-0072): el nodo está a su capacidad declarada
+   * (`availability.maxConcurrentRequests`) y rechaza la petición de
+   * inmediato, sin `dispatch.ack`. Quien invoca debe tratarlo como señal de
+   * failover (probar otro nodo), no como fallo del nodo — en hardware
+   * comunitario, rechazar rápido es más sano que encolar sin límite.
+   */
+  OVERLOADED: "OVERLOADED",
 } as const;
 
 export type FhsErrorCode = (typeof FHS_ERROR_CODES)[keyof typeof FHS_ERROR_CODES];

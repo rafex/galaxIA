@@ -10,6 +10,7 @@ import type {
 } from "@rafex/galaxia-fhs-protocol";
 import { signPayload, invokeSignaturePayload, type ToolCancelMessage } from "@rafex/galaxia-fhs-protocol";
 import { getNavigatorIdentity } from "../identity.js";
+import { acquireInFlight, releaseInFlight } from "./inflight.js";
 import { logTrace } from "../observability/trace.js";
 
 /**
@@ -225,7 +226,9 @@ export class McpHost {
     }
     const requestId = randomUUID();
     const msg: ToolCallRequestMessage = withCallerAuth<ToolCallRequestMessage>({ type: "tool.call", requestId, toolName, arguments: args });
-    return this.sendAndWait(client, msg, requestId, timeoutMs, trace);
+    // Backpressure (DEC-0072): misma contabilidad en vuelo que el gateway LLM.
+    acquireInFlight(providerId);
+    return this.sendAndWait(client, msg, requestId, timeoutMs, trace).finally(() => releaseInFlight(providerId));
   }
 
   disconnect(providerId: string) {

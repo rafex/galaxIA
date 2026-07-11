@@ -1121,3 +1121,14 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
 - **Contexto:** con toda la cadena de publish dual ya funcionando (DEC-0070, addenda 1-4: registro y auth verificados en el log), el publish a npmjs falló con `E404 PUT @rafex/galaxia-fhs-protocol` — el usuario confirmó que su scope en npmjs es **`@rafex_labs`**, no `@rafex` (ese pertenece a otro usuario). GitHub Packages, en cambio, **exige** el scope del owner del repo (`@rafex`, DEC-0068). Los dos registros requieren scopes distintos e irreconciliables con un solo `name`.
 - **Decisión:** el `name` del repo sigue siendo `@rafex/galaxia-*` (manda GitHub Packages, el registro primario). Para el publish a npmjs, el workflow renombra el paquete al vuelo con jq (`@rafex/` → `@rafex_labs/`) y **reescribe la dependencia interna** `@rafex/galaxia-fhs-protocol` → `@rafex_labs/galaxia-fhs-protocol` en las apps — sin esto, `npm install @rafex_labs/galaxia-atlas` desde npmjs no podría resolver su dependencia (que solo existe con ese nombre en GitHub Packages). El package.json se restaura tras publicar (`git checkout`).
 - **Consecuencias:** `.github/workflows/publish-packages.yml`, `docs/instalacion.md` (nota de nombres por registro), `spec-native/pipelines/CD.md`. Los consumidores vía npmjs usan `@rafex_labs/galaxia-*`; vía GitHub Packages, `@rafex/galaxia-*`. Misma versión en ambos.
+
+## DEC-0072 — Backpressure best-effort con `availability.maxConcurrentRequests` + código `OVERLOADED`
+
+- **Fecha:** 2026-07-11
+- **Estado:** `accepted` — implementado (lado Agent Server; el enforcement provider-side es contrato documentado, pendiente en satellite-star)
+- **Contexto:** `ModelInfo.availability.maxConcurrentRequests` existía en el protocolo desde el inicio pero nada lo consumía (hallazgo de la revisión DEC-0069) — un Star saturado recibía peticiones sin límite y la única señal era el timeout del cliente.
+- **Decisión:**
+  - Nuevo código `OVERLOADED` en `FHS_ERROR_CODES`: el nodo a capacidad rechaza de inmediato (sin `dispatch.ack`); el invocador lo trata como señal de failover.
+  - Navigator lleva un contador de peticiones en vuelo por provider (`providers/inflight.ts`, integrado en llm-gateway generate/stream y mcp-host callTool) y `resolveLlm` filtra candidatos cuyo cupo declarado ya está lleno **desde este Navigator** (vista local, best-effort — con dos Agent Servers la última palabra la tiene el provider). Si todos los candidatos están a tope, se usa la lista completa: mejor un posible `OVERLOADED`+failover que un falso "no hay modelos".
+  - El enforcement real es responsabilidad del provider (checklist de `docs/protocolo-provider.md`).
+- **Consecuencias:** `packages/fhs-protocol/src/{constants,types}.ts`, `apps/navigator/src/providers/{inflight.ts (nuevo),llm-gateway.ts,mcp-host.ts}`, `apps/navigator/src/agent/runtime.ts`, `docs/protocolo-provider.md`, test `apps/navigator/src/providers/__tests__/inflight.test.ts`.
