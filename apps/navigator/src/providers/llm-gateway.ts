@@ -15,6 +15,7 @@ import type {
 import { signPayload, invokeSignaturePayload, type ChatCancelMessage } from "@rafex/galaxia-fhs-protocol";
 import { getNavigatorIdentity } from "../identity.js";
 import { acquireInFlight, releaseInFlight } from "./inflight.js";
+import { wsOptions, clampTimeoutMs } from "./ws-security.js";
 import { logTrace } from "../observability/trace.js";
 
 // Invocación firmada (revisión del protocolo 2026-07-10): el Navigator prueba
@@ -52,13 +53,6 @@ interface FhsMessageEnvelope {
 export interface TraceContext {
   conversationId: string;
   capability: string;
-}
-
-// PoC: certificados autofirmados en wss:// — no hay CA de confianza que
-// verificar. Ver docs/tls-autofirmado.md. No usar rejectUnauthorized:false
-// contra un endpoint real fuera de esta PoC.
-function wsOptions(url: string) {
-  return url.startsWith("wss://") ? { rejectUnauthorized: false } : undefined;
 }
 
 export interface LlmProviderSelection {
@@ -139,7 +133,7 @@ export class LlmGateway {
         ws.close();
         emitTrace(false, "TIMEOUT");
         reject(new Error("Timeout esperando respuesta del LLM vía FHS"));
-      }, timeoutMs ?? 310_000);
+      }, clampTimeoutMs(timeoutMs, 310_000));
 
       ws.on("open", () => {
         ws.send(JSON.stringify(signedChatRequest(requestId, { ...request, stream: false })));
@@ -262,7 +256,7 @@ export class LlmGateway {
       sendCancel(ws, requestId);
       enqueue({ kind: "error", message: "Timeout esperando stream FHS" });
       ws.close();
-    }, 310_000);
+    }, clampTimeoutMs(undefined, 310_000));
 
     try {
       while (true) {

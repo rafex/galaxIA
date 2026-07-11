@@ -92,7 +92,10 @@ Abrir el chat en `https://<ip-laptop>:8443` — el navegador mostrará la advert
 
 - **`apps/navigator`**: `TLS_CERT_PATH`/`TLS_KEY_PATH` (env) activan `https` en la configuración de Fastify — cubre `/fhs/v1/ws` (Registry) y `/api/chat/ws` (chat) con el mismo servidor, sin cambios en el código de esas rutas.
 - **`examples/star-example`, `examples/satellite-ocr-example`**: mismas variables activan un `https.createServer` interno para su propio servidor de chat/tools, y cambian el esquema anunciado en el manifiesto (`wss://` en vez de `ws://`). El cliente que se conecta al Registry también usa `wss://` cuando `REGISTRY_URL` lo especifica.
-- **Clientes WebSocket** (`llm-gateway.ts`, `mcp-host.ts`, y los clientes de Registry en ambos providers): pasan `{ rejectUnauthorized: false }` cuando la URL empieza con `wss://` — sin esto, Node rechazaría el certificado autofirmado por no tener una CA reconocida.
+- **Clientes WebSocket de `apps/navigator`** (`llm-gateway.ts`, `mcp-host.ts`): usan `wsOptions()` de `providers/ws-security.ts` (DEC-0078). El default ahora es **seguro**: una URL `wss://` sin más configuración usa la verificación TLS estándar de Node (rechaza el cert autofirmado, como cualquier cliente TLS normal). Dos formas explícitas de conectar contra un cert autofirmado:
+  - **`TLS_CA_CERT_PATH`** (recomendado): fija el certificado exacto como única CA confiable (`{ ca: readFileSync(...) }`) — sigue rechazando cualquier otro certificado, MITM-safe. Es la opción "fijar el certificado esperado" que este documento ya recomendaba pero no estaba implementada.
+  - **`FHS_TLS_INSECURE=true`** (solo si no se puede distribuir el cert): vuelve al `{ rejectUnauthorized: false }` de antes — acepta cualquier certificado, con un warning en el log la primera vez que se usa.
+- **Clientes de Registry en `examples/star-example`/`examples/satellite-ocr-example`** (repo `galaxIA-satellite-star`): siguen usando `{ rejectUnauthorized: false }` sin condición — pendiente de aplicar el mismo mecanismo ahí (fuera de alcance de DEC-0078, que solo tocó `galaxIA`).
 - **`apps/portal-chat` (nginx)**: `containers/portal-chat/nginx-tls.conf` termina TLS para el navegador y reenvía a `navigator` por `https://` con `proxy_ssl_verify off` (mismo motivo: cert autofirmado).
 - **Frontend (`apps/portal-chat/src/services/api.ts`)**: ya elegía `wss://` automáticamente cuando `location.protocol === "https:"` — no necesitó ningún cambio.
 
@@ -100,7 +103,7 @@ Abrir el chat en `https://<ip-laptop>:8443` — el navegador mostrará la advert
 
 | Riesgo | Mitigación |
 |---|---|
-| `rejectUnauthorized: false` acepta *cualquier* certificado, no solo el nuestro — vulnerable a MITM si un atacante ya está en la LAN | Aceptable para una PoC en LAN de confianza; para producción, verificar contra una CA propia (fijar el certificado esperado, no desactivar la verificación) |
+| `rejectUnauthorized: false` acepta *cualquier* certificado, no solo el nuestro — vulnerable a MITM si un atacante ya está en la LAN | Cerrado del lado de `apps/navigator` (DEC-0078): `TLS_CA_CERT_PATH` fija el certificado esperado por default seguro; `FHS_TLS_INSECURE=true` sigue disponible como escape explícito, no default. Pendiente en `galaxIA-satellite-star`. |
 | La clave privada vive en texto plano en `certs/dev.key` en cada máquina | Gitignored, permisos `600` al generarla; no es peor que cualquier clave de servidor de desarrollo, pero no rotar ni reusar fuera de esta PoC |
 | Un solo certificado compartido entre todos los servicios, sin identidad individual por nodo | Suficiente para cifrar el canal; no reemplaza la identidad verificable del protocolo (DID, `did:key:...`) que ya cubre "quién es quién" a nivel de aplicación |
 

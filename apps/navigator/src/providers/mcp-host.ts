@@ -11,6 +11,7 @@ import type {
 import { signPayload, invokeSignaturePayload, type ToolCancelMessage } from "@rafex/galaxia-fhs-protocol";
 import { getNavigatorIdentity } from "../identity.js";
 import { acquireInFlight, releaseInFlight } from "./inflight.js";
+import { wsOptions, clampTimeoutMs } from "./ws-security.js";
 import { logTrace } from "../observability/trace.js";
 
 /**
@@ -70,11 +71,6 @@ export interface McpProviderClient {
 const CONNECT_TIMEOUT_MS = 10_000;
 // Alineado con los timeouts de 300s del resto del stack para hardware comunitario lento.
 const CALL_TIMEOUT_MS = 300_000;
-
-// PoC: certificados autofirmados en wss:// — ver docs/tls-autofirmado.md.
-function wsOptions(url: string) {
-  return url.startsWith("wss://") ? { rejectUnauthorized: false } : undefined;
-}
 
 /**
  * Cliente del protocolo FHS de tools (tool.list / tool.call / tool.result / tool.error)
@@ -271,7 +267,7 @@ export class McpHost {
           });
         }
         reject(new Error(`Timeout esperando respuesta FHS de ${client.providerId}`));
-      }, timeoutMs ?? CALL_TIMEOUT_MS);
+      }, clampTimeoutMs(timeoutMs, CALL_TIMEOUT_MS));
       client.pending.set(requestId, {
         startedAt,
         trace,
