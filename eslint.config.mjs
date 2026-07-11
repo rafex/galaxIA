@@ -2,7 +2,10 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["**/dist/**", "**/node_modules/**", "**/version.json"],
+    // vendor/**: subtrees de repos externos (galaxIA-satellite-star,
+    // galaxia-parser-catalog, DEC-0077) — cada uno tiene su propio lint,
+    // no forman parte de los workspaces de este monorepo.
+    ignores: ["**/dist/**", "**/node_modules/**", "**/version.json", "vendor/**"],
   },
   {
     extends: [

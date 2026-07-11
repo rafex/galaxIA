@@ -1217,3 +1217,14 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
 - **Consecuencia inmediata esperada**: el `star`/`satellite-ocr` de `galaxIA-satellite-star` corriendo en `bastion-wifi` (ver DEC-0075) dejan de poder registrarse hasta migrar — es el costo aceptado explícitamente en este análisis, no un efecto secundario no previsto.
 - **Migración de `galaxIA-satellite-star` ejecutada en paralelo** (issue #1 de ese repo): los 5 examples (`star-example`, `satellite-ocr-example`, `rag-provider`, `kb-provider`, `nova-example`) migrados a `helloSignaturePayload`/`registerSignaturePayload`/`welcomeSignaturePayload`, con verificación de la firma del `welcome` antes de registrar.
 - **Consecuencias de código:** `apps/atlas/src/atlas/ws-handler.ts`, `packages/fhs-protocol/src/messages.ts`, `docs/protocolo.md`, `docs/protocolo-provider.md` (repo `galaxIA`); los 5 `examples/*/src/index.ts` de `galaxIA-satellite-star`.
+
+## DEC-0077 — `vendor/`: subtrees de galaxIA-satellite-star y galaxia-parser-catalog para integración local
+
+- **Fecha:** 2026-07-11
+- **Estado:** `accepted` — implementado
+- **Contexto:** DEC-0038 separó `galaxIA-satellite-star` (providers de referencia) de `galaxIA` (protocolo/core), y `galaxia-parser-catalog` siempre vivió aparte. Trabajar en cambios que cruzan los tres repos (como la migración de payloads de DEC-0076) requiere clonar/actualizar cada uno por separado y recordar tres directorios — fricción real, vivida en esta misma sesión.
+- **Decisión:** agregar `vendor/galaxIA-satellite-star` y `vendor/galaxia-parser-catalog` como **subtrees** (`git subtree add --squash`, un commit squasheado por repo, no todo su historial) dentro de `galaxIA`, puramente para conveniencia de desarrollo local:
+  - **No cambia DEC-0038**: los repos externos siguen siendo la fuente de verdad; `vendor/` es una copia, no una fusión. Sincronización explícita vía `just vendor-pull-*`/`vendor-push-*` (ver `docs/vendor-subtrees.md`), nunca automática.
+  - **No entra a los workspaces de npm** (`package.json` raíz sigue declarando solo `packages/*`/`apps/*`) ni al lint del monorepo (`vendor/**` excluido en `eslint.config.mjs`) — cada repo mantiene su propio pipeline.
+  - Los remotes `satellite-star-src`/`parser-catalog-src` son locales (se agregan una vez por checkout), no viven en `origin`.
+- **Consecuencias:** `vendor/galaxIA-satellite-star/`, `vendor/galaxia-parser-catalog/` (nuevos, subtree), `Justfile` (recipes `vendor-*`), `eslint.config.mjs` (ignore), `docs/vendor-subtrees.md` (nuevo). Verificado: typecheck/lint del monorepo raíz sin cambios tras agregar los subtrees.
