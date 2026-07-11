@@ -8,6 +8,7 @@ import { setupChatApi } from "./api/chat.js";
 import { setupEventsApi } from "./api/events.js";
 import { setupChatWebSocket } from "./api/chat-ws.js";
 import { EventBus } from "./sse/event-bus.js";
+import { connectNatsBridge } from "./nats-bridge.js";
 import { isIpfsConfigured, getPublicGatewayUrl } from "./ipfs/ipfs-client.js";
 import versionInfo from "./version.json" with { type: "json" };
 
@@ -23,6 +24,11 @@ const ATLAS_URL = process.env.ATLAS_URL || "http://localhost:8081";
 // autofirmado, solo para la PoC.
 const TLS_CERT_PATH = process.env.TLS_CERT_PATH;
 const TLS_KEY_PATH = process.env.TLS_KEY_PATH;
+// Puente de eventos desde Atlas vía NATS (SPEC-BRIDGE-0001, DEC-0074) —
+// opt-in, mismo NATS_URL que Atlas debe apuntar al mismo servidor. Sin él,
+// Navigator funciona igual que hoy (el chat no depende de esto, ver
+// nats-bridge.ts).
+const NATS_URL = process.env.NATS_URL;
 
 async function main() {
   const tlsEnabled = !!(TLS_CERT_PATH && TLS_KEY_PATH);
@@ -40,6 +46,9 @@ async function main() {
 
   const eventBus = new EventBus();
   const atlasClient = new AtlasClient(ATLAS_URL);
+
+  const natsBridge = await connectNatsBridge(NATS_URL, eventBus, { warn: (msg) => app.log.warn(msg) });
+  if (natsBridge.connected) app.log.info(`Puente NATS activo desde ${NATS_URL} (fhs.node.online / fhs.node.lost)`);
 
   setupEventsApi(app, eventBus);
   setupChatApi(app, atlasClient, eventBus);

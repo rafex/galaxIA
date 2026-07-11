@@ -2,7 +2,7 @@
 
 ## Estado
 
-`proposed` — solo documentado, sin implementar. Decisión de tecnología registrada en `spec-native/DECISIONS.md` DEC-0036.
+`accepted` — implementado (DEC-0074, 2026-07-11). Ver "Decisiones tomadas al implementar" al final de este documento para cómo se resolvió cada pregunta abierta.
 
 ## Owner
 
@@ -40,9 +40,11 @@ Usar **NATS** como bus de mensajería entre Atlas y Navigator:
 - Cualquier persistencia — eso ya se resolvió para el rating con SQLite+WAL (DEC-0036, ver también `spec-native/specs/satelite-rating/SPEC.md`). Esta spec es puramente sobre mensajería entre procesos, no sobre almacenamiento.
 - Requerir NATS como dependencia obligatoria del despliegue — si se implementa, debe ser opt-in (igual que mDNS, TLS, etc.) para no romper el despliegue de un solo proceso/sin NATS que ya funciona hoy.
 
-## Preguntas abiertas (para cuando se priorice implementar)
+## Decisiones tomadas al implementar (DEC-0074)
 
-1. ¿NATS corre como contenedor nuevo en `containers/compose.yaml` (cuarto servicio del core, junto a atlas/navigator/portal), o es opcional/externo?
-2. ¿Snapshot inicial al arrancar Navigator (REST a Atlas) + solo deltas por NATS después, o Navigator espera el primer evento sin snapshot?
-3. ¿Este mismo bus sirve también para que el Portal reciba notificaciones sin pasar por Navigator, o Navigator sigue siendo el único punto de contacto del Portal (como hoy)?
-4. ¿Vale la pena esto antes o después de tener autenticación de usuarios (`SPEC-AUTH-0001`, pausada) — un Portal sin sesión de usuario real ya muestra notificaciones globales de nodo a cualquiera conectado, lo cual puede ser aceptable o no según el modelo de privacidad que se decida más adelante?
+1. **NATS es un servicio opt-in**, no un cuarto servicio obligatorio de `compose.yaml` — vive en un overlay separado (`containers/compose.nats.yaml`, mismo patrón que `compose.tls.yaml`). Sin el overlay, el stack funciona exactamente igual que hoy.
+2. **Sin snapshot inicial.** Navigator solo consume deltas en vivo después de conectar — no hace falta ponerse al día del estado al arrancar porque `AgentRuntime` ya resuelve el catálogo completo por REST en cada turno de chat, con o sin NATS. Si Navigator se reinicia mientras NATS está activo, no se pierde nada funcionalmente relevante.
+3. **Navigator sigue siendo el único punto de contacto del Portal** — el bridge reinyecta los eventos en el `EventBus` propio de Navigator (`connectNatsBridge`, `apps/navigator/src/nats-bridge.ts`), el mismo canal que ya distribuye eventos de conversación por `/api/chat/ws`/SSE. El Portal no gana una segunda conexión directa a Atlas.
+4. **Se implementó ya, sin esperar `SPEC-AUTH-0001`** — la limitación de "notificaciones globales de nodo a cualquiera conectado" queda igual que estaba (ya era el comportamiento de `/api/fhs/providers`, sin scoping por usuario); no es una regresión de privacidad nueva, solo hace visible en vivo algo que ya era público por REST.
+5. **NATS core, no JetStream** — confirmado: esto nunca fue una dependencia funcional del pipeline de chat, solo una mejora de experiencia (notificaciones en vivo en el Portal). Sin persistencia ni replay.
+6. **Degradación graceful:** si `NATS_URL` está configurado pero la conexión falla, ambos lados (`createNatsBridge` en Atlas, `connectNatsBridge` en Navigator) caen a un no-op con un `warn` en el log — un NATS caído nunca tumba a Atlas ni a Navigator (mismo principio que mDNS/TLS opt-in, DEC-0032).
