@@ -187,7 +187,12 @@ jobs:
             #    mecanismos apuntan a npmjs. Se verifica en el propio log de
             #    npm a qué registro fue, para fallar rápido y claro si npm
             #    vuelve a cambiar de opinión.
-            npm pkg set publishConfig.registry=https://registry.npmjs.org -w "$pkg"
+            # `npm pkg set -w` es un no-op silencioso en el npm 10 del runner
+            # (run 29138559277 — publishConfig siguió apuntando a GH) — se
+            # edita el package.json directamente con jq, que no puede fallar
+            # en silencio.
+            jq '.publishConfig.registry = "https://registry.npmjs.org"' "$pkg/package.json" > /tmp/pkg.json && mv /tmp/pkg.json "$pkg/package.json"
+            echo "publishConfig efectivo: $(jq -c .publishConfig "$pkg/package.json")"
             (cd "$pkg" && set -o pipefail && npm publish --registry https://registry.npmjs.org --access public 2>&1 | tee /tmp/npmjs-publish.log)
             if ! grep -q "Publishing to https://registry.npmjs.org" /tmp/npmjs-publish.log; then
               echo "::error::El publish a npmjs.org fue a otro registro — ver log arriba" >&2
