@@ -177,6 +177,14 @@ jobs:
             npm publish -w "$pkg" --registry https://npm.pkg.github.com
 
             echo "→ Publicando a npmjs.org..."
+            # publishConfig.registry del package.json (GitHub Packages) tiene
+            # prioridad sobre --registry de la CLI — el primer intento real de
+            # publish dual (2026-07-10, run 29100658504) mandó "npmjs" de
+            # nuevo a npm.pkg.github.com y falló con E409 "Cannot publish
+            # over existing version". Hay que reescribir publishConfig antes
+            # del segundo publish y restaurarlo después (DEC-0070).
+            npm pkg set publishConfig.registry=https://registry.npmjs.org -w "$pkg"
             npm publish -w "$pkg" --registry https://registry.npmjs.org --access public
+            git checkout -- "$pkg/package.json"
             echo "::endgroup::"
           done
