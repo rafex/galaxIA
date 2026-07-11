@@ -83,3 +83,29 @@ container-up-core-tls:
       --build-arg COMMIT_HASH={{commit-hash}} \
       --build-arg BUILD_DATE={{build-date}} \
       atlas navigator portal-chat
+
+# ── vendor/ (subtrees de repos externos, ver docs/vendor-subtrees.md) ──────
+
+# Trae cambios nuevos de galaxIA-satellite-star hacia vendor/galaxIA-satellite-star.
+vendor-pull-satellite-star:
+    @echo "→ Actualizando vendor/galaxIA-satellite-star..."
+    git subtree pull --prefix=vendor/galaxIA-satellite-star satellite-star-src main --squash -m "vendor: actualizar galaxIA-satellite-star"
+
+# Trae cambios nuevos de galaxia-parser-catalog hacia vendor/galaxia-parser-catalog.
+vendor-pull-parser-catalog:
+    @echo "→ Actualizando vendor/galaxia-parser-catalog..."
+    git subtree pull --prefix=vendor/galaxia-parser-catalog parser-catalog-src main --squash -m "vendor: actualizar galaxia-parser-catalog"
+
+vendor-pull-all: vendor-pull-satellite-star vendor-pull-parser-catalog
+
+# Empuja cambios hechos dentro de vendor/galaxIA-satellite-star a una rama
+# nueva del repo externo (abrir PR ahí después, no empujar directo a main).
+vendor-push-satellite-star branch="vendor-sync":
+    @echo "→ Empujando vendor/galaxIA-satellite-star a satellite-star-src/{{branch}}..."
+    git subtree push --prefix=vendor/galaxIA-satellite-star satellite-star-src {{branch}}
+
+# Empuja cambios hechos dentro de vendor/galaxia-parser-catalog a una rama
+# nueva del repo externo (abrir PR ahí después, no empujar directo a main).
+vendor-push-parser-catalog branch="vendor-sync":
+    @echo "→ Empujando vendor/galaxia-parser-catalog a parser-catalog-src/{{branch}}..."
+    git subtree push --prefix=vendor/galaxia-parser-catalog parser-catalog-src {{branch}}
