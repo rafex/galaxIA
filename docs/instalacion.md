@@ -46,6 +46,8 @@ Para detener: `podman-compose -f compose.release.yaml down`.
 Para quien prefiere Node nativo, o quiere correr un solo servicio (ej. solo
 Atlas en una máquina, sin los otros dos). Requiere Node 20+.
 
+> **Nota de registros:** los comandos de esta guía usan los nombres de GitHub Packages (`@rafex/galaxia-*`). Si instalas desde **npmjs.org**, los mismos paquetes se llaman **`@rafex_labs/galaxia-*`** (ej. `npx @rafex_labs/galaxia-atlas`) — en npmjs el scope `@rafex` pertenece a otro usuario (DEC-0071).
+
 ```bash
 # Atlas (Registry) — puerto 8081 por default
 npx @rafex/galaxia-atlas

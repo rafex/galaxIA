@@ -195,8 +195,22 @@ jobs:
             # npmjs y aun así publicó a GH). Se sobreescribe el registro del
             # scope en las tres capas: package.json (jq), publishConfig y
             # flag de CLI por scope.
-            jq '.publishConfig = {"registry": "https://registry.npmjs.org", "@rafex:registry": "https://registry.npmjs.org"}' "$pkg/package.json" > /tmp/pkg.json && mv /tmp/pkg.json "$pkg/package.json"
-            echo "publishConfig efectivo: $(jq -c .publishConfig "$pkg/package.json")"
+            # En npmjs el scope del usuario es @rafex_labs (@rafex pertenece
+            # a otro usuario), mientras GitHub Packages EXIGE @rafex (owner
+            # del repo) — cada registro lleva su scope (DEC-0071): se
+            # renombra el paquete al vuelo y se reescribe la dependencia
+            # interna del protocolo para que `npm install` desde npmjs
+            # resuelva dentro del mismo registro.
+            NPMJS_NAME=$(jq -r .name "$pkg/package.json" | sed 's|^@rafex/|@rafex_labs/|')
+            jq --arg n "$NPMJS_NAME" '
+              .name = $n
+              | .publishConfig = {"registry": "https://registry.npmjs.org", "@rafex_labs:registry": "https://registry.npmjs.org"}
+              | (if (.dependencies // {}) | has("@rafex/galaxia-fhs-protocol") then
+                   .dependencies["@rafex_labs/galaxia-fhs-protocol"] = .dependencies["@rafex/galaxia-fhs-protocol"]
+                   | del(.dependencies["@rafex/galaxia-fhs-protocol"])
+                 else . end)
+            ' "$pkg/package.json" > /tmp/pkg.json && mv /tmp/pkg.json "$pkg/package.json"
+            echo "npmjs name: $NPMJS_NAME — publishConfig: $(jq -c .publishConfig "$pkg/package.json")"
             # Userconfig limpio SOLO para este publish: el .npmrc temporal de
             # setup-node siguió interfiriendo incluso con el token añadido
             # (ENEEDAUTH, run 29138983772) — reemplazarlo entero por uno que
