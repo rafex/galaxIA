@@ -3,7 +3,7 @@
   "version": "0.1.2",
   "private": false,
   "type": "module",
-  "description": "Atlas (Registry) de FHS v0.1: registro de nodos Star/Satellite, cat\u00e1logo de servicios y m\u00e9tricas de rating.",
+  "description": "Atlas (Registry) de FHS v0.1: registro de nodos Star/Satellite, catálogo de servicios y métricas de rating.",
   "bin": {
     "galaxia-atlas": "./dist/index.js"
   },
@@ -27,6 +27,7 @@
     "better-sqlite3": "12.11.1",
     "bonjour-service": "1.4.2",
     "fastify": "5.10.0",
+    "nats": "2.29.3",
     "ws": "8.21.0"
   },
   "devDependencies": {

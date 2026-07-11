@@ -10,6 +10,7 @@ import { setupMetricsApi } from "./api/metrics.js";
 import { EventBus } from "./sse/event-bus.js";
 import { loadOrCreateIdentity } from "./atlas/identity-store.js";
 import { announceRegistry } from "./atlas/mdns-announce.js";
+import { createNatsBridge } from "./atlas/nats-bridge.js";
 import versionInfo from "./version.json" with { type: "json" };
 
 const PORT = Number(process.env.PORT || 8081);
@@ -29,6 +30,11 @@ const ATLAS_DB_PATH = process.env.ATLAS_DB_PATH || "./data/atlas-metrics.db";
 // docs/tls-autofirmado.md). Certificado autofirmado, solo para la PoC.
 const TLS_CERT_PATH = process.env.TLS_CERT_PATH;
 const TLS_KEY_PATH = process.env.TLS_KEY_PATH;
+// Puente de eventos a Navigator vía NATS (SPEC-BRIDGE-0001, DEC-0074) — opt-in
+// explícito, mismo patrón que MDNS_ENABLED/TLS_*: sin NATS_URL, Atlas se
+// comporta exactamente igual que hoy (node.online/node.lost solo viven en
+// su EventBus local, sin consumidor).
+const NATS_URL = process.env.NATS_URL;
 
 async function main() {
   const tlsEnabled = !!(TLS_CERT_PATH && TLS_KEY_PATH);
@@ -47,6 +53,10 @@ async function main() {
   const eventBus = new EventBus();
   const registry = new Atlas(eventBus, ATLAS_DB_PATH);
   registry.startHealthChecks();
+
+  const natsBridge = await createNatsBridge(NATS_URL, { warn: (msg) => app.log.warn(msg) });
+  eventBus.subscribeToRuntime((event) => natsBridge.publish(event));
+  if (natsBridge.connected) app.log.info(`Puente NATS activo hacia ${NATS_URL} (fhs.node.online / fhs.node.lost)`);
 
   // La identidad del Atlas ya no es solo para mDNS: firma el `welcome`
   // (revisión del protocolo 2026-07-10) para que un nodo pueda verificar que
