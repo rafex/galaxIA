@@ -178,22 +178,13 @@ export function setupWebSocket(app: FastifyInstance, registry: Atlas, identity: 
           // reenviarse/alterarse por separado. Desde la revisión 2026-07-10
           // la firma ancla además el hash canónico del manifiesto — sin él,
           // un MITM podía sustituir el manifiesto (endpoint incluido)
-          // conservando una firma válida. El payload legado sin hash se
-          // acepta como deprecado hasta v0.2.
+          // conservando una firma válida. El payload legado sin hash (que
+          // aceptaba esta verificación como fallback deprecado) se retiró
+          // en DEC-0076: en alpha (0.1.x) sin consumidores externos reales,
+          // no valía la pena mantener abierta la vulnerabilidad que esta
+          // firma existe para cerrar.
           const registerPayload = registerSignaturePayload(providerId, register.timestamp, register.manifest);
-          const legacyPayload = `${providerId}:${register.timestamp}`;
-          let signatureOk = false;
-          if (register.signature) {
-            if (verifySignature(providerId, registerPayload, register.signature)) {
-              signatureOk = true;
-            } else if (verifySignature(providerId, legacyPayload, register.signature)) {
-              signatureOk = true;
-              app.log.warn(
-                { providerId },
-                "register con firma legada (no cubre el manifiesto) — deprecado, se rechazará en FHS v0.2"
-              );
-            }
-          }
+          const signatureOk = !!register.signature && verifySignature(providerId, registerPayload, register.signature);
           if (!signatureOk) {
             send({
               type: "error",

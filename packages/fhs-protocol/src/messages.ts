@@ -54,8 +54,9 @@ export interface RegisterMessage extends BaseMessage {
   /**
    * Ed25519 base64 sobre `registerSignaturePayload(providerId, timestamp,
    * manifest)` — la firma ancla el contenido del manifiesto (hash SHA-256
-   * canónico), no solo identidad+frescura. El payload legado
-   * `${providerId}:${timestamp}` se acepta como deprecado hasta v0.2.
+   * canónico), no solo identidad+frescura. Obligatorio: sin él (o sin
+   * cubrir el manifiesto) el Registry responde `INVALID_SIGNATURE`
+   * (DEC-0076 retiró el fallback al payload legado sin hash).
    */
   signature?: string;
 }

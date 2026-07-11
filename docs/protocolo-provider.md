@@ -108,7 +108,7 @@ requestId | conversationId (si viaja en el mensaje) | tipo (chat/tool) | resulta
 Un provider nuevo puede conectarse a Atlas (Registry) sin ningún cambio en `apps/atlas` si cumple:
 
 - [ ] Implementa el ciclo de vida completo (`Connecting → Identifying → Registering → Ready`) del diagrama de arriba.
-- [ ] Genera (o carga) una identidad Ed25519 real, deriva su `providerId` como `did:key:z...`, y firma `hello`/`register` con la clave privada (DEC-0030) — persiste la clave privada entre reinicios, no la regenera en cada arranque. **Todo `timestamp` en milisegundos** (`Date.now()`); la firma de `register` cubre el hash canónico del manifiesto (`registerSignaturePayload`, revisión 2026-07-10 — el payload legado sin hash está deprecado hasta v0.2).
+- [ ] Genera (o carga) una identidad Ed25519 real, deriva su `providerId` como `did:key:z...`, y firma `hello`/`register` con la clave privada (DEC-0030) — persiste la clave privada entre reinicios, no la regenera en cada arranque. **Todo `timestamp` en milisegundos** (`Date.now()`); la firma de `register` **debe** cubrir el hash canónico del manifiesto (`registerSignaturePayload`, revisión 2026-07-10) — el payload legado sin hash ya no se acepta (DEC-0076).
 - [ ] Anuncia su `fhsVersion` en `hello` y maneja `error { code: "UNSUPPORTED_VERSION" }` sin reintentar en bucle.
 - [ ] (Recomendado) Verifica la firma del `welcome` (`welcomeSignaturePayload`) antes de enviar su manifiesto — protege contra un Registry impostor en la misma LAN.
 - [ ] (Recomendado) Exige `callerId`/`signature` en `chat.request`/`tool.call` y responde `UNAUTHORIZED` a invocadores anónimos o con firma inválida.
