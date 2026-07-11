@@ -110,3 +110,57 @@ jobs:
         # se separó en DEC-0035. --workspaces sí cubre las 4 (ver
         # spec-native/DECISIONS.md DEC-0042).
         run: npm run build --workspaces
+
+  e2e-smoke:
+    # Regresión funcional real (SPEC-QUALITY-0001, DEC-0073) — todo lo de
+    # arriba valida "compila" (lint/typecheck/build) y "las funciones puras
+    # no rompen" (test), pero nada verificaba que el sistema siga
+    # funcionando de punta a punta. Levanta Atlas + Navigator reales (mismo
+    # patrón que la verificación manual del proyecto) y corre
+    # scripts/e2e-smoke.ts: registro firmado (DEC-0069), welcome verificado,
+    # visibility propagada, CallerAuth, y un chat.request/chat.completed
+    # real. Encontró un bug real la primera vez que corrió (Navigator
+    # crasheaba en silencio si `chat.completed.toolCalls` faltaba — ahora
+    # corregido en llm-gateway.ts).
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar dependencias
+        # Mismo motivo que el job "build": el lockfile committeado (macOS
+        # ARM) no trae el binario nativo de Rollup para linux-x64.
+        run: |
+          rm -f package-lock.json
+          npm install
+
+      - name: Build (protocolo, atlas, navigator)
+        run: |
+          npm run build -w packages/fhs-protocol
+          npm run build -w apps/atlas
+          npm run build -w apps/navigator
+
+      - name: Levantar Atlas + Navigator y correr el smoke E2E
+        run: |
+          PORT=8081 HOST=127.0.0.1 MDNS_ENABLED=false \
+            ATLAS_DB_PATH=/tmp/e2e-atlas.db IDENTITY_KEY_PATH=/tmp/e2e-atlas-id.pem \
+            node apps/atlas/dist/index.js > /tmp/atlas.log 2>&1 &
+          PORT=8090 HOST=127.0.0.1 ATLAS_URL=http://127.0.0.1:8081 \
+            NAVIGATOR_IDENTITY_KEY_PATH=/tmp/e2e-nav-id.pem \
+            node apps/navigator/dist/index.js > /tmp/navigator.log 2>&1 &
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8081/health >/dev/null && curl -sf http://127.0.0.1:8090/health >/dev/null && break
+            sleep 1
+          done
+          ATLAS_URL=http://127.0.0.1:8081 NAVIGATOR_URL=http://127.0.0.1:8090 npx tsx scripts/e2e-smoke.ts
+
+      - name: Logs de Atlas/Navigator (siempre, para diagnosticar fallos)
+        if: always()
+        run: |
+          echo "::group::atlas.log"; cat /tmp/atlas.log || true; echo "::endgroup::"
+          echo "::group::navigator.log"; cat /tmp/navigator.log || true; echo "::endgroup::"
