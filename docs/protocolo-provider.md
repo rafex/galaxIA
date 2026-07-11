@@ -84,6 +84,7 @@ Todo provider debe usar estos códigos en `chat.error` / `tool.error` en vez de 
 | `UNAUTHORIZED` | El invocador no envió `callerId`/`signature` válidos (si el provider los exige) o está vetado (revisión 2026-07-10) |
 | `UNSUPPORTED_VERSION` | El `fhsVersion` anunciado en `hello` no es compatible (lo emite el Registry) |
 | `CANCELLED` | La petición fue abortada tras recibir `chat.cancel`/`tool.cancel` de quien la originó |
+| `OVERLOADED` | El nodo está a su capacidad declarada (`availability.maxConcurrentRequests`) y rechaza de inmediato, sin `dispatch.ack` (DEC-0072) — quien invoca debe probar otro nodo |
 | `INTERNAL_ERROR` | Cualquier otro fallo no clasificado — debe ser la excepción, no la norma |
 
 Ejemplo:
@@ -111,6 +112,7 @@ Un provider nuevo puede conectarse a Atlas (Registry) sin ningún cambio en `app
 - [ ] Anuncia su `fhsVersion` en `hello` y maneja `error { code: "UNSUPPORTED_VERSION" }` sin reintentar en bucle.
 - [ ] (Recomendado) Verifica la firma del `welcome` (`welcomeSignaturePayload`) antes de enviar su manifiesto — protege contra un Registry impostor en la misma LAN.
 - [ ] (Recomendado) Exige `callerId`/`signature` en `chat.request`/`tool.call` y responde `UNAUTHORIZED` a invocadores anónimos o con firma inválida.
+- [ ] Si declara `availability.maxConcurrentRequests`, la hace cumplir: rechaza la petición N+1 con `OVERLOADED` de inmediato (sin `dispatch.ack`, sin encolar) — el Agent Server además evita mandarla si su propia vista local ya ve el cupo lleno (DEC-0072).
 - [ ] Maneja `chat.cancel`/`tool.cancel` abortando el trabajo si puede (respondiendo con código `CANCELLED`) — en hardware comunitario, seguir procesando una petición abandonada es el peor uso posible del recurso.
 - [ ] El heartbeat corre en una tarea/timer independiente del procesamiento de peticiones (dispatcher concurrente).
 - [ ] Envía `dispatch.ack { requestId, queuedAt }` inmediatamente al encolar cada `chat.request`/`tool.call` en su dispatcher, antes de empezar a procesar (ver "Regla central: el dispatcher concurrente" arriba).

@@ -28,6 +28,7 @@ import { AtlasClient } from "../atlas-client.js";
 import { EventBus } from "../sse/event-bus.js";
 import { LlmGateway } from "../providers/llm-gateway.js";
 import { McpHost, LoadedTool } from "../providers/mcp-host.js";
+import { atDeclaredCapacity } from "../providers/inflight.js";
 import {
   isIpfsConfigured,
   resolveGatewayUrl,
@@ -262,9 +263,20 @@ export class AgentRuntime {
 
   private async resolveLlm(preferences: ModelPreferences): Promise<ResolvedLlm | null> {
     const providers = await this.atlasClient.getProviders("llm");
-    const candidates = providers.filter((p) =>
+    const inScope = providers.filter((p) =>
       preferences.scope ? matchesScope(p.service, preferences.scope) : true
     );
+
+    // Backpressure (DEC-0072): no mandar la petición N+1 a un nodo que
+    // declaró capacidad N y ya la tiene ocupada desde este Navigator. Es un
+    // filtro best-effort (vista local, no global) — si TODOS los candidatos
+    // están a tope, se usa la lista completa igual: mejor encolar en el
+    // provider (que puede rechazar con OVERLOADED y disparar failover) que
+    // responder "no hay modelos" a un usuario cuando sí los hay.
+    const withCapacity = inScope.filter(
+      (p) => !p.service.models?.every((m) => atDeclaredCapacity(p.providerId, m.availability?.maxConcurrentRequests))
+    );
+    const candidates = withCapacity.length > 0 ? withCapacity : inScope;
 
     if (preferences.model && preferences.model !== "auto") {
       for (const p of candidates) {

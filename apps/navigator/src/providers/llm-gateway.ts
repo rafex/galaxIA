@@ -14,6 +14,7 @@ import type {
 } from "@rafex/galaxia-fhs-protocol";
 import { signPayload, invokeSignaturePayload, type ChatCancelMessage } from "@rafex/galaxia-fhs-protocol";
 import { getNavigatorIdentity } from "../identity.js";
+import { acquireInFlight, releaseInFlight } from "./inflight.js";
 import { logTrace } from "../observability/trace.js";
 
 // Invocación firmada (revisión del protocolo 2026-07-10): el Navigator prueba
@@ -93,7 +94,12 @@ export class LlmGateway {
     selection: LlmProviderSelection,
     request: GenerateRequest
   ): AsyncGenerator<string, GenerateResponse, unknown> {
-    return yield* this.fhsStream(selection.service.endpoint.url, request);
+    acquireInFlight(selection.nodeId);
+    try {
+      return yield* this.fhsStream(selection.service.endpoint.url, request);
+    } finally {
+      releaseInFlight(selection.nodeId);
+    }
   }
 
   private fhsGenerate(
@@ -103,7 +109,11 @@ export class LlmGateway {
     timeoutMs?: number,
     trace?: TraceContext
   ): Promise<GenerateDispatchResult> {
-    return new Promise((resolve, reject) => {
+    // Backpressure (DEC-0072): contar la petición en vuelo mientras dura —
+    // la resolución usa este contador para no mandar la N+1 a un nodo que
+    // declaró capacidad N.
+    acquireInFlight(nodeId);
+    const settle = new Promise<GenerateDispatchResult>((resolve, reject) => {
       const ws = new WebSocket(url, wsOptions(url));
       const requestId = randomUUID();
       const startedAt = Date.now();
@@ -176,6 +186,7 @@ export class LlmGateway {
         clearTimeout(timeout);
       });
     });
+    return settle.finally(() => releaseInFlight(nodeId));
   }
 
   private async *fhsStream(

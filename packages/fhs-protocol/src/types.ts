@@ -102,6 +102,13 @@ export interface ModelInfo {
   };
   availability?: {
     status?: ServiceStatus;
+    /**
+     * Capacidad declarada del nodo para este modelo (DEC-0072): cuántas
+     * peticiones simultáneas acepta antes de rechazar con `OVERLOADED`.
+     * El Agent Server la usa como filtro best-effort al resolver (evita
+     * mandar la N+1 a un nodo que ya tiene N en vuelo desde este mismo
+     * Agent Server); el provider es quien la hace cumplir de verdad.
+     */
     maxConcurrentRequests?: number;
   };
 }
