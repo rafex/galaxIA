@@ -49,6 +49,8 @@ export interface DispatchResult {
 export interface TraceContext {
   conversationId: string;
   capabilityId: string;
+  /** DEC-0029: UUID de dispositivo del browser que inició la conversación. */
+  deviceId?: string;
 }
 
 interface PendingCall {
@@ -139,6 +141,7 @@ export class McpHost {
           totalMs: Date.now() - entry.startedAt,
           success,
           errorCode: success ? undefined : msg.code,
+          deviceId: entry.trace.deviceId,
         });
       }
       if (msg.type === "tool.error") {
@@ -161,6 +164,7 @@ export class McpHost {
             totalMs: Date.now() - entry.startedAt,
             success: false,
             errorCode: "CONNECTION_CLOSED",
+            deviceId: entry.trace.deviceId,
           });
         }
         entry.reject(new Error(`Conexión FHS cerrada con provider ${providerId}`));
@@ -264,6 +268,7 @@ export class McpHost {
             totalMs: Date.now() - startedAt,
             success: false,
             errorCode: "TIMEOUT",
+            deviceId: trace.deviceId,
           });
         }
         reject(new Error(`Timeout esperando respuesta FHS de ${client.providerId}`));

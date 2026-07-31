@@ -1,4 +1,5 @@
 import type { AgentSSEEvent, UserMessage } from "../types/fhs.js";
+import { getOrCreateDeviceId } from "./device-id.js";
 
 export interface ApiOptions {
   conversationId?: string;
@@ -68,6 +69,7 @@ export function connectToChat(
     const msg: {
       type: "start";
       conversationId?: string;
+      deviceId: string;
       message: UserMessage;
       artifacts: string[];
       attachmentName?: string;
@@ -75,6 +77,7 @@ export function connectToChat(
     } = {
       type: "start",
       conversationId: options.conversationId,
+      deviceId: getOrCreateDeviceId(),
       message: { role: "user", content: options.message },
       artifacts: options.artifacts || [],
       attachmentName: options.attachmentName,

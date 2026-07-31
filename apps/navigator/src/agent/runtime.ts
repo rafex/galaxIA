@@ -115,7 +115,8 @@ export class AgentRuntime {
   constructor(
     private atlasClient: AtlasClient,
     private eventBus: EventBus,
-    private conversationId: string
+    private conversationId: string,
+    private deviceId?: string
   ) {}
 
   async run(
@@ -404,7 +405,7 @@ export class AgentRuntime {
         indexTool.name,
         { text, conversationId: this.conversationId, source },
         preferences.maxWaitMs,
-        { conversationId: this.conversationId, capabilityId: indexTool.capabilityId }
+        { conversationId: this.conversationId, capabilityId: indexTool.capabilityId, deviceId: this.deviceId }
       );
       return true;
     } catch {
@@ -439,7 +440,7 @@ export class AgentRuntime {
         queryTool.name,
         { query, conversationId: this.conversationId, top_k: topK },
         preferences.maxWaitMs,
-        { conversationId: this.conversationId, capabilityId: queryTool.capabilityId }
+        { conversationId: this.conversationId, capabilityId: queryTool.capabilityId, deviceId: this.deviceId }
       );
       const parsed = JSON.parse(extractText(result)) as {
         chunks: Array<{ text: string; score: number; source?: string }>;
@@ -650,7 +651,7 @@ export class AgentRuntime {
           kbTool.name,
           { query, top_k: 3 },
           preferences.maxWaitMs,
-          { conversationId: this.conversationId, capabilityId: kbTool.capabilityId }
+          { conversationId: this.conversationId, capabilityId: kbTool.capabilityId, deviceId: this.deviceId }
         );
         const parsed = JSON.parse(extractText(result)) as { chunks: KbQueryChunk[] };
         this.atlasClient.recordSample({
@@ -737,7 +738,7 @@ export class AgentRuntime {
           tool.name,
           args,
           preferences.maxWaitMs,
-          { conversationId: this.conversationId, capabilityId: tool.capabilityId }
+          { conversationId: this.conversationId, capabilityId: tool.capabilityId, deviceId: this.deviceId }
         );
         const duration = Date.now() - startTime;
         const textResult = extractText(result);
@@ -933,7 +934,7 @@ export class AgentRuntime {
         { nodeId: llm.nodeId, providerName: llm.providerName, service: llm.service, model: llm.model },
         request,
         maxWaitMs,
-        { conversationId: this.conversationId, capability: llm.model.id }
+        { conversationId: this.conversationId, capability: llm.model.id, deviceId: this.deviceId }
       );
     } catch (err) {
       this.atlasClient.recordSample({

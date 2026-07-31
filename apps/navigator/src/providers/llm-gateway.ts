@@ -53,6 +53,8 @@ interface FhsMessageEnvelope {
 export interface TraceContext {
   conversationId: string;
   capability: string;
+  /** DEC-0029: UUID de dispositivo del browser que inició la conversación. */
+  deviceId?: string;
 }
 
 export interface LlmProviderSelection {
@@ -125,6 +127,7 @@ export class LlmGateway {
           totalMs: Date.now() - startedAt,
           success,
           errorCode,
+          deviceId: trace.deviceId,
         });
       };
 

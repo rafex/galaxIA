@@ -13,6 +13,8 @@ export interface TraceEntry {
   totalMs: number;
   success: boolean;
   errorCode?: string;
+  /** DEC-0029: UUID de dispositivo del browser que inició la conversación. */
+  deviceId?: string;
 }
 
 export function logTrace(entry: TraceEntry): void {
