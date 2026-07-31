@@ -48,6 +48,11 @@ export function setupChatWebSocket(
 
   app.get("/api/chat/ws", { websocket: true }, (socket: WebSocket) => {
     let conversationId: string | null = null;
+    // DEC-0029: ID de dispositivo del browser — persiste en localStorage del
+    // cliente y se envía en cada mensaje "start". Se usa para deduplicar
+    // futuros votos de community tags/rating subjetivo. No es una identidad
+    // de persona. Undefined si el portal no lo envía (backward compat).
+    let deviceId: string | undefined;
 
     const send = (event: AgentSSEEvent) => {
       if (socket.readyState === 1) {
@@ -95,7 +100,7 @@ export function setupChatWebSocket(
       artifacts?: string[],
       kbProviderIds?: string[]
     ) {
-      const runtime = new AgentRuntime(atlasClient, eventBus, id);
+      const runtime = new AgentRuntime(atlasClient, eventBus, id, deviceId);
       runtimes.set(id, runtime);
 
       runtime
@@ -124,7 +129,7 @@ export function setupChatWebSocket(
         return;
       }
 
-      const runtime = new AgentRuntime(atlasClient, eventBus, id);
+      const runtime = new AgentRuntime(atlasClient, eventBus, id, deviceId);
       runtime
         .resolveKbCandidates(message.content, preferences)
         .then(({ candidates, chosenByLlm }) => {
@@ -150,7 +155,7 @@ export function setupChatWebSocket(
     // conversación como "RAG activa" (degradación graceful, sin error
     // visible: el usuario ya obtiene su respuesta vía el texto OCR completo).
     function indexForRag(id: string, text: string, preferences: ModelPreferences) {
-      const runtime = new AgentRuntime(atlasClient, eventBus, id);
+      const runtime = new AgentRuntime(atlasClient, eventBus, id, deviceId);
       runtime
         .indexDocumentForRag(text, preferences)
         .then((indexed) => {
@@ -164,6 +169,7 @@ export function setupChatWebSocket(
     function handleMessage(msg: IncomingMessage) {
       if (msg.type === "start") {
         conversationId = (msg.conversationId as string | undefined) || randomUUID();
+        deviceId = (msg.deviceId as string | undefined) || undefined;
         const body = msg as {
           conversationId?: string;
           message: UserMessage;
@@ -187,7 +193,7 @@ export function setupChatWebSocket(
 
           // Modo "confirmar" (default, SPEC-OCRCONFIRM-0001): se extrae el
           // texto y se muestra al usuario, pero NO se llama al LLM todavía.
-          const runtime = new AgentRuntime(atlasClient, eventBus, id);
+          const runtime = new AgentRuntime(atlasClient, eventBus, id, deviceId);
           runtime
             .extractOcrText(body.artifacts, body.attachmentName || "archivo adjunto", preferences)
             .then((text) => {

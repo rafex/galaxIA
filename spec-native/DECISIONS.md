@@ -412,10 +412,10 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
   - Esta decisión no depende de que `rag-provider` o `kb-provider` se implementen primero — aplica a cualquier `Capability` del protocolo, aunque la motivación inmediata sea KB.
   - Ninguna de las dos partes se implementa como consecuencia directa de esta decisión — es diseño de referencia, a implementar cuando se priorice (la parte 1 no tiene bloqueos; la parte 2 depende de que `SPEC-AUTH-0001` deje de estar pausado).
 
-## DEC-0029 — ID de dispositivo como validación intermedia para tags/ratings (documentado, sin resolver — pendiente de debate más profundo)
+## DEC-0029 — ID de dispositivo como validación intermedia para tags/ratings
 
-- **Fecha:** 2026-07-06
-- **Estado:** `proposed` — explícitamente documentado para debatir más adelante, no una decisión cerrada
+- **Fecha:** 2026-07-06 — **implementado 2026-07-30 (DEC-0080)**
+- **Estado:** `accepted` — las preguntas abiertas resueltas en DEC-0080
 - **Contexto:** DEC-0028 bloqueó los tags de comunidad hasta que `SPEC-AUTH-0001` (identidad de usuario) se retome, y descartó a propósito cualquier mitigación intermedia sin auth real por dar una falsa sensación de garantía. El usuario propone un punto medio explícito: **autenticación completa de usuario no está planeada de inicio**, pero un **ID único de dispositivo** (generado y persistido del lado del cliente, no una cuenta ni una identidad real de persona) podría dar "cierto peso" a los tags de comunidad y a un futuro rating subjetivo de servicios — sin llegar a resolver `SPEC-AUTH-0001` completo.
 - **Premisa a documentar (sin resolver todavía):** "mismo dispositivo = mismo voto reconocible en el tiempo" — no prueba que sea una persona real, ni impide que alguien genere múltiples IDs de dispositivo distintos (limpiar `localStorage`, usar otro navegador/perfil), pero sube el costo/fricción de manipular el conteo en volumen comparado con no tener ningún identificador. Es, honestamente, el mismo tipo de mecanismo que DEC-0028 ya señaló como "garantía débil" — la diferencia es que aquí se documenta con esa limitación explícita, en vez de presentarlo como una solución robusta.
 - **Por qué queda `proposed`, no `accepted`:** el propio usuario pidió documentarlo sin resolverlo — faltan varias preguntas de diseño abiertas antes de decidir si vale la pena implementarlo, o si es mejor esperar a `SPEC-AUTH-0001`.
@@ -1249,3 +1249,17 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
 - **Decisión:** Aplicar el mismo mecanismo de DEC-0078 a los 5 ejemplos. Cada ejemplo recibe su propio `src/ws-security.ts` (no un paquete compartido — los ejemplos son independientes y la función es mínima). La función `wsOptions` local se elimina de cada `index.ts` y se importa del módulo nuevo.
 - **Comportamiento resultante:** idéntico al de DEC-0078 — default seguro, `TLS_CA_CERT_PATH` para pinning, `FHS_TLS_INSECURE=true` para opt-in explícito con warning.
 - **Consecuencias:** `examples/{star,satellite-ocr,nova}-example/src/ws-security.ts` y `examples/{rag,kb}-provider/src/ws-security.ts` (5 nuevos), cada `src/index.ts` actualizado. Verificado: `npm run typecheck` verde en los 5 workspaces. El pendiente documentado en `docs/tls-autofirmado.md` (sección "Riesgos y alcance") queda cerrado.
+
+## DEC-0080 — Device ID de navegador para deduplicación de community tags/ratings (SPEC-AUTH-0001 fase 1)
+
+- **Fecha:** 2026-07-30
+- **Estado:** `accepted` — implementado (PR feat/device-id)
+- **Contexto:** DEC-0029 documentó la propuesta de un UUID de dispositivo como mecanismo intermedio — más honesto que nada, menos complejo que auth real de usuario — para deduplicar votos en tags de comunidad y rating subjetivo de nodos. Quedó `proposed` con preguntas de diseño abiertas. Las preguntas abiertas se responden aquí antes de implementar.
+- **Preguntas de DEC-0029 resueltas:**
+  1. **Cómo se genera y persiste:** UUID v4 (`crypto.randomUUID()`) en `localStorage` bajo la clave `fhs:deviceId`. Sencillo, sin implicaciones de privacidad de fingerprinting. Se pierde al limpiar caché — limitación aceptada y documentada.
+  2. **Qué tipo de peso da:** deduplicación trivial ("mismo dispositivo = un solo voto por tag"). No se presenta como señal de confianza fuerte.
+  3. **Alcance:** community tags de KB (DEC-0028) y futuro rating subjetivo de nodos. Explícitamente separado del rating automático de `satelite-rating` (telemetría real).
+  4. **Dispositivos compartidos o reinstalados:** limitación aceptada sin solución — documentada.
+  5. **Relación con auth real futura:** cuando exista SPEC-AUTH-0001 completo, el `deviceId` se convierte en un factor adicional ("dispositivo conocido"), no se descarta.
+- **Decisión técnica:** el `deviceId` se genera en `apps/portal-chat/src/services/device-id.ts` y se envía en cada mensaje `start` del WebSocket. El navigator lo extrae y lo almacena en el closure de la conexión WebSocket, lo pasa al `AgentRuntime` y de ahí a los `TraceContext` de todos los gateways (LLM y MCP). El campo `deviceId?` opcional queda en `TraceEntry` — aparece en las líneas de log de trazabilidad correlacionado con cada `conversationId`.
+- **Consecuencias:** `apps/portal-chat/src/services/device-id.ts` (nuevo), `apps/portal-chat/src/services/api.ts` (agrega `deviceId` al mensaje start), `apps/navigator/src/api/chat-ws.ts` (extrae y propaga `deviceId`), `apps/navigator/src/agent/runtime.ts` (recibe y pasa `deviceId`), `apps/navigator/src/providers/{llm-gateway,mcp-host}.ts` (agregan `deviceId?` a `TraceContext`), `apps/navigator/src/observability/trace.ts` (agrega `deviceId?` a `TraceEntry`). Verificado: typecheck/tests verdes.
