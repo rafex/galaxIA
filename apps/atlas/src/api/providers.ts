@@ -8,6 +8,8 @@ interface ModelListEntry {
   providerName: string;
   capabilities: string[];
   contextWindow?: number;
+  /** DEC-0031: true si el nodo está en FHS_TRUSTED_PROVIDERS del operador. */
+  trusted: boolean;
 }
 
 export function setupProvidersApi(app: FastifyInstance, registry: Atlas) {
@@ -46,6 +48,7 @@ export function setupProvidersApi(app: FastifyInstance, registry: Atlas) {
           providerName: p.name,
           capabilities: m.capabilities,
           contextWindow: m.contextWindow,
+          trusted: p.trusted,
         });
       }
     }

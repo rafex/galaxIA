@@ -13,6 +13,25 @@ import type {
   NodeType,
 } from "./types.js";
 
+/**
+ * DEC-0031: información declarativa del nodo que el operador publica en su
+ * manifiesto para que el Portal pueda mostrarla a los usuarios. Todos los
+ * campos son opcionales y autodeclarados — no verificados criptográficamente
+ * en esta versión del protocolo.
+ */
+export interface NodeInfo {
+  /** Procesador declarado, ej. "Intel Core i9-13900K" */
+  cpu?: string;
+  /** Memoria RAM declarada, ej. "64 GB DDR5" */
+  ram?: string;
+  /** GPU declarada, ej. "NVIDIA RTX 4090 24 GB" */
+  gpu?: string;
+  /** Ubicación geográfica declarada, ej. "Madrid, España" */
+  location?: string;
+  /** Descripción libre del operador */
+  description?: string;
+}
+
 export interface BaseBeacon {
   fhsVersion: string;
   provider: NodeProfile;
@@ -20,6 +39,8 @@ export interface BaseBeacon {
   privacy?: PrivacyPolicy;
   authentication?: AuthenticationInfo;
   signature?: SignatureInfo;
+  /** DEC-0031: metadatos de hardware/operador, opcionales y autodeclarados. */
+  nodeInfo?: NodeInfo;
 }
 
 export interface StarBeacon extends BaseBeacon {

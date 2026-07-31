@@ -8,10 +8,19 @@ import {
   NODE_PURGE_SECONDS,
   FHS_VERSION,
   type Beacon,
+  type NodeInfo,
   type PublishedService,
   type NodeStatus,
   flattenManifest,
 } from "@rafex/galaxia-fhs-protocol";
+
+// DEC-0031: lista de providerIds de confianza configurados por el operador
+// del Agent Server. Separados por coma, ej. "did:key:zAAA,did:key:zBBB".
+// Los nodos en esta lista reciben `trusted: true` en la respuesta de
+// /api/fhs/providers — el Portal puede mostrar un distintivo visual.
+const TRUSTED_PROVIDER_IDS: ReadonlySet<string> = new Set(
+  (process.env.FHS_TRUSTED_PROVIDERS ?? "").split(",").map((s) => s.trim()).filter(Boolean)
+);
 
 export interface AtlasConnection {
   providerId: string;
@@ -35,6 +44,8 @@ export class Atlas {
   private connections = new Map<string, AtlasConnection>();
   private checkTimer?: NodeJS.Timeout;
   private metrics: NodeMetricsStore;
+  // DEC-0031: nodeInfo autodeclarado por cada proveedor en su manifiesto.
+  private nodeInfos = new Map<string, NodeInfo | undefined>();
 
   constructor(private eventBus: EventBus, metricsDbPath: string) {
     this.store = new MemoryAtlasStore();
@@ -103,6 +114,8 @@ export class Atlas {
     const now = nowSeconds();
     const leaseExpires = now + LEASE_EXPIRE_SECONDS;
 
+    this.nodeInfos.set(providerId, manifest.nodeInfo);
+
     this.store.upsertNode({
       providerId,
       name: manifest.provider.name,
@@ -147,6 +160,7 @@ export class Atlas {
   }
 
   markLost(providerId: string) {
+    this.nodeInfos.delete(providerId);
     this.store.updateNodeStatus(providerId, "lost", nowSeconds());
     const node = this.store.getNode(providerId);
     if (node) {
@@ -174,7 +188,16 @@ export class Atlas {
 
   getProviders(type?: "llm" | "mcp") {
     const nodes = this.getNodes();
-    const providers: Array<{ providerId: string; name: string; type: string; service: PublishedService }> = [];
+    const providers: Array<{
+      providerId: string;
+      name: string;
+      type: string;
+      service: PublishedService;
+      /** DEC-0031: true si el providerId está en FHS_TRUSTED_PROVIDERS. */
+      trusted: boolean;
+      /** DEC-0031: metadatos de hardware/operador autodeclarados. */
+      nodeInfo?: NodeInfo;
+    }> = [];
     for (const node of nodes) {
       for (const service of node.services) {
         if (!type || service.kind === type) {
@@ -183,6 +206,8 @@ export class Atlas {
             name: node.name,
             type: service.kind,
             service,
+            trusted: TRUSTED_PROVIDER_IDS.has(node.providerId),
+            nodeInfo: this.nodeInfos.get(node.providerId),
           });
         }
       }
