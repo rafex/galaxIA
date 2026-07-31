@@ -446,8 +446,8 @@ Registrar una decisión cuando cambie algo que futuras iniciativas o agentes deb
 
 ## DEC-0031 — Nivel "premium" de nodo: campos declarativos + mTLS + aprobación humana (documentado, sin implementar)
 
-- **Fecha:** 2026-07-06
-- **Estado:** `proposed` — diseño documentado para debatir y priorizar más adelante, ninguna parte implementada
+- **Fecha:** 2026-07-06 — **actualizado 2026-07-31 (DEC-0081)** para la fase 1 implementada
+- **Estado:** `accepted` (fase 1: `nodeInfo` + `trusted` implementados; mTLS diferido a fase futura)
 - **Contexto:** El usuario propone un nivel de confianza reforzado para Stars/Satellites, por encima del `did:key` autogenerado (DEC-0030) y los tags autodeclarados (DEC-0028): un proceso de aprobación humana (aviso por correo a los administradores de la red/servidor) seguido de una conexión **mTLS** (autenticación mutua, ambos extremos presentan certificado) — condicionado a que el nodo declare públicamente un conjunto de datos verificables/observables por la red, para que quien elige un proveedor tenga más información con la que decidir confiar, sin que el proyecto pretenda poder auditar todo automáticamente.
 - **Decisión — documentar tres piezas de naturaleza distinta, ninguna implementada:**
   1. **Campos declarativos nuevos** (extensión del manifiesto, mismo nivel de confianza que `description`/`tags` de DEC-0028 — autodeclarados, no verificados automáticamente): URL del código fuente del servicio expuesto (para auditoría), licencia de ese código, mantenedores, responsable/owner, SLA declarado, descripción del hardware expuesto, política de tratamiento de datos, y política de borrado/retención (esta última ya parcialmente cubierta por `privacy.retention`, DEC-0025 — aquí se pediría más detalle, no solo el enum).
@@ -1263,3 +1263,19 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
   5. **Relación con auth real futura:** cuando exista SPEC-AUTH-0001 completo, el `deviceId` se convierte en un factor adicional ("dispositivo conocido"), no se descarta.
 - **Decisión técnica:** el `deviceId` se genera en `apps/portal-chat/src/services/device-id.ts` y se envía en cada mensaje `start` del WebSocket. El navigator lo extrae y lo almacena en el closure de la conexión WebSocket, lo pasa al `AgentRuntime` y de ahí a los `TraceContext` de todos los gateways (LLM y MCP). El campo `deviceId?` opcional queda en `TraceEntry` — aparece en las líneas de log de trazabilidad correlacionado con cada `conversationId`.
 - **Consecuencias:** `apps/portal-chat/src/services/device-id.ts` (nuevo), `apps/portal-chat/src/services/api.ts` (agrega `deviceId` al mensaje start), `apps/navigator/src/api/chat-ws.ts` (extrae y propaga `deviceId`), `apps/navigator/src/agent/runtime.ts` (recibe y pasa `deviceId`), `apps/navigator/src/providers/{llm-gateway,mcp-host}.ts` (agregan `deviceId?` a `TraceContext`), `apps/navigator/src/observability/trace.ts` (agrega `deviceId?` a `TraceEntry`). Verificado: typecheck/tests verdes.
+
+## DEC-0081 — Nivel "premium" de nodo: fase 1 implementada (nodeInfo declarativo + FHS_TRUSTED_PROVIDERS)
+
+- **Fecha:** 2026-07-31
+- **Estado:** `accepted` — implementado (PR feat/trusted-nodes)
+- **Contexto:** DEC-0031 documentó tres piezas del nivel "premium": campos declarativos, mTLS y proceso de aprobación humana. Se decidió implementar la fase 1 — los campos declarativos más un mecanismo simple de configuración de confianza — sin mTLS (diferido) ni proceso de aprobación (política operativa, fuera de código). Ver DEC-0031 para el diseño completo y las limitaciones reconocidas.
+- **Decisión — qué se implementa:**
+  1. **`NodeInfo` en el protocolo:** nueva interface `NodeInfo` en `packages/fhs-protocol/src/manifest.ts`, campo opcional `nodeInfo?: NodeInfo` en `BaseBeacon`. Campos: `cpu?`, `ram?`, `gpu?`, `location?`, `description?` — autodeclarados por el operador del nodo en su manifiesto, sin verificación criptográfica. Mismo nivel de confianza que `description`/`tags` de DEC-0028.
+  2. **`FHS_TRUSTED_PROVIDERS` en Atlas:** variable de entorno del operador del Agent Server — lista de `providerId`s separados por coma. Los nodos listados aparecen con `trusted: true` en `/api/fhs/providers`. Atlas parsea el env al arrancar (`TRUSTED_PROVIDER_IDS` como `ReadonlySet<string>` constante de módulo). No requiere reinicio del nodo remoto — solo del Atlas local.
+  3. **`trusted` propagado a la UI:** `/api/fhs/models` incluye `trusted: boolean` por modelo. El Portal muestra `★` antes del nombre del modelo en el selector si el nodo es de confianza.
+- **Qué NO se implementa (diferido):**
+  - mTLS (DEC-0031 punto 2) — requiere CA + proceso de emisión de certificados. Complejidad operativa alta para una red comunitaria en hardware modesto. Se deja como fase futura.
+  - Proceso de aprobación humana (DEC-0031 punto 3) — política operativa, no código.
+  - Verificación de `sourceUrl`/build reproducible — debate pendiente de su propia decisión.
+- **Limitaciones mantenidas (ver DEC-0031):** `FHS_TRUSTED_PROVIDERS` es config del operador local, no una señal de red verificable. Un operador puede marcar como `trusted` cualquier nodo que quiera, sin proceso de auditoría externa. Se documenta explícitamente para que no se presente como una garantía más fuerte de lo que es.
+- **Consecuencias:** `packages/fhs-protocol/src/manifest.ts` (agrega `NodeInfo` + `nodeInfo?`), `apps/atlas/src/atlas/registry.ts` (parsea `FHS_TRUSTED_PROVIDERS`, almacena `nodeInfos`, expone `trusted`/`nodeInfo` en `getProviders()`), `apps/atlas/src/api/providers.ts` (agrega `trusted` a `ModelListEntry` y a la respuesta de `/api/fhs/models`), `apps/portal-chat/src/components/chat-view.ts` (muestra `★` en el selector de modelo si `trusted`). Verificado: typecheck/tests verdes.

@@ -6,6 +6,8 @@ interface ModelOption {
   displayName: string;
   providerId: string;
   providerName: string;
+  /** DEC-0031: true si el operador del Agent Server marcó este nodo como de confianza. */
+  trusted?: boolean;
 }
 
 interface KbOption {
@@ -228,7 +230,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
       for (const m of data.models) {
         const option = document.createElement("option");
         option.value = m.modelId;
-        option.textContent = `${m.displayName} — ${m.providerName}`;
+        option.textContent = `${m.trusted ? "★ " : ""}${m.displayName} — ${m.providerName}`;
         modelSelector.appendChild(option);
       }
     } catch (err) {
