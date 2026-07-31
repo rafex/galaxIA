@@ -1264,6 +1264,19 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
 - **Decisión técnica:** el `deviceId` se genera en `apps/portal-chat/src/services/device-id.ts` y se envía en cada mensaje `start` del WebSocket. El navigator lo extrae y lo almacena en el closure de la conexión WebSocket, lo pasa al `AgentRuntime` y de ahí a los `TraceContext` de todos los gateways (LLM y MCP). El campo `deviceId?` opcional queda en `TraceEntry` — aparece en las líneas de log de trazabilidad correlacionado con cada `conversationId`.
 - **Consecuencias:** `apps/portal-chat/src/services/device-id.ts` (nuevo), `apps/portal-chat/src/services/api.ts` (agrega `deviceId` al mensaje start), `apps/navigator/src/api/chat-ws.ts` (extrae y propaga `deviceId`), `apps/navigator/src/agent/runtime.ts` (recibe y pasa `deviceId`), `apps/navigator/src/providers/{llm-gateway,mcp-host}.ts` (agregan `deviceId?` a `TraceContext`), `apps/navigator/src/observability/trace.ts` (agrega `deviceId?` a `TraceEntry`). Verificado: typecheck/tests verdes.
 
+## DEC-0082 — CallerAuth, chat/tool.cancel y AbortSignal en galaxIA-satellite-star (DEC-0069 recomendados)
+
+- **Fecha:** 2026-07-31
+- **Estado:** `accepted` — implementado en galaxIA-satellite-star (PR #4, branch feat/dec-0069-recommended)
+- **Contexto:** DEC-0069 separó los ítems obligatorios (firmas hello/register/welcome — ya implementados en galaxIA-satellite-star issue #1, commit fc67893) de los recomendados. Quedan pendientes CallerAuth en invocaciones, cancelación activa y propagación de AbortSignal a bridges de proceso externo.
+- **Decisión — qué se implementa:**
+  1. **CallerAuth en `chat.request` y `tool.call`:** los 5 providers verifican la firma de invocación usando `invokeSignaturePayload(callerId, requestId, timestamp)` cuando el invocador incluye `callerId + timestamp + signature`. Si está presente pero inválida → `UNAUTHORIZED`. Si no está presente → se acepta (compatible con invocadores anteriores a DEC-0069).
+  2. **`chat.cancel` / `tool.cancel`:** cada conexión WebSocket mantiene un `Map<requestId, AbortController>`. Al recibir cancel: se llama `ctrl.abort()`, se envía `chat.error`/`tool.error` con código `CANCELLED`, y se elimina la entrada del mapa. Al cerrar socket: se abortan todas las peticiones pendientes.
+  3. **AbortSignal en bridges con proceso externo:** `star-example` (curlPost + stream), `nova-example` (curlPost en LlmBridge + reasoning-loop), `satellite-ocr-example` (curlMultipart en OcrBridge) — el signal se pasa a `execFile` options. `AbortError` se preserva tal cual en vez de envolverlo (para que el check `err.name === "AbortError"` funcione en el handler de la conexión). `rag-provider` y `kb-provider` son síncronos/en-memoria: mantienen el mapa pero no abortan un proceso externo real.
+  4. **NodeInfo (DEC-0081) en los 5 providers:** cada manifiesto incluye spread condicional de `nodeInfo` basado en env vars `NODE_INFO_CPU/RAM/GPU/LOCATION/DESCRIPTION`.
+  5. **Versión de protocolo fijada exacta a `0.1.21`** en los 5 `package.json` (DEC-0058).
+- **Consecuencias:** todos los archivos `examples/*/src/index.ts` y los bridges `llm-bridge.ts`/`ocr-bridge.ts`/`reasoning-loop.ts` en los ejemplos con proceso externo. Typecheck limpio en todos los workspaces.
+
 ## DEC-0081 — Nivel "premium" de nodo: fase 1 implementada (nodeInfo declarativo + FHS_TRUSTED_PROVIDERS)
 
 - **Fecha:** 2026-07-31
