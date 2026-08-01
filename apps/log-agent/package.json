@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Agente de logs — sigue contenedores locales (podman logs -f), escribe archivo local para lnav y opcionalmente publica a NATS (DEC-0083). No forma parte del protocolo FHS.",
+  "description": "Colector central de logs (DEC-0083) — se suscribe a NATS y agrega en un solo archivo lo que publican los shippers de cada host (helpers/scripts/shell/log-agent-ship.sh). No forma parte del protocolo FHS.",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
