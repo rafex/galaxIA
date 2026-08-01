@@ -30,40 +30,60 @@ export interface ChatConnection {
 
 const WS_URL = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/chat/ws`;
 
+/**
+ * Si el socket muere por cualquier razón (el server se reinicia, la red
+ * falla un instante, la laptop se durmió) hay que reconectar solo — sin
+ * esto, `ready` se quedaba en `true` para siempre tras el primer `open`, y
+ * cada envío siguiente llamaba `socket.send()` sobre un socket ya cerrado:
+ * el mensaje se perdía en silencio, sin error visible para el usuario (bug
+ * real encontrado en producción, 2026-08-01 — un mensaje enviado durante
+ * un redeploy del Portal se quedó sin respuesta, sin ningún error en UI).
+ */
 export function connectToChat(
   onEvent: (event: AgentSSEEvent) => void,
   onOpen?: () => void
 ): ChatConnection {
-  const socket = new WebSocket(WS_URL);
+  let socket: WebSocket;
   let ready = false;
   let pending: ApiOptions | null = null;
+  let closedByCaller = false;
 
-  socket.addEventListener("open", () => {
-    ready = true;
-    if (pending) {
-      send(pending);
-      pending = null;
-    }
-    onOpen?.();
-  });
+  function openSocket() {
+    socket = new WebSocket(WS_URL);
 
-  socket.addEventListener("message", (event: MessageEvent<string>) => {
-    try {
-      const payload = JSON.parse(event.data) as AgentSSEEvent;
-      onEvent(payload);
-    } catch (err) {
-      console.error("Failed to parse WebSocket event", err);
-    }
-  });
+    socket.addEventListener("open", () => {
+      ready = true;
+      if (pending) {
+        const toSend = pending;
+        pending = null;
+        send(toSend);
+      }
+      onOpen?.();
+    });
 
-  socket.addEventListener("error", (err) => {
-    console.error("WebSocket error", err);
-    onEvent({ type: "error", data: { code: "WS_ERROR", message: "Error de conexión" } });
-  });
+    socket.addEventListener("message", (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as AgentSSEEvent;
+        onEvent(payload);
+      } catch (err) {
+        console.error("Failed to parse WebSocket event", err);
+      }
+    });
 
-  socket.addEventListener("close", () => {
-    onEvent({ type: "error", data: { code: "WS_CLOSED", message: "Conexión cerrada" } });
-  });
+    socket.addEventListener("error", (err) => {
+      console.error("WebSocket error", err);
+      ready = false;
+      onEvent({ type: "error", data: { code: "WS_ERROR", message: "Error de conexión" } });
+    });
+
+    socket.addEventListener("close", () => {
+      ready = false;
+      if (closedByCaller) return;
+      onEvent({ type: "error", data: { code: "WS_CLOSED", message: "Conexión cerrada" } });
+    });
+  }
+
+  openSocket();
 
   function send(options: ApiOptions) {
     const msg: {
@@ -86,8 +106,13 @@ export function connectToChat(
 
     if (ready) {
       socket.send(JSON.stringify(msg));
-    } else {
-      pending = options;
+      return;
+    }
+
+    // Socket no listo (nunca conectó, o se cayó) — reconecta y encola.
+    pending = options;
+    if (socket.readyState !== WebSocket.CONNECTING) {
+      openSocket();
     }
   }
 
@@ -107,6 +132,9 @@ export function connectToChat(
     send,
     sendDecision,
     sendKbDecision,
-    close: () => socket.close(),
+    close: () => {
+      closedByCaller = true;
+      socket.close();
+    },
   };
 }

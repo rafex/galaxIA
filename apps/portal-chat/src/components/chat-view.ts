@@ -1,5 +1,9 @@
 import type { AgentSSEEvent, ChatMessage, ChatState, KbCitation, ProvenanceInfo } from "../types/fhs.js";
 import { connectToChat, type ChatConnection } from "../services/api.js";
+import { applyTheme, cycleTheme, getCurrentTheme, getInitialTheme, themeLabel } from "../services/theme.js";
+import { createDrawerGroup } from "./drawer.js";
+import { initTooltips, refreshTooltip } from "./tooltip.js";
+import { createTour, hasTourRun, type TourStep } from "./tour.js";
 
 interface ModelOption {
   modelId: string;
@@ -36,18 +40,29 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
   let pendingAttachmentIsPdf = false;
   let pendingAttachmentName: string | null = null;
 
+  applyTheme(getInitialTheme());
+
   container.innerHTML = `
     <div class="app">
       <header class="header">
+        <button type="button" class="icon-btn drawer-trigger" data-drawer-trigger="sidebar"
+          aria-label="Conversaciones" data-tooltip="Ver conversaciones">☰</button>
         <h1>FHS Community</h1>
-        <div class="network-status">
+        <div class="header-spacer"></div>
+        <div class="network-status" data-tooltip="Estado de la conexión con la red comunitaria FHS">
           <span class="status-dot"></span>
           <span>Red: FARO</span>
           <span class="version">${version}</span>
         </div>
+        <button type="button" class="icon-btn drawer-trigger" data-drawer-trigger="activity"
+          aria-label="Actividad del agente" data-tooltip="Ver qué está haciendo el agente y de dónde viene la respuesta">📊</button>
+        <button type="button" class="icon-btn drawer-trigger" data-drawer-trigger="settings"
+          aria-label="Ajustes" data-tooltip="Modelo, privacidad, adjuntos y transporte">⚙️</button>
+        <button type="button" class="icon-btn theme-toggle" aria-label="Cambiar tema" data-tooltip="Cambiar tema de color">🌓</button>
+        <button type="button" class="icon-btn tour-trigger" aria-label="Ayuda: repetir el tour guiado" data-tooltip="Repetir el tour guiado">?</button>
       </header>
-      <aside class="sidebar">
-        <h2>Conversaciones</h2>
+      <aside class="sidebar drawer-panel" data-drawer="sidebar">
+        <h2 data-tooltip="Historial de conversaciones en este dispositivo">Conversaciones</h2>
         <ul class="conversation-list">
           <li class="active">OCR demo</li>
         </ul>
@@ -56,27 +71,27 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
         <div class="messages"></div>
         <div class="composer">
           <input type="file" class="file-input" accept="image/*,application/pdf" hidden />
-          <button class="attach-btn" type="button">Adjuntar</button>
+          <button class="attach-btn" type="button" data-tooltip="Adjuntar una imagen o PDF para extraer texto (OCR)">📎</button>
           <textarea placeholder="Escribe un mensaje..." rows="1"></textarea>
-          <button class="send-btn" type="button">Enviar</button>
+          <button class="send-btn" type="button" data-tooltip="Enviar mensaje (Enter)">Enviar</button>
         </div>
       </main>
-      <aside class="activity-panel">
-        <h2>Actividad del agente</h2>
+      <aside class="activity-panel drawer-panel" data-drawer="activity">
+        <h2 data-tooltip="Pasos que sigue el agente para resolver tu mensaje, en tiempo real">Actividad del agente</h2>
         <ul class="activity-log"></ul>
         <div class="provenance-card">
-          <h3>Procedencia</h3>
+          <h3 data-tooltip="De dónde vino cada parte de la respuesta: modelo, herramientas y datos usados">Procedencia</h3>
           <p class="provenance-placeholder">Esperando primera respuesta...</p>
         </div>
       </aside>
-      <footer class="settings-bar">
-        <label>
+      <footer class="settings-bar drawer-panel" data-drawer="settings">
+        <label data-tooltip="Qué modelo de IA responde tu mensaje. ★ = nodo de confianza del operador">
           Modelo:
           <select class="model-selector">
             <option value="auto">Automático</option>
           </select>
         </label>
-        <label>
+        <label data-tooltip="Qué tan lejos puede viajar tu mensaje en la red para encontrar un proveedor">
           Privacidad:
           <select class="scope-selector">
             <option value="local">Sólo este equipo</option>
@@ -85,20 +100,20 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
             <option value="external">Proveedores externos autorizados</option>
           </select>
         </label>
-        <label>
+        <label data-tooltip="Qué hacer con el texto extraído de un documento adjunto antes de usarlo">
           Documentos adjuntos:
           <select class="ocr-mode-selector">
             <option value="confirm" selected>Confirmar antes de usar</option>
             <option value="auto">Automático (más rápido, sin confirmar)</option>
           </select>
         </label>
-        <label>
+        <label data-tooltip="Base de conocimiento a consultar para responder preguntas sobre un tema">
           Base de conocimiento:
           <select class="kb-selector">
             <option value="" selected>Recomendada automáticamente (con confirmación)</option>
           </select>
         </label>
-        <label>
+        <label data-tooltip="Cuántas bases de conocimiento se consultan a la vez cuando no eliges una manualmente">
           KBs por pregunta:
           <select class="kb-max-selector">
             <option value="1" selected>1</option>
@@ -107,7 +122,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
           </select>
         </label>
         <span class="kb-max-warning" hidden>⚠️ Consultar más de una KB puede ser notablemente más lento en modelos pequeños</span>
-        <label>
+        <label data-tooltip="Cómo viajan tus adjuntos por la red: directo al proveedor o vía IPFS">
           Transporte de adjuntos:
           <select class="ipfs-mode-selector">
             <option value="direct" selected>Transmisión directa</option>
@@ -131,6 +146,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
         <span class="ipfs-gateway-info" hidden></span>
       </footer>
     </div>
+    <div class="scrim"></div>
   `;
 
   const messagesEl = container.querySelector(".messages") as HTMLElement;
@@ -152,6 +168,82 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
   const ipfsRetentionSelector = container.querySelector(".ipfs-retention-selector") as HTMLSelectElement;
   const ipfsGatewayInfo = container.querySelector(".ipfs-gateway-info") as HTMLElement;
   const provenancePlaceholder = container.querySelector(".provenance-placeholder") as HTMLElement;
+
+  const scrimEl = container.querySelector(".scrim") as HTMLElement;
+  const sidebarEl = container.querySelector(".sidebar") as HTMLElement;
+  const activityPanelEl = container.querySelector(".activity-panel") as HTMLElement;
+  const settingsBarEl = container.querySelector(".settings-bar") as HTMLElement;
+  const themeToggleBtn = container.querySelector(".theme-toggle") as HTMLButtonElement;
+  const tourTriggerBtn = container.querySelector(".tour-trigger") as HTMLButtonElement;
+
+  initTooltips(container);
+
+  const drawers = createDrawerGroup(scrimEl);
+  drawers.register(sidebarEl, container.querySelector('[data-drawer-trigger="sidebar"]') as HTMLElement);
+  const activityDrawer = drawers.register(
+    activityPanelEl,
+    container.querySelector('[data-drawer-trigger="activity"]') as HTMLElement
+  );
+  const settingsDrawer = drawers.register(
+    settingsBarEl,
+    container.querySelector('[data-drawer-trigger="settings"]') as HTMLElement
+  );
+
+  function updateThemeToggleLabel() {
+    themeToggleBtn.dataset.tooltip = `Tema actual: ${themeLabel(getCurrentTheme())} — clic para cambiar`;
+    refreshTooltip(themeToggleBtn);
+  }
+  updateThemeToggleLabel();
+  themeToggleBtn.addEventListener("click", () => {
+    cycleTheme();
+    updateThemeToggleLabel();
+  });
+
+  const tourSteps: TourStep[] = [
+    {
+      selector: ".network-status",
+      title: "Bienvenido a FHS Community",
+      body: "Este punto indica que estás conectado a la red comunitaria. El chat se resuelve con hardware que comparten otros miembros — no un servicio centralizado.",
+    },
+    {
+      selector: ".model-selector",
+      title: "Elige el modelo",
+      body: "Aquí ves qué modelos de IA están disponibles ahora mismo en la red. ★ marca los nodos de confianza del operador.",
+      beforeShow: () => settingsDrawer.open(),
+    },
+    {
+      selector: ".attach-btn",
+      title: "Adjunta documentos",
+      body: "Puedes adjuntar una imagen o PDF — el texto se extrae automáticamente (OCR) antes de responder tu pregunta.",
+      beforeShow: () => settingsDrawer.close(),
+    },
+    {
+      selector: ".composer textarea",
+      title: "Escribe tu mensaje",
+      body: "Escribe aquí y presiona Enter (o el botón Enviar) para mandar tu mensaje a la red.",
+    },
+    {
+      selector: '[data-drawer-trigger="activity"]',
+      title: "Actividad del agente",
+      body: "Aquí ves en tiempo real qué está haciendo el agente: qué modelo eligió, qué herramientas usó y de dónde vino cada dato de la respuesta.",
+      beforeShow: () => activityDrawer.close(),
+    },
+    {
+      selector: ".theme-toggle",
+      title: "Cambia el tema",
+      body: "Alterna entre Claro, Oscuro y Alto contraste según lo que te resulte más cómodo de leer.",
+    },
+    {
+      selector: ".tour-trigger",
+      title: "¿Necesitas repasar esto?",
+      body: "Vuelve a este botón cuando quieras repetir el tour.",
+    },
+  ];
+  const tour = createTour(tourSteps);
+  tourTriggerBtn.addEventListener("click", () => tour.start());
+  if (!hasTourRun()) {
+    setTimeout(() => tour.start(), 400);
+  }
 
   void loadModels();
   void loadKbs();
@@ -303,7 +395,7 @@ export function createApp(container: HTMLElement, version: string = "unknown") {
     pendingAttachment = null;
     pendingAttachmentIsPdf = false;
     pendingAttachmentName = null;
-    attachBtn.textContent = "Adjuntar";
+    attachBtn.textContent = "📎";
     attachBtn.classList.remove("attached");
     textareaEl.value = "";
     textareaEl.style.height = "auto";
