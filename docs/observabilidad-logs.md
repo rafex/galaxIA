@@ -7,12 +7,12 @@ Diagnosticar un problema en la topología multi-host (`docs/despliegue-multi-hos
 ## Cómo funciona
 
 - **`ship`** (`helpers/scripts/shell/log-agent-ship.sh`, uno por host, uno por cada set de contenedores de su rol): sigue `podman logs -f <container>` de cada contenedor configurado. Cada línea se escribe a un archivo local (`logs/<container>.log` — exactamente lo que `just logs-core`/`logs-llm`/`logs-ocr` ya usaban, sin cambios ahí) y, si `NATS_URL` está seteada, se publica también a `logs.<host>.<container>` con el CLI de NATS. **Sin runtime aparte** — solo `podman` (ya presente en cada host) y el binario CLI de `nats` (un ejecutable estático, sin dependencias).
-- **`collect`** (`apps/log-agent`, corre una vez, junto al servidor NATS): se suscribe a `logs.>` (todos los hosts) y arma `logs/all.log`, formato `[host/container] línea` — el archivo para ver **todo el sistema en una sola vista** con `lnav -f logs/all.log`. Esta pieza sí es una app Node/TypeScript (reusa el cliente oficial de NATS) — pero corre en **un solo host**, no en los tres.
+- **`collect`** (`apps/log-agent`, containerizado — `containers/log-agent/Containerfile` — corre una vez, junto al servidor NATS): se suscribe a `logs.>` (todos los hosts) y arma `/app/logs/all.log` dentro del contenedor (montado a un directorio del host vía `-v`), formato `[host/container] línea` — el archivo para ver **todo el sistema en una sola vista** con `lnav -f logs/all.log`.
 - **Degradación**: sin `NATS_URL`, o si `nats pub` falla, `ship` sigue escribiendo su archivo local exactamente igual — nunca depende de NATS para eso (mismo patrón que `apps/atlas/src/atlas/nats-bridge.ts`, DEC-0074). `collect` sí requiere NATS (sin conexión no hay nada que agregar) y falla explícito si no la tiene.
 
-## Por qué esta división (Node solo para `collect`)
+## Por qué `ship` es shell y `collect` es un contenedor
 
-`ship` originalmente también iba en TypeScript, pero eso hubiera exigido instalar Node en **los tres hosts** solo para poder invocar `podman logs -f` — footprint innecesario en máquinas que hoy no lo tienen (Bastion no traía Node instalado). Un script de shell + el CLI de `nats` (un solo binario, sin runtime) resuelve lo mismo con muchísimo menos peso. `collect` sí se queda en Node porque corre una sola vez, en un solo nodo (el mismo que aloja NATS), y ahí sí vale la pena reusar el cliente oficial de la librería.
+`ship` necesita invocar `podman logs -f` de contenedores **hermanos** en el mismo host — containerizarlo exigiría montar el socket de podman (en esta sesión vimos que ni siquiera está habilitado en el modo rootless de Raspi4B), así que corre como script de shell directo en cada host, sin runtime nuevo (ni Node ni contenedor). `collect` no tiene esa necesidad — solo habla NATS — así que sí se containeriza como cualquier otro servicio del stack (mismo patrón que `containers/atlas/Containerfile`), evitando instalar Node en el host.
 
 ## Levantar NATS (una vez, en el nodo que hará de `collect` — recomendado: el más "siempre encendido" de la topología)
 
@@ -30,13 +30,19 @@ Un solo binario estático, sin sudo necesario si se instala en `~/.local/bin` (v
 curl -sf https://binaries.nats.dev/nats-io/natscli/nats@latest | sh
 ```
 
-## Correr `collect` (en el mismo nodo que NATS — requiere Node 20+)
+## Correr `collect` (en el mismo nodo que NATS, containerizado)
 
 ```bash
-cd apps/log-agent
-npm install && npm run build
-NATS_URL=nats://localhost:4222 LOG_AGENT_LOCAL_DIR=./logs npm start
+podman build -f containers/log-agent/Containerfile -t fhs-log-agent:latest .
+podman run -d --name fhs-log-agent-collect \
+  -e NATS_URL=nats://host.containers.internal:4222 \
+  --add-host host.containers.internal:host-gateway \
+  -v "$(pwd)/logs:/app/logs" \
+  --restart unless-stopped \
+  fhs-log-agent:latest
 ```
+
+`host.containers.internal` (no `localhost`) porque NATS corre en **otro contenedor** del mismo host, publicado por el host — en rootless podman (`pasta`), un contenedor no puede alcanzar el puerto publicado de otro contenedor vía `localhost` (hairpin NAT no soportado, ver `docs/despliegue-multi-host.md`). El volumen `-v` es lo que permite abrir `logs/all.log` con `lnav` directo desde el host, sin entrar al contenedor.
 
 ## Correr `ship` (en cada host, con los contenedores de su rol — sin Node)
 
