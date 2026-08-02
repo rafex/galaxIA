@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "-w", "apps/portal-chat"],
       "port": 3000
+    },
+    {
+      "name": "satellite-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "-w", "apps/satellite-web"],
+      "port": 5173
     }
   ]
 }
