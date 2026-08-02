@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/rafex/galaxIA/idl/schemas/beacon-base.schema.json",
+  "title": "FHS Beacon — Base",
+  "description": "Campos obligatorios compartidos por todos los tipos de Beacon FHS. Enviado en HandshakeMessage.beacon.",
+  "type": "object",
+  "required": ["fhsVersion", "provider", "endpoint", "privacy"],
+  "properties": {
+    "fhsVersion": {
+      "type": "string",
+      "description": "Versión del protocolo FHS que soporta este nodo (ej. \"1\")"
+    },
+    "provider": {
+      "type": "object",
+      "required": ["id", "type", "visibility"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^did:key:z",
+          "description": "DID Ed25519 del provider (did:key:z...). Debe coincidir con Envelope.sourcePeerId."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["star", "satellite", "nova", "multi"],
+          "description": "Rol del nodo en la red FHS."
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["public", "private", "community"],
+          "description": "public: visible a cualquier Navigator. private: solo en la red local. community: visible a grupos autorizados."
+        },
+        "name": {
+          "type": "string",
+          "description": "Nombre legible del nodo."
+        },
+        "description": {
+          "type": "string",
+          "description": "Descripción del nodo para mostrar en interfaces de usuario."
+        },
+        "region": {
+          "type": "string",
+          "description": "Región geográfica del nodo (ej. 'mx', 'us-west', 'eu-central')."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Etiquetas para filtrado y descubrimiento."
+        }
+      },
+      "additionalProperties": false
+    },
+    "endpoint": {
+      "type": "object",
+      "description": "Endpoints de acceso al nodo. Al menos url o multiaddr debe estar presente.",
+      "anyOf": [
+        { "required": ["url"] },
+        { "required": ["multiaddr"] }
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "WebSocket URL del nodo (ws:// o wss://)."
+        },
+        "multiaddr": {
+          "type": "string",
+          "description": "Multiaddr P2P del nodo (ej. /ip4/1.2.3.4/tcp/8081/ws). Para conexión directa peer-to-peer (DEC-0086)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "availability": {
+      "type": "object",
+      "description": "Capacidad del nodo para aceptar misiones concurrentes.",
+      "properties": {
+        "maxConcurrentRequests": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Misiones concurrentes máximas. Superarlo activa código de error OVERLOADED (DEC-0072)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "privacy": {
+      "type": "object",
+      "required": ["retention"],
+      "properties": {
+        "retention": {
+          "type": "string",
+          "enum": ["none", "session", "persistent"],
+          "description": "none: no retiene nada. session: retiene durante la sesión. persistent: puede retener entre sesiones."
+        },
+        "jurisdiction": {
+          "type": "string",
+          "description": "Jurisdicción legal del nodo (ej. 'MX', 'EU', 'US'). Informativo."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

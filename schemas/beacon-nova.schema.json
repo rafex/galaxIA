@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/rafex/galaxIA/idl/schemas/beacon-nova.schema.json",
+  "title": "FHS Beacon — Nova",
+  "description": "Manifiesto Beacon para nodos de tipo Nova (agente con bucle autónomo). Extiende beacon-base.schema.json.",
+  "allOf": [
+    { "$ref": "beacon-base.schema.json" },
+    {
+      "type": "object",
+      "required": ["agentCapabilities"],
+      "properties": {
+        "provider": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["nova"],
+              "description": "Un Nova solo puede declararse como tipo 'nova'."
+            }
+          }
+        },
+        "agentCapabilities": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Tareas o flujos que este Nova puede ejecutar de forma autónoma.",
+          "items": {
+            "type": "object",
+            "required": ["id", "name"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Identificador único de la capability del agente (ej. 'research.web')."
+              },
+              "name": {
+                "type": "string",
+                "description": "Nombre legible de la capability."
+              },
+              "description": {
+                "type": "string",
+                "description": "Descripción del flujo o tarea que el Nova puede completar autónomamente."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "preferredStars": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^did:key:z",
+            "description": "DID de un Star preferido por este Nova (did:key:z...)."
+          },
+          "description": "Stars con los que este Nova prefiere trabajar. Navigator puede usarlos como hint de routing."
+        }
+      }
+    }
+  ]
+}

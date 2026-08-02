@@ -63,8 +63,16 @@ message Envelope {
     NodeLostMessage         node_lost       = 41;
 
     // Gossip P2P (Atlas ↔ Atlas)               [50-59]
-    AtlasAnnounceMessage    atlas_announce  = 50;
-    AtlasSyncMessage        atlas_sync      = 51;
+    AtlasAnnounceMessage      atlas_announce      = 50;
+    AtlasSyncMessage          atlas_sync          = 51;
+
+    // Portal ↔ Navigator (interfaz de agente)  [60-69]
+    AgentStartMessage         agent_start         = 60;
+    AgentStatusMessage        agent_status        = 61;
+    StarSelectedMessage       star_selected       = 62;
+    ToolSelectedMessage       tool_selected       = 63;
+    AssistantDeltaMessage     assistant_delta     = 64;
+    AssistantCompletedMessage assistant_completed = 65;
   }
 }
 
@@ -270,4 +278,67 @@ message AtlasAnnounceMessage {
 // Devuelve el estado completo de los providers para sincronizar el routing table.
 message AtlasSyncMessage {
   repeated NodeOnlineMessage providers = 1;
+}
+
+// ── Portal ↔ Navigator (interfaz de agente, IDL-007) ─────────────────────────
+// Mensajes que viajan entre el Portal (chat UI) y el Navigator (Agent Runtime).
+// Todos usan el Envelope estándar: sourcePeerId = DID del Portal o del Navigator.
+
+// agent.start — Portal → Navigator
+// Inicia una sesión de agente. El sessionId correlaciona múltiples misiones del
+// mismo usuario. Enviado antes del primer chat.request de la sesión.
+message AgentStartMessage {
+  string session_id = 1;  // UUID de la sesión Portal
+  string scope      = 2;  // "local" | "network" | "community" | "external"
+  string model      = 3;  // Modelo LLM preferido (hint; Navigator puede ignorarlo)
+}
+
+// agent.status — Navigator → Portal
+// Notifica el estado actual del agente durante el procesamiento de una misión.
+message AgentStatusMessage {
+  string mission_id = 1;
+  string status     = 2;  // "thinking" | "calling_star" | "calling_satellite" | "streaming" | "completed" | "error"
+}
+
+// star.selected — Navigator → Portal
+// Informa qué Star (LLM provider) fue seleccionado para procesar la misión.
+message StarSelectedMessage {
+  string mission_id  = 1;
+  string provider_id = 2;  // DID del Star seleccionado (did:key:z...)
+  string model       = 3;  // Modelo LLM que usará el Star
+}
+
+// tool.selected — Navigator → Portal
+// Informa qué Satellite y capability están siendo invocados.
+message ToolSelectedMessage {
+  string mission_id    = 1;
+  string provider_id   = 2;  // DID del Satellite invocado (did:key:z...)
+  string capability_id = 3;  // ID de la capability del Satellite
+}
+
+// assistant.delta — Navigator → Portal (streaming)
+// Fragmento de texto de la respuesta final del agente hacia el Portal.
+// Equivalente a chat.delta pero a nivel Portal↔Navigator (incluye postprocesado del Navigator).
+message AssistantDeltaMessage {
+  string mission_id = 1;
+  string delta      = 2;
+}
+
+// ProvenanceInfo — trazabilidad de la misión
+// Qué Star generó la respuesta, qué Satellites se invocaron, jurisdicción, etc.
+message ProvenanceInfo {
+  string           provider_id        = 1;  // DID del Star que generó la respuesta
+  string           model              = 2;  // Modelo LLM utilizado
+  int32            completion_tokens  = 3;  // Tokens generados en la respuesta
+  repeated string  tool_provider_ids  = 4;  // DIDs de Satellites invocados
+  bool             data_exported      = 5;  // true si algún tool exportó datos fuera del nodo
+  string           jurisdiction       = 6;  // Jurisdicción legal del Star (ej. "MX")
+}
+
+// assistant.completed — Navigator → Portal
+// Respuesta final del agente incluyendo la provenance completa de la misión.
+message AssistantCompletedMessage {
+  string         mission_id = 1;
+  string         content    = 2;  // Respuesta completa del agente
+  ProvenanceInfo provenance = 3;
 }

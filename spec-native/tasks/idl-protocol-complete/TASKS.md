@@ -44,7 +44,7 @@ todos los artefactos ya existen. Los schemas de Beacon dependen de la alineació
 ### TASK-IDL-002 — JSON Schemas de manifiesto Beacon por tipo de nodo
 
 - ID: TASK-IDL-002
-- State: `todo`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-IDL-001
 - Expected files:
@@ -80,7 +80,7 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 ### TASK-IDL-003 — Diagramas de secuencia Mermaid en idl/flows.md
 
 - ID: TASK-IDL-003
-- State: `todo`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-IDL-001
 - Expected files:
@@ -174,7 +174,7 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 ### TASK-IDL-007 — Canal Portal↔Navigator en asyncapi.yaml y fhs-protocol.proto
 
 - ID: TASK-IDL-007
-- State: `todo`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-IDL-001
 - Expected files:
@@ -215,7 +215,7 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 ### TASK-IDL-012 — Actualizar idl/flows.md para reflejar Handshake 2-step (DEC-0087)
 
 - ID: TASK-IDL-012
-- State: `todo`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-IDL-003
 - Expected files:

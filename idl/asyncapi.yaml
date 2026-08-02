@@ -2,7 +2,7 @@ asyncapi: "3.0.0"
 
 info:
   title: FHS Wire Protocol
-  version: "0.2.0"
+  version: "0.3.0"
   description: |
     Federation of Sovereign Horizons (FHS) — protocolo de mensajería entre
     nodos federados: Atlas (Registry), Navigator (Agent Runtime) y
@@ -47,14 +47,18 @@ info:
 defaultContentType: application/json
 
 channels:
-  # ── WebSocket: Cliente → Navigator (misiones de chat) ────────────────────
+  # ── WebSocket: Portal → Navigator (misiones de chat + control de agente) ─
   /chat:
     address: ws://{navigator}/chat
     description: |
-      Canal de misiones de chat. El cliente envía chat.request / chat.cancel.
-      El Navigator responde con chat.delta (streaming), chat.completed, chat.error,
-      tool.call y tool.list. También puede recibir tool.result y tool.list.response.
+      Canal principal Portal↔Navigator. El Portal envía agent.start para iniciar
+      la sesión, chat.request / chat.cancel para misiones, y tool.result /
+      tool.list.response para respuestas a tool calls del Star.
+      Navigator responde con agent.status, star.selected, tool.selected,
+      assistant.delta, assistant.completed, chat.error, tool.call y tool.list.
     messages:
+      agentStart:
+        $ref: "#/components/messages/AgentStartMessage"
       chatRequest:
         $ref: "#/components/messages/ChatRequestMessage"
       chatCancel:
@@ -76,10 +80,20 @@ channels:
               enum: [fhs.v1, fhs.v1.json]
               description: "fhs.v1: binario LPP+Protobuf (P2P). fhs.v1.json: texto JSON (compat)."
 
-  # ── WebSocket: Navigator → Cliente (respuestas de misión) ────────────────
+  # ── WebSocket: Navigator → Portal (respuestas de agente + misión) ────────
   /chat/stream:
     address: ws://{navigator}/chat
     messages:
+      agentStatus:
+        $ref: "#/components/messages/AgentStatusMessage"
+      starSelected:
+        $ref: "#/components/messages/StarSelectedMessage"
+      toolSelected:
+        $ref: "#/components/messages/ToolSelectedMessage"
+      assistantDelta:
+        $ref: "#/components/messages/AssistantDeltaMessage"
+      assistantCompleted:
+        $ref: "#/components/messages/AssistantCompletedMessage"
       chatDelta:
         $ref: "#/components/messages/ChatDeltaMessage"
       chatCompleted:
@@ -173,6 +187,62 @@ channels:
 
 components:
   messages:
+    # ── Portal ↔ Navigator (interfaz de agente, IDL-007) ─────────────────────
+    AgentStartMessage:
+      name: agent.start
+      title: Inicio de sesión de agente
+      summary: |
+        Portal → Navigator. Inicia una sesión de agente. El sessionId correlaciona
+        múltiples misiones dentro de la misma sesión del usuario.
+      payload:
+        $ref: "#/components/schemas/AgentStartMessage"
+
+    AgentStatusMessage:
+      name: agent.status
+      title: Estado del agente
+      summary: |
+        Navigator → Portal. Notificación del estado actual del agente durante el
+        procesamiento de una misión (thinking, calling_star, calling_satellite, etc.)
+      payload:
+        $ref: "#/components/schemas/AgentStatusMessage"
+
+    StarSelectedMessage:
+      name: star.selected
+      title: Star seleccionado para la misión
+      summary: |
+        Navigator → Portal. Informa al Portal qué Star (LLM provider) fue
+        seleccionado para procesar la misión.
+      payload:
+        $ref: "#/components/schemas/StarSelectedMessage"
+
+    ToolSelectedMessage:
+      name: tool.selected
+      title: Satellite y capability seleccionados
+      summary: |
+        Navigator → Portal. Informa al Portal qué Satellite y capability están
+        siendo invocados durante la misión.
+      payload:
+        $ref: "#/components/schemas/ToolSelectedMessage"
+
+    AssistantDeltaMessage:
+      name: assistant.delta
+      title: Fragmento de respuesta del agente (streaming)
+      summary: |
+        Navigator → Portal. Fragmento de texto en streaming de la respuesta final
+        del agente al Portal (equivalente a chat.delta pero a nivel Portal↔Navigator).
+      payload:
+        $ref: "#/components/schemas/AssistantDeltaMessage"
+
+    AssistantCompletedMessage:
+      name: assistant.completed
+      title: Respuesta completa del agente con provenance
+      summary: |
+        Navigator → Portal. Respuesta final del agente incluyendo la provenance
+        de la misión: qué Star generó la respuesta, qué Satellites se invocaron,
+        jurisdicción, si se exportaron datos, etc.
+      payload:
+        $ref: "#/components/schemas/AssistantCompletedMessage"
+
     # ── Ciclo de vida P2P (Provider ↔ Atlas, DEC-0087) ───────────────────────
     HandshakeMessage:
       name: handshake
@@ -318,6 +388,145 @@ components:
         $ref: "#/components/schemas/NodeLostMessage"
 
   schemas:
+    # ── Portal ↔ Navigator — Canal de agente (IDL-007) ────────────────────────
+    AgentStartMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [sessionId]
+          properties:
+            type:
+              type: string
+              enum: [agent.start]
+            sessionId:
+              type: string
+              format: uuid
+              description: UUID de la sesión Portal. Correlaciona múltiples misiones.
+            scope:
+              type: string
+              enum: [local, network, community, external]
+              description: |
+                Alcance de descubrimiento de providers.
+                local: solo providers del mismo host.
+                network: providers en la red local.
+                community: providers visibles a grupos autorizados.
+                external: cualquier provider público de la federación.
+            model:
+              type: string
+              description: Modelo LLM preferido (hint, Navigator puede ignorarlo si no está disponible).
+
+    AgentStatusMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, status]
+          properties:
+            type:
+              type: string
+              enum: [agent.status]
+            missionId:
+              type: string
+            status:
+              type: string
+              enum: [thinking, calling_star, calling_satellite, streaming, completed, error]
+              description: Estado actual del agente durante el procesamiento de la misión.
+
+    StarSelectedMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, providerId, model]
+          properties:
+            type:
+              type: string
+              enum: [star.selected]
+            missionId:
+              type: string
+            providerId:
+              type: string
+              description: DID del Star seleccionado (did:key:z...)
+            model:
+              type: string
+              description: Modelo LLM que usará el Star para esta misión
+
+    ToolSelectedMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, providerId, capabilityId]
+          properties:
+            type:
+              type: string
+              enum: [tool.selected]
+            missionId:
+              type: string
+            providerId:
+              type: string
+              description: DID del Satellite invocado (did:key:z...)
+            capabilityId:
+              type: string
+              description: ID de la capability del Satellite que se está ejecutando
+
+    AssistantDeltaMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, delta]
+          properties:
+            type:
+              type: string
+              enum: [assistant.delta]
+            missionId:
+              type: string
+            delta:
+              type: string
+              description: Fragmento de texto de la respuesta del agente (streaming hacia el Portal)
+
+    ProvenanceInfo:
+      type: object
+      description: |
+        Trazabilidad de la misión: quién generó la respuesta, qué herramientas se usaron,
+        si se exportaron datos, y la jurisdicción legal del Star.
+      required: [providerId, model]
+      properties:
+        providerId:
+          type: string
+          description: DID del Star que generó la respuesta (did:key:z...)
+        model:
+          type: string
+          description: Modelo LLM utilizado (ej. "llama3.2:3b")
+        completionTokens:
+          type: integer
+          description: Tokens generados en la respuesta
+        toolProviderIds:
+          type: array
+          items:
+            type: string
+          description: DIDs de los Satellites invocados durante la misión
+        dataExported:
+          type: boolean
+          description: true si algún tool exportó datos fuera del nodo local
+        jurisdiction:
+          type: string
+          description: Jurisdicción legal del Star (ej. "MX", "EU", "US")
+
+    AssistantCompletedMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, content]
+          properties:
+            type:
+              type: string
+              enum: [assistant.completed]
+            missionId:
+              type: string
+            content:
+              type: string
+              description: Respuesta completa del agente
+            provenance:
+              $ref: "#/components/schemas/ProvenanceInfo"
+
     # ── Envelope (frame raíz del protocolo, DEC-0087) ─────────────────────────
     # En modo JSON, los campos del Envelope van al nivel raíz del objeto
     # junto con los campos del payload y el discriminador `type`.
