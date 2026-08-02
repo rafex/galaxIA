@@ -13,3 +13,34 @@ session-ses_*.md
 
 # SpecNative — entorno Python generado
 .specnative/.venv/
+
+# ── Artefactos residuales del monorepo original ──────────────────────────────
+# galaxIA es ahora IDL-only. El código vive en otros repos:
+#   apps/        → galaxIA-Core  (atlas, navigator, portal-chat, log-agent, portal-tui)
+#                  galaxIA-SDK   (satellite-web)
+#   packages/    → galaxIA-SDK   (fhs-protocol, satellite-capabilities, satellite-capabilities-wasm)
+#   examples/    → galaxIA-Core  (star-example, satellite-ocr-example)
+#   node_modules → dependencias npm del monorepo original
+# Estos directorios pueden existir localmente si el repo se clonó antes de la
+# separación. Se ignoran para que `git status` no los muestre.
+apps/
+packages/
+examples/
+node_modules/
+
+# ── Artefactos de runtime local ───────────────────────────────────────────────
+# Generados al ejecutar el stack localmente (Atlas, Navigator, etc.).
+# No son fuente, no pertenecen a ningún repo.
+.env
+.env.*
+certs/
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# ── Secretos de identidad ─────────────────────────────────────────────────────
+# Claves privadas Ed25519 de nodos FHS (Registry, providers).
+# Generadas en el servidor — nunca se commitean.
+*.pem
+*.key
