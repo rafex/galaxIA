@@ -11,29 +11,23 @@ install:
 	$(call ok,Dependencias instaladas)
 
 .PHONY: build
-build: build-protocol build-atlas build-agent build-web
+build: build-atlas build-agent build-web
 	$(call ok,Build completo terminado)
 
-.PHONY: build-protocol
-build-protocol:
-	$(call info,Compilando fhs-protocol)
-	npm run build -w $(WS_PROTOCOL)
-	$(call ok,fhs-protocol compilado)
-
 .PHONY: build-atlas
-build-atlas: build-protocol
+build-atlas:
 	$(call info,Compilando atlas)
 	npm run build -w $(WS_ATLAS)
 	$(call ok,atlas compilado)
 
 .PHONY: build-agent
-build-agent: build-protocol
+build-agent:
 	$(call info,Compilando navigator)
 	npm run build -w $(WS_AGENT)
 	$(call ok,navigator compilado)
 
 .PHONY: build-web
-build-web: build-protocol
+build-web:
 	$(call info,Compilando portal)
 	npm run build -w $(WS_WEB)
 	$(call ok,portal compilado)

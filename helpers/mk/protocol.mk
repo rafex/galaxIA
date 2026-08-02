@@ -1,43 +1,14 @@
-# helpers/mk/protocol.mk — automatización de publicación de los 4 paquetes
-# distribuibles (@rafex/galaxia-fhs-protocol, @rafex/galaxia-atlas,
-# @rafex/galaxia-navigator, @rafex/galaxia-portal-chat) a GitHub Packages.
+# helpers/mk/protocol.mk — automatización de publicación de los 3 paquetes
+# distribuibles (@rafex/galaxia-atlas, @rafex/galaxia-navigator,
+# @rafex/galaxia-portal-chat) a GitHub Packages.
 # Depende de: helpers/mk/common.mk, helpers/mk/node.mk
 # Incluir con: include helpers/mk/protocol.mk
 #
-# Estos targets envuelven helpers/shell/verify-package.sh y
-# helpers/python/bump_package_version.py (generalizados de
-# verify-protocol-package.sh/bump_protocol_version.py, antes solo para el
-# protocolo — ver esos archivos para el detalle de qué hacen y por qué
-# existen, DEC-0040/DEC-0041). Usados tanto por desarrolladores locales
-# como por .github/workflows/publish-*.yml.
-#
-# "protocol-*" se mantiene como el nombre histórico para
-# packages/fhs-protocol (primer paquete publicado, DEC-0040/0041); los
-# demás paquetes usan su propio nombre de app.
+# NOTA: @rafex/galaxia-fhs-protocol y los paquetes satellite-capabilities*
+# migraron a galaxIA-SDK (2026-08-02, DEC-0085). Sus targets se eliminaron de
+# este Makefile — ver galaxIA-SDK/Makefile para sus equivalentes.
 
 include helpers/mk/common.mk
-
-.PHONY: protocol-bump-check protocol-bump protocol-verify protocol-publish
-protocol-bump-check:
-	$(call section,Verificando si hace falta subir la versión de @rafex/galaxia-fhs-protocol)
-	@GH_TOKEN=$${GH_TOKEN:?"GH_TOKEN requerido — export GH_TOKEN=\$$(gh auth token)"} \
-		uv run helpers/python/bump_package_version.py packages/fhs-protocol --check
-
-protocol-bump:
-	$(call section,Subiendo versión de @rafex/galaxia-fhs-protocol si ya está publicada)
-	@GH_TOKEN=$${GH_TOKEN:?"GH_TOKEN requerido — export GH_TOKEN=\$$(gh auth token)"} \
-		uv run helpers/python/bump_package_version.py packages/fhs-protocol
-	$(call ok,Bump de versión completo (o no hacía falta))
-
-protocol-verify:
-	$(call section,Verificando contenido del paquete de fhs-protocol)
-	@sh helpers/shell/verify-package.sh packages/fhs-protocol
-	$(call ok,Paquete verificado)
-
-protocol-publish: protocol-bump protocol-verify
-	$(call section,Publicando @rafex/galaxia-fhs-protocol a GitHub Packages)
-	npm publish -w packages/fhs-protocol
-	$(call ok,Publicado)
 
 .PHONY: atlas-bump-check atlas-bump atlas-verify atlas-publish
 atlas-bump-check:

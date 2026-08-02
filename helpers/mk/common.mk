@@ -11,14 +11,13 @@ C_BLUE    := \033[34m
 C_CYAN    := \033[36m
 
 # ── Workspaces ─────────────────────────────────────────────────────────────
-# Los providers de referencia (Star/LLM, Satellite/OCR, RAG, KB) viven en el
-# repo separado `galaxIA-satellite-star` — ya no son workspaces de este repo.
-WS_PROTOCOL := packages/fhs-protocol
+# fhs-protocol, satellite-capabilities y satellite-capabilities-wasm viven en
+# galaxIA-SDK (migrados 2026-08-02, DEC-0085). Este repo solo contiene apps.
 WS_ATLAS    := apps/atlas
 WS_AGENT    := apps/navigator
 WS_WEB      := apps/portal-chat
 
-WS_ALL      := $(WS_PROTOCOL) $(WS_ATLAS) $(WS_AGENT) $(WS_WEB)
+WS_ALL      := $(WS_ATLAS) $(WS_AGENT) $(WS_WEB)
 
 # ── Contenedores ───────────────────────────────────────────────────────────
 CONTAINER_DIR := containers

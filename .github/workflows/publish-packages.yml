@@ -1,14 +1,11 @@
 name: Publish packages to GitHub Packages + npmjs.org
 
 # CD (entrega continua), no CI — ver spec-native/pipelines/CD.md.
-# Publica los 4 paquetes distribuibles del monorepo a GitHub Packages y a
-# npmjs.org en cada push a main que toque alguno: @rafex/galaxia-fhs-protocol
-# (protocolo), @rafex/galaxia-atlas, @rafex/galaxia-navigator, @rafex/galaxia-portal-chat
-# (DEC-0061/DEC-0066, fases 2 y 6 del plan de distribución — antes solo el
-# protocolo se publicaba, y solo a GitHub Packages, DEC-0040/DEC-0041).
-# Generalizado de publish-fhs-protocol.yml: un solo job procesa solo los
-# paquetes cuyos archivos cambiaron en el push (o los 4, si se dispara
-# manualmente sin filtrar), en vez de un workflow por paquete.
+# Publica los 3 paquetes distribuibles del monorepo a GitHub Packages y a
+# npmjs.org en cada push a main que toque alguno: @rafex/galaxia-atlas,
+# @rafex/galaxia-navigator, @rafex/galaxia-portal-chat
+# (DEC-0061/DEC-0066, fases 2 y 6 del plan de distribución).
+# @rafex/galaxia-fhs-protocol migró a galaxIA-SDK (2026-08-02, DEC-0085).
 #
 # Automatización (DEC-0041, ver helpers/shell y helpers/python):
 # - Si la versión en package.json ya está publicada (en GitHub Packages —
@@ -20,18 +17,17 @@ name: Publish packages to GitHub Packages + npmjs.org
 # - Antes de publicar, verifica que el tarball incluya dist/ compilado
 #   (helpers/shell/verify-package.sh) — la versión 0.1.0 de fhs-protocol se
 #   publicó rota por esto exacto (ver DEC-0040), este chequeo evita que se
-#   repita en cualquiera de los 4 paquetes.
+#   repita en cualquiera de los 3 paquetes.
 # - npmjs.org requiere --access public explícito la primera vez que se
 #   publica un paquete con scope (@rafex/*) — por default los
 #   paquetes con scope se asumen privados (requiere una org de pago), y
-#   estos 4 nombres están libres en npmjs.org (verificado antes de activar
+#   estos 3 nombres están libres en npmjs.org (verificado antes de activar
 #   esto, DEC-0066).
 
 on:
   push:
     branches: ["main"]
     paths:
-      - "packages/fhs-protocol/**"
       - "apps/atlas/**"
       - "apps/navigator/**"
       - "apps/portal-chat/**"
@@ -39,11 +35,10 @@ on:
   workflow_dispatch:
     inputs:
       package:
-        description: "Paquete a publicar (`all` = los 4)"
+        description: "Paquete a publicar (`all` = los 3)"
         type: choice
         options:
           - all
-          - packages/fhs-protocol
           - apps/atlas
           - apps/navigator
           - apps/portal-chat
@@ -58,7 +53,7 @@ permissions:
 # del commit de bump de versión — visto en vivo el 2026-07-06 con el
 # workflow original de un solo paquete: el segundo run perdía la carrera
 # con "! [rejected] main -> main (fetch first)". Un solo job secuencial
-# (no matriz) evita el mismo problema entre los 4 paquetes de este push.
+# (no matriz) evita el mismo problema entre los 3 paquetes de este push.
 concurrency:
   group: publish-packages
   cancel-in-progress: false
@@ -92,20 +87,13 @@ jobs:
 
       - name: Instalar dependencias del workspace
         run: npm ci
-
-      - name: Compilar fhs-protocol
-        # dist/ está gitignored — atlas/navigator/portal-chat importan
-        # @rafex/galaxia-fhs-protocol contra ese dist/, así que su propio
-        # build/verify falla en un checkout limpio sin este paso (mismo
-        # motivo que DEC-0042 documentó para el CI de PRs; no se había
-        # necesitado aquí hasta que este workflow empezó a procesar algo
-        # más que fhs-protocol, DEC-0062).
-        run: npm run build -w packages/fhs-protocol
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Determinar qué paquetes cambiaron
         id: changed
         run: |
-          ALL="packages/fhs-protocol apps/atlas apps/navigator apps/portal-chat"
+          ALL="apps/atlas apps/navigator apps/portal-chat"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.package }}" != "all" ]; then
             TO_PROCESS="${{ inputs.package }}"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -153,7 +141,6 @@ jobs:
 
             echo "→ Bump de versión si ya está publicada..."
             case "$pkg" in
-              packages/fhs-protocol) TARGET="protocol" ;;
               apps/atlas) TARGET="atlas" ;;
               apps/navigator) TARGET="navigator" ;;
               apps/portal-chat) TARGET="portal-chat" ;;

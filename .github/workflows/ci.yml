@@ -28,13 +28,10 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
+          registry-url: "https://npm.pkg.github.com"
       - run: npm ci
-      - name: Compilar fhs-protocol
-        # dist/ está gitignored y eslint (parserOptions.projectService) más
-        # el resto de workspaces resuelven @rafex/galaxia-fhs-protocol contra
-        # dist/ — sin este paso, lint también falla en un checkout limpio
-        # (mismo motivo documentado en DEC-0042 para typecheck/build).
-        run: npm run build -w packages/fhs-protocol
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: npm run lint --workspaces
       - run: npm run lint:scripts
 
@@ -46,9 +43,10 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
+          registry-url: "https://npm.pkg.github.com"
       - run: npm ci
-      - name: Compilar fhs-protocol
-        run: npm run build -w packages/fhs-protocol
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: npm run typecheck --workspaces
 
   test:
@@ -58,6 +56,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          registry-url: "https://npm.pkg.github.com"
       - name: Instalar dependencias
         # `apps/portal-chat` corre vitest reutilizando vite.config.ts, que carga
         # el binario nativo de Rollup — mismo problema de DEC-0042 (el
@@ -68,7 +67,8 @@ jobs:
         run: |
           rm -f package-lock.json
           npm install
-      - run: npm run build -w packages/fhs-protocol
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: npm run test --workspaces
 
   build:
@@ -81,6 +81,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          registry-url: "https://npm.pkg.github.com"
 
       - name: Instalar dependencias
         # No usa el package-lock.json commiteado: se genera en macOS (ARM),
@@ -100,13 +101,12 @@ jobs:
         run: |
           rm -f package-lock.json
           npm install
-
-      - name: Compilar fhs-protocol
-        run: npm run build -w packages/fhs-protocol
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build (todos los workspaces)
         # No usa el script raíz "build" a propósito: ese solo compila
-        # fhs-protocol + navigator + portal, se le olvidó apps/atlas cuando
+        # atlas + navigator + portal, se le olvidó apps/log-agent cuando
         # se separó en DEC-0035. --workspaces sí cubre las 4 (ver
         # spec-native/DECISIONS.md DEC-0042).
         run: npm run build --workspaces
@@ -131,6 +131,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          registry-url: "https://npm.pkg.github.com"
 
       - name: Instalar dependencias
         # Mismo motivo que el job "build": el lockfile committeado (macOS
@@ -138,10 +139,11 @@ jobs:
         run: |
           rm -f package-lock.json
           npm install
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build (protocolo, atlas, navigator)
+      - name: Build (atlas, navigator)
         run: |
-          npm run build -w packages/fhs-protocol
           npm run build -w apps/atlas
           npm run build -w apps/navigator
 
