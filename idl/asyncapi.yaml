@@ -57,17 +57,117 @@ channels:
       toolListRequest:
         $ref: "#/components/messages/ToolListRequestMessage"
 
-  # ── WebSocket: Provider → Atlas (registro inicial) ───────────────────────
+  # ── WebSocket: Provider ↔ Atlas (registro y ciclo de vida) ───────────────
   /register:
     address: ws://{atlas}/register
+    description: |
+      Canal de ciclo de vida de un provider con Atlas.
+      Flujo: hello → welcome → register → registered → ping/pong (cada 10 s).
+      Una vez en estado Ready el mismo canal recibe dispatch.ack y tool.cancel.
     messages:
+      hello:
+        $ref: "#/components/messages/HelloMessage"
+      welcome:
+        $ref: "#/components/messages/WelcomeMessage"
+      register:
+        $ref: "#/components/messages/RegisterMessage"
+      registered:
+        $ref: "#/components/messages/RegisteredMessage"
+      ping:
+        $ref: "#/components/messages/PingMessage"
+      pong:
+        $ref: "#/components/messages/PongMessage"
+      error:
+        $ref: "#/components/messages/ErrorMessage"
       dispatchAck:
         $ref: "#/components/messages/DispatchAckMessage"
       toolCancel:
         $ref: "#/components/messages/ToolCancelMessage"
+    bindings:
+      ws:
+        method: GET
+
+  # ── WebSocket: Atlas → Navigator (notificaciones de topología) ───────────
+  /atlas/nodes:
+    address: ws://{atlas}/nodes
+    description: |
+      Notificaciones internas que Atlas emite hacia Navigator cuando
+      un provider entra en Orbit (node.online) o pierde su lease (node.lost).
+    messages:
+      nodeOnline:
+        $ref: "#/components/messages/NodeOnlineMessage"
+      nodeLost:
+        $ref: "#/components/messages/NodeLostMessage"
+    bindings:
+      ws:
+        method: GET
 
 components:
   messages:
+    # ── Registro y ciclo de vida (Provider ↔ Atlas) ───────────────────────
+    HelloMessage:
+      name: hello
+      title: Identificación inicial del provider
+      summary: Provider → Atlas. Primer mensaje tras abrir el WebSocket. Lleva la identidad DID y la firma Ed25519.
+      payload:
+        $ref: "#/components/schemas/HelloMessage"
+
+    WelcomeMessage:
+      name: welcome
+      title: Confirmación de identidad por el Registry
+      summary: Atlas → Provider. Responde a hello con los parámetros de lease y la firma del Registry.
+      payload:
+        $ref: "#/components/schemas/WelcomeMessage"
+
+    RegisterMessage:
+      name: register
+      title: Publicación del manifiesto (Beacon)
+      summary: Provider → Atlas. Envía el Beacon firmado con hash canónico del manifiesto.
+      payload:
+        $ref: "#/components/schemas/RegisterMessage"
+
+    RegisteredMessage:
+      name: registered
+      title: Confirmación de registro
+      summary: Atlas → Provider. El provider está en Orbit; indica cuándo vence el lease.
+      payload:
+        $ref: "#/components/schemas/RegisteredMessage"
+
+    PingMessage:
+      name: ping
+      title: Heartbeat (Pulse) del provider
+      summary: Provider → Atlas. Enviado cada heartbeatSeconds para renovar el lease.
+      payload:
+        $ref: "#/components/schemas/PingMessage"
+
+    PongMessage:
+      name: pong
+      title: Respuesta al Pulse
+      summary: Atlas → Provider. Responde a ping con el timestamp del servidor.
+      payload:
+        $ref: "#/components/schemas/PongMessage"
+
+    ErrorMessage:
+      name: error
+      title: Error estandarizado del Registry
+      summary: Atlas → Provider. Código de error semántico (NOT_IDENTIFIED, INVALID_MANIFEST, etc.).
+      payload:
+        $ref: "#/components/schemas/ErrorMessage"
+
+    NodeOnlineMessage:
+      name: node.online
+      title: Notificación de provider conectado
+      summary: Atlas → Navigator. Un provider entró en Orbit tras registro exitoso.
+      payload:
+        $ref: "#/components/schemas/NodeOnlineMessage"
+
+    NodeLostMessage:
+      name: node.lost
+      title: Notificación de provider perdido
+      summary: Atlas → Navigator. Un provider perdió su lease o cerró la conexión.
+      payload:
+        $ref: "#/components/schemas/NodeLostMessage"
+
     # ── Mensajes de Chat ──────────────────────────────────────────────────
     ChatRequestMessage:
       name: chat.request
@@ -142,6 +242,191 @@ components:
         $ref: "#/components/schemas/ToolListResponseMessage"
 
   schemas:
+    # ── Mensajes de registro y ciclo de vida ──────────────────────────────
+    HelloMessage:
+      type: object
+      required: [type, providerId, timestamp, fhsVersion, signature]
+      properties:
+        type:
+          type: string
+          enum: [hello]
+        providerId:
+          type: string
+          description: DID Ed25519 del provider (did:key:z...)
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix ms (Date.now()). Ventana anti-replay ±30 000 ms
+        fhsVersion:
+          type: string
+          description: Versión del protocolo FHS que anuncia el provider (ej. "0.1")
+        signature:
+          type: string
+          description: Firma Ed25519 en base64 de "providerId:timestamp" con la clave privada del nodo
+
+    WelcomeMessage:
+      type: object
+      required: [type, registryId, leaseSeconds, heartbeatSeconds, fhsVersion, timestamp, signature]
+      properties:
+        type:
+          type: string
+          enum: [welcome]
+        registryId:
+          type: string
+          description: DID Ed25519 del Registry (did:key:z...)
+        leaseSeconds:
+          type: integer
+          description: Duración del lease en segundos (default 30). El provider se marca lost si no llega ping en este tiempo.
+        heartbeatSeconds:
+          type: integer
+          description: Intervalo de ping recomendado en segundos (default 10)
+        fhsVersion:
+          type: string
+          description: Versión de protocolo que usará esta sesión (negociada por el Registry)
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix ms del momento de emisión
+        signature:
+          type: string
+          description: Firma Ed25519 en base64 de "registryId:timestamp" con la clave privada del Registry
+
+    RegisterMessage:
+      type: object
+      required: [type, providerId, manifest, timestamp, signature]
+      properties:
+        type:
+          type: string
+          enum: [register]
+        providerId:
+          type: string
+          description: DID Ed25519 del provider — debe coincidir con el hello
+        manifest:
+          type: object
+          description: Beacon (manifiesto) del provider. Ver schemas/beacon-*.schema.json (TASK-IDL-002)
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix ms
+        signature:
+          type: string
+          description: Firma Ed25519 en base64 de "providerId:timestamp:sha256hex(manifiesto canónico)"
+
+    RegisteredMessage:
+      type: object
+      required: [type, leaseExpires, acceptedServices]
+      properties:
+        type:
+          type: string
+          enum: [registered]
+        leaseExpires:
+          type: integer
+          format: int64
+          description: Unix ms cuando vence el lease actual (se renueva con cada ping)
+        acceptedServices:
+          type: integer
+          description: Número de capacidades (capabilities) aceptadas del manifiesto
+
+    PingMessage:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [ping]
+      description: Heartbeat (Pulse). El provider lo emite cada heartbeatSeconds para renovar el lease.
+
+    PongMessage:
+      type: object
+      required: [type, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [pong]
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix ms del momento en que Atlas responde al ping
+
+    FhsErrorCode:
+      type: string
+      enum:
+        - NOT_IDENTIFIED
+        - INVALID_MANIFEST
+        - INVALID_SIGNATURE
+        - UNSUPPORTED_VERSION
+        - UPSTREAM_UNAVAILABLE
+        - UPSTREAM_TIMEOUT
+        - INVALID_ARGUMENTS
+        - UNSUPPORTED_CAPABILITY
+        - UNAUTHORIZED
+        - CANCELLED
+        - OVERLOADED
+        - INTERNAL_ERROR
+      description: Código semántico de error FHS. Quien consume debe poder tomar decisiones basándose solo en el código, sin parsear el campo message.
+
+    ErrorMessage:
+      type: object
+      required: [type, code]
+      properties:
+        type:
+          type: string
+          enum: [error]
+        code:
+          $ref: "#/components/schemas/FhsErrorCode"
+        message:
+          type: string
+          description: Descripción legible del error (opcional, no machine-readable)
+
+    NodeService:
+      type: object
+      required: [kind, capabilities]
+      properties:
+        kind:
+          type: string
+          description: "Tipo de provider: star | satellite | nova | multi (ver docs/vocabulario.md)"
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: IDs de las capacidades ofrecidas por el nodo
+
+    NodeOnlineMessage:
+      type: object
+      required: [type, providerId, providerName, services]
+      properties:
+        type:
+          type: string
+          enum: [node.online]
+        providerId:
+          type: string
+          description: DID del provider que entró en Orbit
+        providerName:
+          type: string
+          description: Nombre legible del provider (del manifiesto)
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeService"
+
+    NodeLostMessage:
+      type: object
+      required: [type, providerId, providerName, services]
+      properties:
+        type:
+          type: string
+          enum: [node.lost]
+        providerId:
+          type: string
+          description: DID del provider que perdió su lease o cerró la conexión
+        providerName:
+          type: string
+          description: Nombre legible del provider
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeService"
+
     # ── Tipos base ────────────────────────────────────────────────────────
     CallerAuth:
       type: object
