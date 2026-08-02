@@ -136,23 +136,129 @@ message ToolListResponseMessage {
   int64  timestamp                    = 3;
 }
 
+// ── Mensajes de registro y ciclo de vida ────────────────────────────────────
+
+// hello — Provider → Atlas
+// Primer mensaje tras abrir el WebSocket. Firma: Ed25519 de "providerId:timestamp".
+message HelloMessage {
+  string provider_id  = 1; // DID Ed25519 del provider (did:key:z...)
+  int64  timestamp    = 2; // Unix ms. Ventana anti-replay ±30 000 ms (MAX_CLOCK_SKEW_MS=5000)
+  string fhs_version  = 3; // Versión del protocolo que anuncia el provider (ej. "0.1")
+  string signature    = 4; // Base64 Ed25519 de "providerId:timestamp"
+}
+
+// welcome — Atlas → Provider
+// Responde a hello. Firma: Ed25519 de "registryId:timestamp" con la clave del Registry.
+message WelcomeMessage {
+  string registry_id        = 1; // DID Ed25519 del Registry (did:key:z...)
+  int32  lease_seconds      = 2; // Duración del lease en segundos (default 30)
+  int32  heartbeat_seconds  = 3; // Intervalo de ping recomendado en segundos (default 10)
+  string fhs_version        = 4; // Versión de protocolo acordada para esta sesión
+  int64  timestamp          = 5; // Unix ms del momento de emisión
+  string signature          = 6; // Base64 Ed25519 de "registryId:timestamp"
+}
+
+// register — Provider → Atlas
+// Envía el Beacon firmado. Firma: Ed25519 de "providerId:timestamp:sha256hex(manifiesto canónico)".
+message RegisterMessage {
+  string provider_id = 1; // DID del provider — debe coincidir con hello
+  string manifest    = 2; // Beacon serializado como JSON (ver schemas/beacon-*.schema.json)
+  int64  timestamp   = 3; // Unix ms
+  string signature   = 4; // Base64 Ed25519 de "providerId:timestamp:sha256hex(manifest)"
+}
+
+// registered — Atlas → Provider
+// El provider está en Orbit; indica lease y capacidades aceptadas.
+message RegisteredMessage {
+  int64 lease_expires      = 1; // Unix ms cuando vence el lease actual
+  int32 accepted_services  = 2; // Número de capabilities aceptadas del manifiesto
+}
+
+// ping — Provider → Atlas (Pulse / heartbeat)
+// Mensaje vacío: el provider lo emite cada heartbeat_seconds para renovar el lease.
+message PingMessage {}
+
+// pong — Atlas → Provider
+// Respuesta al ping con timestamp del servidor.
+message PongMessage {
+  int64 timestamp = 1; // Unix ms del momento en que Atlas procesa el ping
+}
+
+// ErrorMessage — Atlas → Provider
+// Error estandarizado con código semántico.
+enum FhsErrorCode {
+  FHS_ERROR_CODE_UNSPECIFIED    = 0;
+  NOT_IDENTIFIED                = 1;  // Mensaje recibido antes de completar hello
+  INVALID_MANIFEST              = 2;  // Manifiesto no cumple el schema mínimo
+  INVALID_SIGNATURE             = 3;  // Firma inválida en hello o register
+  UNSUPPORTED_VERSION           = 4;  // fhsVersion no compatible con el Registry
+  UPSTREAM_UNAVAILABLE          = 5;  // Servicio real detrás del provider no responde
+  UPSTREAM_TIMEOUT              = 6;  // Servicio real respondió más lento que el timeout
+  INVALID_ARGUMENTS             = 7;  // Argumentos de tool.call/chat.request inválidos
+  UNSUPPORTED_CAPABILITY        = 8;  // Capability o modelo no registrado en el provider
+  UNAUTHORIZED                  = 9;  // callerId/signature inválidos o vetados
+  CANCELLED                     = 10; // Petición abortada tras chat.cancel/tool.cancel
+  OVERLOADED                    = 11; // Nodo a capacidad máxima; rechaza sin dispatch.ack
+  INTERNAL_ERROR                = 12; // Fallo no clasificado
+}
+
+message ErrorMessage {
+  FhsErrorCode code = 1;
+  string message    = 2; // Descripción legible del error (opcional)
+}
+
+// ── Notificaciones internas Atlas → Navigator ────────────────────────────────
+
+message NodeService {
+  string kind                    = 1; // "star" | "satellite" | "nova" | "multi"
+  repeated string capabilities   = 2; // IDs de las capacidades del nodo
+}
+
+// node.online — Atlas → Navigator
+// Un provider entró en Orbit tras registro exitoso.
+message NodeOnlineMessage {
+  string provider_id              = 1; // DID del provider
+  string provider_name            = 2; // Nombre legible del manifiesto
+  repeated NodeService services   = 3;
+}
+
+// node.lost — Atlas → Navigator
+// Un provider perdió su lease o cerró la conexión.
+message NodeLostMessage {
+  string provider_id              = 1; // DID del provider
+  string provider_name            = 2; // Nombre legible del manifiesto
+  repeated NodeService services   = 3;
+}
+
 // ── Envelope de mensajes (para desambiguación en transporte) ─────────────────
 
 // FhsMessage — envelope para uso en transporte binario (gRPC, AMQP, etc.)
 // En WebSocket/JSON el campo `type` cumple esta función.
 message FhsMessage {
   oneof payload {
-    ChatRequestMessage    chat_request      = 1;
-    ChatCancelMessage     chat_cancel       = 2;
-    ChatDeltaMessage      chat_delta        = 3;
-    ChatCompletedMessage  chat_completed    = 4;
-    ChatErrorMessage      chat_error        = 5;
-    DispatchAckMessage    dispatch_ack      = 6;
-    ToolCallRequestMessage tool_call        = 7;
-    ToolCancelMessage     tool_cancel       = 8;
-    ToolCallResultMessage  tool_result      = 9;
-    ToolCallErrorMessage   tool_error       = 10;
-    ToolListRequestMessage tool_list        = 11;
+    // Mensajes de misión (chat + tool)
+    ChatRequestMessage      chat_request    = 1;
+    ChatCancelMessage       chat_cancel     = 2;
+    ChatDeltaMessage        chat_delta      = 3;
+    ChatCompletedMessage    chat_completed  = 4;
+    ChatErrorMessage        chat_error      = 5;
+    DispatchAckMessage      dispatch_ack    = 6;
+    ToolCallRequestMessage  tool_call       = 7;
+    ToolCancelMessage       tool_cancel     = 8;
+    ToolCallResultMessage   tool_result     = 9;
+    ToolCallErrorMessage    tool_error      = 10;
+    ToolListRequestMessage  tool_list       = 11;
     ToolListResponseMessage tool_list_resp  = 12;
+    // Registro y ciclo de vida (Provider ↔ Atlas)
+    HelloMessage            hello           = 13;
+    WelcomeMessage          welcome         = 14;
+    RegisterMessage         register        = 15;
+    RegisteredMessage       registered      = 16;
+    PingMessage             ping            = 17;
+    PongMessage             pong            = 18;
+    ErrorMessage            error           = 19;
+    // Notificaciones internas (Atlas → Navigator)
+    NodeOnlineMessage       node_online     = 20;
+    NodeLostMessage         node_lost       = 21;
   }
 }
