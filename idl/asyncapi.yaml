@@ -2,33 +2,39 @@ asyncapi: "3.0.0"
 
 info:
   title: FHS Wire Protocol
-  version: "0.1.23"
+  version: "0.2.0"
   description: |
     Federation of Sovereign Horizons (FHS) — protocolo de mensajería entre
     nodos federados: Atlas (Registry), Navigator (Agent Runtime) y
-    Satellites/Stars (Providers de LLM, tools, OCR, RAG, KB).
+    Providers (Star, Satellite, Nova).
 
     ## Modos de transporte (DEC-0086)
 
-    El protocolo opera en dos modos sobre WebSocket, negociados con el
-    header `Sec-WebSocket-Protocol`:
+    Negociación con `Sec-WebSocket-Protocol`:
 
-    | Subprotocol    | Frames    | Formato                        |
-    |----------------|-----------|-------------------------------|
-    | `fhs.v1`       | binary    | LPP + Protobuf (primario, P2P) |
-    | `fhs.v1.json`  | text      | JSON compat                    |
+    | Subprotocol    | Frames  | Formato                        |
+    |----------------|---------|-------------------------------|
+    | `fhs.v1`       | binary  | LPP + Protobuf (primario, P2P) |
+    | `fhs.v1.json`  | text    | JSON compat                    |
 
-    En modo `fhs.v1`, cada frame binario es un FhsMessage LPP-prefijado
-    (varint-length + proto3 bytes). Ver `idl/framing.md` para la spec completa.
-    En modo `fhs.v1.json`, el campo `type` del JSON actúa como discriminador.
+    En modo `fhs.v1`, cada frame binario es `[varint-length][Envelope bytes]`.
+    Ver `idl/framing.md`. En modo JSON, el campo `type` actúa como discriminador.
 
-    ## Topología P2P
+    ## Envelope P2P (DEC-0087)
 
-    Atlas opera como bootstrap peer en una malla P2P federada, no como único
-    registry centralizado. Los mensajes `atlas.announce` / `atlas.sync`
-    permiten que múltiples instancias Atlas sincronicen sus routing tables.
+    Todos los mensajes viajan dentro de un `Envelope` con campos de routing:
+    `messageId` (UUID), `sourcePeerId` (DID), `destPeerId` (DID, opcional),
+    `timestamp` (anti-replay), `version`, `signature` (Ed25519 del envelope).
 
-    Versión de referencia: @rafex/galaxia-fhs-protocol@0.1.23
+    La autenticación es por Envelope: `sourcePeerId` identifica al emisor y
+    `signature` autentica el frame. No hay `CallerAuth` separado.
+
+    ## Ciclo de vida (DEC-0087)
+
+    Flujo 2-step: `handshake` → `handshake_ack` → `ping/pong` (cada heartbeatSeconds).
+    Reemplaza el flujo anterior de 4 pasos (hello/welcome/register/registered).
+
+    Versión de referencia: @rafex/galaxia-fhs-protocol
     Repositorio de tipos: https://github.com/rafex/galaxIA-SDK
     Framing spec: idl/framing.md
 
@@ -41,9 +47,13 @@ info:
 defaultContentType: application/json
 
 channels:
-  # ── WebSocket: Cliente → Navigator ───────────────────────────────────────
+  # ── WebSocket: Cliente → Navigator (misiones de chat) ────────────────────
   /chat:
     address: ws://{navigator}/chat
+    description: |
+      Canal de misiones de chat. El cliente envía chat.request / chat.cancel.
+      El Navigator responde con chat.delta (streaming), chat.completed, chat.error,
+      tool.call y tool.list. También puede recibir tool.result y tool.list.response.
     messages:
       chatRequest:
         $ref: "#/components/messages/ChatRequestMessage"
@@ -55,7 +65,6 @@ channels:
         $ref: "#/components/messages/ToolCallErrorMessage"
       toolListResponse:
         $ref: "#/components/messages/ToolListResponseMessage"
-
     bindings:
       ws:
         method: GET
@@ -67,7 +76,7 @@ channels:
               enum: [fhs.v1, fhs.v1.json]
               description: "fhs.v1: binario LPP+Protobuf (P2P). fhs.v1.json: texto JSON (compat)."
 
-  # ── WebSocket: Navigator → Cliente ───────────────────────────────────────
+  # ── WebSocket: Navigator → Cliente (respuestas de misión) ────────────────
   /chat/stream:
     address: ws://{navigator}/chat
     messages:
@@ -82,22 +91,19 @@ channels:
       toolListRequest:
         $ref: "#/components/messages/ToolListRequestMessage"
 
-  # ── WebSocket: Provider ↔ Atlas (registro y ciclo de vida) ───────────────
+  # ── WebSocket: Provider ↔ Atlas (ciclo de vida P2P) ───────────────────────
   /register:
     address: ws://{atlas}/register
     description: |
-      Canal de ciclo de vida de un provider con Atlas.
-      Flujo: hello → welcome → register → registered → ping/pong (cada 10 s).
-      Una vez en estado Ready el mismo canal recibe dispatch.ack y tool.cancel.
+      Canal de ciclo de vida de un provider con Atlas (DEC-0087).
+      Flujo 2-step: handshake → handshake_ack → ping/pong (cada heartbeatSeconds).
+      Una vez en Orbit el canal recibe dispatch.ack y tool.cancel.
+      Todos los mensajes viajan en un Envelope firmado.
     messages:
-      hello:
-        $ref: "#/components/messages/HelloMessage"
-      welcome:
-        $ref: "#/components/messages/WelcomeMessage"
-      register:
-        $ref: "#/components/messages/RegisterMessage"
-      registered:
-        $ref: "#/components/messages/RegisteredMessage"
+      handshake:
+        $ref: "#/components/messages/HandshakeMessage"
+      handshakeAck:
+        $ref: "#/components/messages/HandshakeAckMessage"
       ping:
         $ref: "#/components/messages/PingMessage"
       pong:
@@ -147,8 +153,8 @@ channels:
     description: |
       Canal de gossip entre instancias Atlas. Permite que múltiples Atlas sincronicen
       sus routing tables sin coordinator central, formando una malla federada P2P.
-      El Atlas que inicia la conexión envía atlas.announce; el receptor responde con
-      atlas.sync devolviendo el estado completo de sus providers en Orbit.
+      El Atlas iniciador envía atlas.announce; el receptor responde con atlas.sync.
+      sourcePeerId en el Envelope identifica al Atlas emisor.
     messages:
       atlasAnnounce:
         $ref: "#/components/messages/AtlasAnnounceMessage"
@@ -167,34 +173,24 @@ channels:
 
 components:
   messages:
-    # ── Registro y ciclo de vida (Provider ↔ Atlas) ───────────────────────
-    HelloMessage:
-      name: hello
-      title: Identificación inicial del provider
-      summary: Provider → Atlas. Primer mensaje tras abrir el WebSocket. Lleva la identidad DID y la firma Ed25519.
+    # ── Ciclo de vida P2P (Provider ↔ Atlas, DEC-0087) ───────────────────────
+    HandshakeMessage:
+      name: handshake
+      title: Handshake del provider con Atlas
+      summary: |
+        Provider → Atlas. Primer mensaje tras abrir el WebSocket. Lleva el Beacon
+        firmado y los multiaddrs P2P del nodo. Reemplaza hello+register.
       payload:
-        $ref: "#/components/schemas/HelloMessage"
+        $ref: "#/components/schemas/HandshakeMessage"
 
-    WelcomeMessage:
-      name: welcome
-      title: Confirmación de identidad por el Registry
-      summary: Atlas → Provider. Responde a hello con los parámetros de lease y la firma del Registry.
+    HandshakeAckMessage:
+      name: handshake_ack
+      title: Confirmación de handshake
+      summary: |
+        Atlas → Provider. El provider está en Orbit. Lleva parámetros de lease.
+        Reemplaza welcome+registered.
       payload:
-        $ref: "#/components/schemas/WelcomeMessage"
-
-    RegisterMessage:
-      name: register
-      title: Publicación del manifiesto (Beacon)
-      summary: Provider → Atlas. Envía el Beacon firmado con hash canónico del manifiesto.
-      payload:
-        $ref: "#/components/schemas/RegisterMessage"
-
-    RegisteredMessage:
-      name: registered
-      title: Confirmación de registro
-      summary: Atlas → Provider. El provider está en Orbit; indica cuándo vence el lease.
-      payload:
-        $ref: "#/components/schemas/RegisteredMessage"
+        $ref: "#/components/schemas/HandshakeAckMessage"
 
     PingMessage:
       name: ping
@@ -206,47 +202,33 @@ components:
     PongMessage:
       name: pong
       title: Respuesta al Pulse
-      summary: Atlas → Provider. Responde a ping con el timestamp del servidor.
+      summary: Atlas → Provider. Responde a ping con el server_timestamp para calcular RTT.
       payload:
         $ref: "#/components/schemas/PongMessage"
 
     ErrorMessage:
       name: error
-      title: Error estandarizado del Registry
-      summary: Atlas → Provider. Código de error semántico (NOT_IDENTIFIED, INVALID_MANIFEST, etc.).
+      title: Error estandarizado
+      summary: Cualquier nodo → cualquier nodo. Código de error semántico FHS.
       payload:
         $ref: "#/components/schemas/ErrorMessage"
 
-    NodeOnlineMessage:
-      name: node.online
-      title: Notificación de provider conectado
-      summary: Atlas → Navigator. Un provider entró en Orbit tras registro exitoso.
-      payload:
-        $ref: "#/components/schemas/NodeOnlineMessage"
-
-    NodeLostMessage:
-      name: node.lost
-      title: Notificación de provider perdido
-      summary: Atlas → Navigator. Un provider perdió su lease o cerró la conexión.
-      payload:
-        $ref: "#/components/schemas/NodeLostMessage"
-
-    # ── Gossip P2P (Atlas ↔ Atlas, DEC-0086) ─────────────────────────────
+    # ── Gossip P2P (Atlas ↔ Atlas, DEC-0086) ─────────────────────────────────
     AtlasAnnounceMessage:
       name: atlas.announce
-      title: Anuncio de providers de un Atlas a otro
-      summary: Atlas → Atlas. Anuncia los providers en Orbit para sincronizar routing tables federadas.
+      title: Anuncio de providers en Orbit
+      summary: Atlas → Atlas. Anuncia los providers en Orbit para sincronizar routing tables.
       payload:
         $ref: "#/components/schemas/AtlasAnnounceMessage"
 
     AtlasSyncMessage:
       name: atlas.sync
-      title: Respuesta de sincronización entre instancias Atlas
+      title: Respuesta de sincronización entre Atlas
       summary: Atlas → Atlas. Devuelve el estado completo de providers en respuesta a atlas.announce.
       payload:
         $ref: "#/components/schemas/AtlasSyncMessage"
 
-    # ── Mensajes de Chat ──────────────────────────────────────────────────
+    # ── Mensajes de Chat ──────────────────────────────────────────────────────
     ChatRequestMessage:
       name: chat.request
       title: Solicitud de chat
@@ -283,6 +265,7 @@ components:
       payload:
         $ref: "#/components/schemas/DispatchAckMessage"
 
+    # ── Mensajes de Tool ──────────────────────────────────────────────────────
     ToolCallRequestMessage:
       name: tool.call
       title: Solicitud de ejecución de tool
@@ -319,112 +302,125 @@ components:
       payload:
         $ref: "#/components/schemas/ToolListResponseMessage"
 
+    # ── Notificaciones internas ───────────────────────────────────────────────
+    NodeOnlineMessage:
+      name: node.online
+      title: Notificación de provider conectado
+      summary: Atlas → Navigator. Un provider entró en Orbit tras handshake exitoso.
+      payload:
+        $ref: "#/components/schemas/NodeOnlineMessage"
+
+    NodeLostMessage:
+      name: node.lost
+      title: Notificación de provider perdido
+      summary: Atlas → Navigator. Un provider perdió su lease o cerró la conexión.
+      payload:
+        $ref: "#/components/schemas/NodeLostMessage"
+
   schemas:
-    # ── Mensajes de registro y ciclo de vida ──────────────────────────────
-    HelloMessage:
+    # ── Envelope (frame raíz del protocolo, DEC-0087) ─────────────────────────
+    # En modo JSON, los campos del Envelope van al nivel raíz del objeto
+    # junto con los campos del payload y el discriminador `type`.
+    Envelope:
       type: object
-      required: [type, providerId, timestamp, fhsVersion, signature]
+      required: [messageId, sourcePeerId, timestamp, version, signature, type]
       properties:
-        type:
+        messageId:
           type: string
-          enum: [hello]
-        providerId:
+          format: uuid
+          description: UUID único por frame (deduplicación en redes P2P)
+        sourcePeerId:
           type: string
-          description: DID Ed25519 del provider (did:key:z...)
+          description: DID del nodo emisor (did:key:z...)
+        destPeerId:
+          type: string
+          description: DID del destino; ausente o vacío = broadcast / cualquier Atlas
         timestamp:
           type: integer
           format: int64
-          description: Unix ms (Date.now()). Ventana anti-replay ±30 000 ms
-        fhsVersion:
+          description: Unix ms — anti-replay (ventana recomendada ±30 000 ms)
+        version:
           type: string
-          description: Versión del protocolo FHS que anuncia el provider (ej. "0.1")
+          enum: ["1"]
+          description: Versión del protocolo FHS
         signature:
           type: string
-          description: Firma Ed25519 en base64 de "providerId:timestamp" con la clave privada del nodo
-
-    WelcomeMessage:
-      type: object
-      required: [type, registryId, leaseSeconds, heartbeatSeconds, fhsVersion, timestamp, signature]
-      properties:
+          description: Ed25519 base64 de sha256(messageId:source:dest:timestamp:payload_bytes_hex)
         type:
           type: string
-          enum: [welcome]
-        registryId:
-          type: string
-          description: DID Ed25519 del Registry (did:key:z...)
-        leaseSeconds:
-          type: integer
-          description: Duración del lease en segundos (default 30). El provider se marca lost si no llega ping en este tiempo.
-        heartbeatSeconds:
-          type: integer
-          description: Intervalo de ping recomendado en segundos (default 10)
-        fhsVersion:
-          type: string
-          description: Versión de protocolo que usará esta sesión (negociada por el Registry)
-        timestamp:
-          type: integer
-          format: int64
-          description: Unix ms del momento de emisión
-        signature:
-          type: string
-          description: Firma Ed25519 en base64 de "registryId:timestamp" con la clave privada del Registry
+          description: Discriminador del payload en modo JSON (ej. "handshake", "chat.request")
 
-    RegisterMessage:
-      type: object
-      required: [type, providerId, manifest, timestamp, signature]
-      properties:
-        type:
-          type: string
-          enum: [register]
-        providerId:
-          type: string
-          description: DID Ed25519 del provider — debe coincidir con el hello
-        manifest:
-          type: object
-          description: Beacon (manifiesto) del provider. Ver schemas/beacon-*.schema.json (TASK-IDL-002)
-        timestamp:
-          type: integer
-          format: int64
-          description: Unix ms
-        signature:
-          type: string
-          description: Firma Ed25519 en base64 de "providerId:timestamp:sha256hex(manifiesto canónico)"
+    # ── Ciclo de vida P2P (DEC-0087) ─────────────────────────────────────────
+    HandshakeMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [fhsVersion, beacon]
+          properties:
+            type:
+              type: string
+              enum: [handshake]
+            fhsVersion:
+              type: string
+              description: Versión del protocolo FHS que soporta este nodo (ej. "1")
+            listenAddrs:
+              type: array
+              items:
+                type: string
+              description: Multiaddrs P2P del nodo (ej. /ip4/1.2.3.4/tcp/8081/ws)
+            beacon:
+              type: object
+              description: Beacon (manifiesto completo del nodo). Ver schemas/beacon-*.schema.json
 
-    RegisteredMessage:
-      type: object
-      required: [type, leaseExpires, acceptedServices]
-      properties:
-        type:
-          type: string
-          enum: [registered]
-        leaseExpires:
-          type: integer
-          format: int64
-          description: Unix ms cuando vence el lease actual (se renueva con cada ping)
-        acceptedServices:
-          type: integer
-          description: Número de capacidades (capabilities) aceptadas del manifiesto
+    HandshakeAckMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [fhsVersion, leaseSeconds, heartbeatSeconds, leaseExpires, acceptedServices]
+          properties:
+            type:
+              type: string
+              enum: [handshake_ack]
+            fhsVersion:
+              type: string
+              description: Versión del protocolo acordada para esta sesión
+            leaseSeconds:
+              type: integer
+              description: Duración del lease en segundos (default 30)
+            heartbeatSeconds:
+              type: integer
+              description: Intervalo de ping recomendado en segundos (default 10)
+            leaseExpires:
+              type: integer
+              format: int64
+              description: Unix ms cuando vence el lease actual
+            acceptedServices:
+              type: integer
+              description: Número de capabilities aceptadas del Beacon
 
     PingMessage:
-      type: object
-      required: [type]
-      properties:
-        type:
-          type: string
-          enum: [ping]
-      description: Heartbeat (Pulse). El provider lo emite cada heartbeatSeconds para renovar el lease.
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: [ping]
+          description: Heartbeat (Pulse). El provider lo emite cada heartbeatSeconds.
 
     PongMessage:
-      type: object
-      required: [type, timestamp]
-      properties:
-        type:
-          type: string
-          enum: [pong]
-        timestamp:
-          type: integer
-          format: int64
-          description: Unix ms del momento en que Atlas responde al ping
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [serverTimestamp]
+          properties:
+            type:
+              type: string
+              enum: [pong]
+            serverTimestamp:
+              type: integer
+              format: int64
+              description: Unix ms cuando Atlas procesa el ping (para calcular RTT)
 
     FhsErrorCode:
       type: string
@@ -441,128 +437,56 @@ components:
         - CANCELLED
         - OVERLOADED
         - INTERNAL_ERROR
-      description: Código semántico de error FHS. Quien consume debe poder tomar decisiones basándose solo en el código, sin parsear el campo message.
+      description: Código semántico de error FHS. Quien consume puede tomar decisiones solo con el código.
 
     ErrorMessage:
-      type: object
-      required: [type, code]
-      properties:
-        type:
-          type: string
-          enum: [error]
-        code:
-          $ref: "#/components/schemas/FhsErrorCode"
-        message:
-          type: string
-          description: Descripción legible del error (opcional, no machine-readable)
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [code]
+          properties:
+            type:
+              type: string
+              enum: [error]
+            code:
+              $ref: "#/components/schemas/FhsErrorCode"
+            message:
+              type: string
+              description: Descripción legible del error (opcional)
 
-    NodeService:
-      type: object
-      required: [kind, capabilities]
-      properties:
-        kind:
-          type: string
-          description: "Tipo de provider: star | satellite | nova | multi (ver docs/vocabulario.md)"
-        capabilities:
-          type: array
-          items:
-            type: string
-          description: IDs de las capacidades ofrecidas por el nodo
-
-    NodeOnlineMessage:
-      type: object
-      required: [type, providerId, providerName, services]
-      properties:
-        type:
-          type: string
-          enum: [node.online]
-        providerId:
-          type: string
-          description: DID del provider que entró en Orbit
-        providerName:
-          type: string
-          description: Nombre legible del provider (del manifiesto)
-        services:
-          type: array
-          items:
-            $ref: "#/components/schemas/NodeService"
-
-    NodeLostMessage:
-      type: object
-      required: [type, providerId, providerName, services]
-      properties:
-        type:
-          type: string
-          enum: [node.lost]
-        providerId:
-          type: string
-          description: DID del provider que perdió su lease o cerró la conexión
-        providerName:
-          type: string
-          description: Nombre legible del provider
-        services:
-          type: array
-          items:
-            $ref: "#/components/schemas/NodeService"
-
-    # ── Gossip P2P (Atlas ↔ Atlas, DEC-0086) ─────────────────────────────
+    # ── Gossip P2P (Atlas ↔ Atlas, DEC-0086) ─────────────────────────────────
+    # atlasId viene de Envelope.sourcePeerId; timestamp y signature del Envelope.
     AtlasAnnounceMessage:
-      type: object
-      required: [type, atlasId, providerIds, timestamp, signature]
-      properties:
-        type:
-          type: string
-          enum: [atlas.announce]
-        atlasId:
-          type: string
-          description: DID del Atlas que anuncia (did:key:z...)
-        providerIds:
-          type: array
-          items:
-            type: string
-          description: DIDs de providers actualmente en Orbit en este Atlas
-        timestamp:
-          type: integer
-          format: int64
-        signature:
-          type: string
-          description: Firma Ed25519 en base64 de "atlasId:timestamp"
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [providerIds]
+          properties:
+            type:
+              type: string
+              enum: [atlas.announce]
+            providerIds:
+              type: array
+              items:
+                type: string
+              description: DIDs de providers actualmente en Orbit en este Atlas
 
     AtlasSyncMessage:
-      type: object
-      required: [type, atlasId, providers, timestamp]
-      properties:
-        type:
-          type: string
-          enum: [atlas.sync]
-        atlasId:
-          type: string
-          description: DID del Atlas que responde (did:key:z...)
-        providers:
-          type: array
-          items:
-            $ref: "#/components/schemas/NodeOnlineMessage"
-          description: Estado completo de cada provider en Orbit en este Atlas
-        timestamp:
-          type: integer
-          format: int64
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [providers]
+          properties:
+            type:
+              type: string
+              enum: [atlas.sync]
+            providers:
+              type: array
+              items:
+                $ref: "#/components/schemas/NodeOnlineMessage"
+              description: Estado completo de cada provider en Orbit
 
-    # ── Tipos base ────────────────────────────────────────────────────────
-    CallerAuth:
-      type: object
-      required: [callerId, signature, timestamp]
-      properties:
-        callerId:
-          type: string
-          description: DID del nodo que origina la solicitud (did:key:...)
-        signature:
-          type: string
-          description: Firma Ed25519 en base64 de `callerId:missionId:timestamp`
-        timestamp:
-          type: integer
-          format: int64
-          description: Unix ms del momento de firma
-
+    # ── Tipos base ────────────────────────────────────────────────────────────
     ToolDefinition:
       type: object
       required: [name, description, inputSchema]
@@ -611,205 +535,248 @@ components:
           items:
             $ref: "#/components/schemas/ToolCall"
 
-    # ── Mensajes del protocolo FHS ────────────────────────────────────────
+    # ── Mensajes de misión — Chat ─────────────────────────────────────────────
+    # callerId = Envelope.sourcePeerId; auth = Envelope.signature; timestamp = Envelope.timestamp
     ChatRequestMessage:
-      type: object
-      required: [type, missionId, messages, timestamp, auth]
-      properties:
-        type:
-          type: string
-          enum: [chat.request]
-        missionId:
-          type: string
-          description: UUID único de la misión/sesión de chat
-        messages:
-          type: array
-          items:
-            $ref: "#/components/schemas/Message"
-        tools:
-          type: array
-          items:
-            $ref: "#/components/schemas/ToolDefinition"
-        model:
-          type: string
-          description: Modelo LLM solicitado (opcional, el provider decide si lo acepta)
-        timestamp:
-          type: integer
-          format: int64
-        auth:
-          $ref: "#/components/schemas/CallerAuth"
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, messages]
+          properties:
+            type:
+              type: string
+              enum: [chat.request]
+            missionId:
+              type: string
+              description: UUID único de la misión de chat
+            messages:
+              type: array
+              items:
+                $ref: "#/components/schemas/Message"
+            tools:
+              type: array
+              items:
+                $ref: "#/components/schemas/ToolDefinition"
+            model:
+              type: string
+              description: Modelo LLM solicitado (opcional)
 
     ChatCancelMessage:
-      type: object
-      required: [type, missionId, timestamp]
-      properties:
-        type:
-          type: string
-          enum: [chat.cancel]
-        missionId:
-          type: string
-        timestamp:
-          type: integer
-          format: int64
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId]
+          properties:
+            type:
+              type: string
+              enum: [chat.cancel]
+            missionId:
+              type: string
 
     ChatDeltaMessage:
-      type: object
-      required: [type, missionId, delta, timestamp]
-      properties:
-        type:
-          type: string
-          enum: [chat.delta]
-        missionId:
-          type: string
-        delta:
-          type: string
-          description: Fragmento de texto generado
-        timestamp:
-          type: integer
-          format: int64
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, delta]
+          properties:
+            type:
+              type: string
+              enum: [chat.delta]
+            missionId:
+              type: string
+            delta:
+              type: string
+              description: Fragmento de texto generado
 
     ChatCompletedMessage:
-      type: object
-      required: [type, missionId, content, timestamp]
-      properties:
-        type:
-          type: string
-          enum: [chat.completed]
-        missionId:
-          type: string
-        content:
-          type: string
-          description: Respuesta completa generada
-        toolCalls:
-          type: array
-          items:
-            $ref: "#/components/schemas/ToolCall"
-        timestamp:
-          type: integer
-          format: int64
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, content]
+          properties:
+            type:
+              type: string
+              enum: [chat.completed]
+            missionId:
+              type: string
+            content:
+              type: string
+            toolCalls:
+              type: array
+              items:
+                $ref: "#/components/schemas/ToolCall"
 
     ChatErrorMessage:
-      type: object
-      required: [type, missionId, error, timestamp]
-      properties:
-        type:
-          type: string
-          enum: [chat.error]
-        missionId:
-          type: string
-        error:
-          type: string
-        timestamp:
-          type: integer
-          format: int64
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, error]
+          properties:
+            type:
+              type: string
+              enum: [chat.error]
+            missionId:
+              type: string
+            error:
+              type: string
 
     DispatchAckMessage:
-      type: object
-      required: [type, missionId, queuedAt]
-      properties:
-        type:
-          type: string
-          enum: [dispatch.ack]
-        missionId:
-          type: string
-        queuedAt:
-          type: integer
-          format: int64
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, queuedAt]
+          properties:
+            type:
+              type: string
+              enum: [dispatch.ack]
+            missionId:
+              type: string
+            queuedAt:
+              type: integer
+              format: int64
+              description: Unix ms cuando la misión entró en la cola (timestamp de negocio)
 
+    # ── Mensajes de misión — Tool ─────────────────────────────────────────────
     ToolCallRequestMessage:
-      type: object
-      required: [type, missionId, toolCalls, timestamp]
-      properties:
-        type:
-          type: string
-          enum: [tool.call]
-        missionId:
-          type: string
-        toolCalls:
-          type: array
-          items:
-            $ref: "#/components/schemas/ToolCall"
-        timestamp:
-          type: integer
-          format: int64
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, toolCalls]
+          properties:
+            type:
+              type: string
+              enum: [tool.call]
+            missionId:
+              type: string
+            toolCalls:
+              type: array
+              items:
+                $ref: "#/components/schemas/ToolCall"
 
     ToolCancelMessage:
-      type: object
-      required: [type, missionId, timestamp]
-      properties:
-        type:
-          type: string
-          enum: [tool.cancel]
-        missionId:
-          type: string
-        timestamp:
-          type: integer
-          format: int64
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId]
+          properties:
+            type:
+              type: string
+              enum: [tool.cancel]
+            missionId:
+              type: string
 
     ToolCallResultMessage:
-      type: object
-      required: [type, missionId, toolCallId, result, timestamp]
-      properties:
-        type:
-          type: string
-          enum: [tool.result]
-        missionId:
-          type: string
-        toolCallId:
-          type: string
-        result:
-          type: string
-          description: JSON serializado del resultado
-        timestamp:
-          type: integer
-          format: int64
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, toolCallId, result]
+          properties:
+            type:
+              type: string
+              enum: [tool.result]
+            missionId:
+              type: string
+            toolCallId:
+              type: string
+            result:
+              type: string
+              description: JSON serializado del resultado
 
     ToolCallErrorMessage:
-      type: object
-      required: [type, missionId, toolCallId, error, timestamp]
-      properties:
-        type:
-          type: string
-          enum: [tool.error]
-        missionId:
-          type: string
-        toolCallId:
-          type: string
-        error:
-          type: string
-        timestamp:
-          type: integer
-          format: int64
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, toolCallId, error]
+          properties:
+            type:
+              type: string
+              enum: [tool.error]
+            missionId:
+              type: string
+            toolCallId:
+              type: string
+            error:
+              type: string
 
     ToolListRequestMessage:
-      type: object
-      required: [type, missionId, timestamp]
-      properties:
-        type:
-          type: string
-          enum: [tool.list]
-        missionId:
-          type: string
-        timestamp:
-          type: integer
-          format: int64
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId]
+          properties:
+            type:
+              type: string
+              enum: [tool.list]
+            missionId:
+              type: string
 
     ToolListResponseMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, tools]
+          properties:
+            type:
+              type: string
+              enum: [tool.list.response]
+            missionId:
+              type: string
+            tools:
+              type: array
+              items:
+                $ref: "#/components/schemas/ToolDefinition"
+
+    # ── Notificaciones internas (Atlas → Navigator) ───────────────────────────
+    NodeService:
       type: object
-      required: [type, missionId, tools, timestamp]
+      required: [kind, capabilities]
       properties:
-        type:
+        kind:
           type: string
-          enum: [tool.list.response]
-        missionId:
-          type: string
-        tools:
+          description: "Tipo de provider: star | satellite | nova | multi"
+        capabilities:
           type: array
           items:
-            $ref: "#/components/schemas/ToolDefinition"
-        timestamp:
-          type: integer
-          format: int64
+            type: string
+          description: IDs de las capabilities ofrecidas
+
+    NodeOnlineMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [providerId, providerName, services]
+          properties:
+            type:
+              type: string
+              enum: [node.online]
+            providerId:
+              type: string
+              description: DID del provider que entró en Orbit
+            providerName:
+              type: string
+            services:
+              type: array
+              items:
+                $ref: "#/components/schemas/NodeService"
+
+    NodeLostMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [providerId, providerName, services]
+          properties:
+            type:
+              type: string
+              enum: [node.lost]
+            providerId:
+              type: string
+              description: DID del provider que perdió su lease
+            providerName:
+              type: string
+            services:
+              type: array
+              items:
+                $ref: "#/components/schemas/NodeService"
 
   servers:
     navigator:
@@ -823,7 +790,7 @@ components:
     atlas:
       host: "{atlas}"
       protocol: ws
-      description: Atlas — Registry
+      description: Atlas — Registry / Bootstrap Peer
       variables:
         atlas:
           default: "localhost:8081"

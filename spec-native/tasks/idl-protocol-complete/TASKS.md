@@ -204,22 +204,27 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 ### TASK-IDL-008 — CallerAuth en tool.list y tool.call
 
 - ID: TASK-IDL-008
-- State: `todo`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-IDL-001
+- Validation: ✅ Resuelto por DEC-0087 (Envelope P2P). `CallerAuth` eliminado del IDL.
+  La autenticación en todos los mensajes (incluyendo `tool.list` y `tool.call`) viene
+  de `Envelope.source_peer_id` (callerId) + `Envelope.signature`. No hay campo `auth`
+  separado; el Envelope lo cubre para todos los mensajes por diseño.
+
+### TASK-IDL-012 — Actualizar idl/flows.md para reflejar Handshake 2-step (DEC-0087)
+
+- ID: TASK-IDL-012
+- State: `todo`
+- Owner: rafex
+- Dependencies: TASK-IDL-003
 - Expected files:
-  - `idl/asyncapi.yaml` (modificado — campo `auth` en schemas `ToolListRequestMessage` y
-    `ToolCallRequestMessage`)
-  - `idl/fhs-protocol.proto` (modificado — campo `CallerAuth auth` en `ToolListRequestMessage`
-    y `ToolCallRequestMessage`)
-- Close criteria: Los mensajes `tool.list` y `tool.call` tienen el campo `auth: CallerAuth`
-  en ambos IDL (igual que `chat.request`). El campo es obligatorio en `tool.call` y
-  opcional en `tool.list` (para backward compat con implementaciones sin firma de lista).
-  El campo `CallerAuth` en proto ya existe (fields: `caller_id=1`, `signature=2`,
-  `timestamp=3`) — solo se añade como campo nuevo al final de cada mensaje.
-- Validation: Confirmar contra `docs/protocolo.md` que la especificación en prosa dice que
-  `tool.list` y `tool.call` deben incluir `callerId`/`signature`. Verificar que `tool.cancel`
-  no necesita `auth` (el cancel usa el `missionId` como autorización implícita).
+  - `idl/flows.md` (modificado — diagrama 1 actualizado, posiblemente diagrama nuevo de Envelope)
+- Close criteria: El diagrama de registro en `idl/flows.md` muestra el flujo 2-step:
+  `handshake` → `handshake_ack` → `ping/pong`. Los mensajes del diagrama incluyen el
+  Envelope frame (messageId, sourcePeerId) como notación. El diagrama antiguo de 4 pasos
+  (hello/welcome/register/registered) es reemplazado o eliminado.
+- Validation: Coherente con DEC-0087, `idl/fhs-protocol.proto` y `idl/asyncapi.yaml`.
 
 ---
 
