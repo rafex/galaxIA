@@ -1,0 +1,3243 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "AgentSSEEvent": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/SessionEvent"
+        },
+        {
+          "$ref": "#/definitions/AgentStatusEvent"
+        },
+        {
+          "$ref": "#/definitions/LlmSelectedEvent"
+        },
+        {
+          "$ref": "#/definitions/LlmStreamingEvent"
+        },
+        {
+          "$ref": "#/definitions/ToolSelectedEvent"
+        },
+        {
+          "$ref": "#/definitions/ToolRunningEvent"
+        },
+        {
+          "$ref": "#/definitions/ToolCompletedEvent"
+        },
+        {
+          "$ref": "#/definitions/ToolErrorEvent"
+        },
+        {
+          "$ref": "#/definitions/AssistantDeltaEvent"
+        },
+        {
+          "$ref": "#/definitions/AssistantCompletedEvent"
+        },
+        {
+          "$ref": "#/definitions/OcrExtractedEvent"
+        },
+        {
+          "$ref": "#/definitions/NodeLostEvent"
+        },
+        {
+          "$ref": "#/definitions/NodeOnlineEvent"
+        },
+        {
+          "$ref": "#/definitions/KbRecommendedEvent"
+        },
+        {
+          "$ref": "#/definitions/ProviderFailoverEvent"
+        },
+        {
+          "$ref": "#/definitions/ErrorEvent"
+        }
+      ]
+    },
+    "AgentStatusEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "status",
+            "message"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "agent.status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "ArtifactRef": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "base64": {
+              "type": "string"
+            },
+            "filename": {
+              "type": "string"
+            },
+            "transport": {
+              "const": "inline",
+              "type": "string"
+            }
+          },
+          "required": [
+            "transport",
+            "base64"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "cid": {
+              "type": "string"
+            },
+            "filename": {
+              "type": "string"
+            },
+            "gatewayUrl": {
+              "type": "string"
+            },
+            "network": {
+              "enum": [
+                "public",
+                "private"
+              ],
+              "type": "string"
+            },
+            "retention": {
+              "description": "DEC-0052 — \"ephemeral\" (default si se omite): quien recibió el archivo debe borrarlo tras usarlo. \"reuse\": no debe borrarlo, el borrado queda como responsabilidad del usuario. Ver SPEC-IPFS-0001.",
+              "enum": [
+                "ephemeral",
+                "reuse"
+              ],
+              "type": "string"
+            },
+            "transport": {
+              "const": "ipfs",
+              "type": "string"
+            }
+          },
+          "required": [
+            "transport",
+            "cid",
+            "network"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "Referencia a un binario (DEC-0046) — modela solo el endpoint de\n**lectura** (inline o gateway IPFS). El endpoint de escritura (con credenciales) es responsabilidad local de quien sube (Navigator, DEC-0051) y nunca forma parte del protocolo. Usado por `KbCitation.sourceArtifact` y por `file` en `ToolCallRequestMessage.arguments` (reemplaza `file_base64`, DEC-0047)."
+    },
+    "AssistantCompletedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "provenance": {
+              "$ref": "#/definitions/ProvenanceInfo"
+            }
+          },
+          "required": [
+            "conversationId",
+            "provenance"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "assistant.completed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "AssistantDeltaEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "text"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "assistant.delta",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "AssistantMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "role": {
+          "const": "assistant",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "content"
+      ],
+      "type": "object"
+    },
+    "AuthenticationInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "methods": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "methods"
+      ],
+      "type": "object"
+    },
+    "BaseBeacon": {
+      "additionalProperties": false,
+      "properties": {
+        "authentication": {
+          "$ref": "#/definitions/AuthenticationInfo"
+        },
+        "endpoint": {
+          "$ref": "#/definitions/EndpointInfo"
+        },
+        "fhsVersion": {
+          "type": "string"
+        },
+        "nodeInfo": {
+          "$ref": "#/definitions/NodeInfo",
+          "description": "DEC-0031: metadatos de hardware/operador, opcionales y autodeclarados."
+        },
+        "privacy": {
+          "$ref": "#/definitions/PrivacyPolicy"
+        },
+        "provider": {
+          "$ref": "#/definitions/NodeProfile"
+        },
+        "signature": {
+          "$ref": "#/definitions/SignatureInfo"
+        }
+      },
+      "required": [
+        "fhsVersion",
+        "provider"
+      ],
+      "type": "object"
+    },
+    "BaseMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    "Beacon": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/StarBeacon"
+        },
+        {
+          "$ref": "#/definitions/SatelliteBeacon"
+        },
+        {
+          "$ref": "#/definitions/MultiBeacon"
+        },
+        {
+          "$ref": "#/definitions/NovaBeacon"
+        }
+      ]
+    },
+    "CallerAuth": {
+      "additionalProperties": false,
+      "description": "Campos de autenticación del invocador (revisión 2026-07-10) — presentes en `chat.request`, `tool.call` y `tool.list`. Sin ellos, cualquier peer de la LAN podía consumir el cómputo de un provider. Opcionales por compatibilidad; un provider puede exigirlos y responder `UNAUTHORIZED`.",
+      "properties": {
+        "callerId": {
+          "description": "did:key del invocador (Navigator u otro agente).",
+          "type": "string"
+        },
+        "signature": {
+          "description": "Ed25519 base64 sobre `invokeSignaturePayload(callerId, missionId, timestamp)`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ChatCancelMessage": {
+      "additionalProperties": false,
+      "description": "Cancelación best-effort (revisión 2026-07-10): quien originó un `chat.request` avisa que dejó de esperar (timeout, failover, usuario que cerró) para que el nodo no siga quemando CPU — el recurso más escaso en hardware comunitario. El provider debe abortar si puede y responder `chat.error` con código `CANCELLED`; ignorarlo no rompe el protocolo.",
+      "properties": {
+        "missionId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "chat.cancel",
+          "type": "string"
+        }
+      },
+      "required": [
+        "missionId",
+        "type"
+      ],
+      "type": "object"
+    },
+    "ChatCompletedMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "missionId": {
+          "type": "string"
+        },
+        "response": {
+          "$ref": "#/definitions/GenerateResponse"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "chat.completed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "missionId",
+        "response",
+        "type"
+      ],
+      "type": "object"
+    },
+    "ChatDeltaMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "delta": {
+          "type": "string"
+        },
+        "missionId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "chat.delta",
+          "type": "string"
+        }
+      },
+      "required": [
+        "delta",
+        "missionId",
+        "type"
+      ],
+      "type": "object"
+    },
+    "ChatErrorMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "missionId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "chat.error",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "missionId",
+        "type"
+      ],
+      "type": "object"
+    },
+    "ChatMessage": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/UserMessage"
+        },
+        {
+          "$ref": "#/definitions/AssistantMessage"
+        }
+      ]
+    },
+    "ChatRequestMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "callerId": {
+          "description": "did:key del invocador (Navigator u otro agente).",
+          "type": "string"
+        },
+        "missionId": {
+          "type": "string"
+        },
+        "request": {
+          "$ref": "#/definitions/GenerateRequest"
+        },
+        "signature": {
+          "description": "Ed25519 base64 sobre `invokeSignaturePayload(callerId, missionId, timestamp)`.",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "chat.request",
+          "type": "string"
+        }
+      },
+      "required": [
+        "missionId",
+        "request",
+        "type"
+      ],
+      "type": "object"
+    },
+    "DispatchAckMessage": {
+      "additionalProperties": false,
+      "description": "Ack del mosquito/dispatcher del nodo: confirma que encoló la petición y va a procesarla, antes de empezar el trabajo real (SPEC-SATRATING-0001). Obligatorio para todo chat.request/tool.call que el nodo acepte; si lo rechaza de inmediato, va directo a chat.error/tool.error sin este ack. Compatible hacia atrás: un nodo que no lo envía sigue funcionando igual, solo sin latencia de despacho en las métricas del Registry.",
+      "properties": {
+        "missionId": {
+          "type": "string"
+        },
+        "queuedAt": {
+          "type": "number"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "dispatch.ack",
+          "type": "string"
+        }
+      },
+      "required": [
+        "missionId",
+        "queuedAt",
+        "type"
+      ],
+      "type": "object"
+    },
+    "EndpointInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "description": "Protocolo de transporte de la capa de aplicación.",
+          "enum": [
+            "openai-compatible",
+            "mcp",
+            "custom",
+            "fhs"
+          ],
+          "type": "string"
+        },
+        "transport": {
+          "description": "Transporte MCP cuando aplica.",
+          "enum": [
+            "streamable-http",
+            "stdio",
+            "sse"
+          ],
+          "type": "string"
+        },
+        "url": {
+          "description": "URL base del servicio.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "url"
+      ],
+      "type": "object"
+    },
+    "ErrorEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "error",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "FhsErrorCode": {
+      "enum": [
+        "NOT_IDENTIFIED",
+        "INVALID_SIGNATURE",
+        "INVALID_MANIFEST",
+        "ALREADY_REGISTERED",
+        "UPSTREAM_UNAVAILABLE",
+        "UPSTREAM_TIMEOUT",
+        "INVALID_ARGUMENTS",
+        "UNSUPPORTED_CAPABILITY",
+        "INTERNAL_ERROR",
+        "PARSE_ERROR",
+        "UNAUTHORIZED",
+        "UNSUPPORTED_VERSION",
+        "CANCELLED",
+        "OVERLOADED"
+      ],
+      "type": "string"
+    },
+    "FhsMessage": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RegistryInboundMessage"
+        },
+        {
+          "$ref": "#/definitions/RegistryOutboundMessage"
+        }
+      ]
+    },
+    "GenerateRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "maxReasoningSteps": {
+          "description": "Sugerencia de cuántas rondas de razonamiento usar (DEC-0055) — solo aplica a un Nova (`NodeType: \"agent\"`); un Star (`\"llm\"`) la ignora, no tiene loop. Es un techo sugerido, no una orden: el Nova puede resolver en menos pasos si ya tiene suficiente para responder.",
+          "type": "number"
+        },
+        "max_tokens": {
+          "type": "number"
+        },
+        "messages": {
+          "items": {
+            "$ref": "#/definitions/LlmMessage"
+          },
+          "type": "array"
+        },
+        "model": {
+          "type": "string"
+        },
+        "stream": {
+          "type": "boolean"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "tools": {
+          "items": {
+            "$ref": "#/definitions/ToolDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "messages"
+      ],
+      "type": "object"
+    },
+    "GenerateResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "$ref": "#/definitions/LlmMessage"
+        },
+        "model": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "reasoningSteps": {
+          "description": "Cuántas rondas usó realmente un Nova (DEC-0055) — traceability/Flight Log, ausente si respondió un Star.",
+          "type": "number"
+        },
+        "toolCalls": {
+          "items": {
+            "$ref": "#/definitions/ToolCall"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "message",
+        "toolCalls",
+        "model",
+        "provider"
+      ],
+      "type": "object"
+    },
+    "HelloMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "fhsVersion": {
+          "description": "Versión del protocolo que habla el nodo (negociación, revisión 2026-07-10). Si el Registry no la soporta responde `error` con `UNSUPPORTED_VERSION` en vez de fallar de formas opacas después. Opcional por compatibilidad: ausente = se asume la versión del Registry.",
+          "type": "string"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "signature": {
+          "description": "Ed25519 base64 sobre `helloSignaturePayload(providerId, timestamp)`.",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix.",
+          "type": "number"
+        },
+        "type": {
+          "const": "hello",
+          "type": "string"
+        }
+      },
+      "required": [
+        "providerId",
+        "timestamp",
+        "type"
+      ],
+      "type": "object"
+    },
+    "KbCitation": {
+      "additionalProperties": false,
+      "description": "Metadata de citación y fuente primaria de un resultado de `kb.query` (SPEC-KB-0003, DEC-0049). Campos de primera clase aplican a cualquier KB sin importar el dominio; `metadata` es un bag libre para lo específico de cada dominio (jurisdicción, artículo, etc.) — el protocolo no impone vocabulario de dominio.",
+      "properties": {
+        "documentTitle": {
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "pageEnd": {
+          "type": "number"
+        },
+        "pageStart": {
+          "type": "number"
+        },
+        "sourceArtifact": {
+          "$ref": "#/definitions/ArtifactRef"
+        },
+        "sourceUrl": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "versionDate": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentTitle"
+      ],
+      "type": "object"
+    },
+    "KbQueryChunk": {
+      "additionalProperties": false,
+      "description": "Un fragmento devuelto por `kb.query` — `citation` es opcional (DEC-0049).",
+      "properties": {
+        "citation": {
+          "$ref": "#/definitions/KbCitation"
+        },
+        "score": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "score"
+      ],
+      "type": "object"
+    },
+    "KbRecommendedEvent": {
+      "additionalProperties": false,
+      "description": "SPEC-KB-0002 (DEC-0054) — puede traer más de un candidato (fan-out multi-KB, `kbMaxPerQuestion`) o exactamente uno resuelto por el LLM en el caso límite (sin match determinístico confiable) — nunca oculto, siempre mostrado al usuario antes de consultar (requisito no negociable del spec).",
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "candidates": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "providerId": {
+                    "type": "string"
+                  },
+                  "providerName": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "providerId",
+                  "providerName",
+                  "description"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "chosenByLlm": {
+              "description": "true si ningún candidato superó el umbral determinístico y el LLM eligió entre las KBs disponibles (paso 5, SPEC-KB-0002).",
+              "type": "boolean"
+            },
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "candidates"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "kb.recommended",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "LlmMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "system",
+            "user",
+            "assistant",
+            "tool"
+          ],
+          "type": "string"
+        },
+        "tool_call_id": {
+          "type": "string"
+        },
+        "tool_calls": {
+          "items": {
+            "$ref": "#/definitions/ToolCall"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "type": "object"
+    },
+    "LlmProviderInboundMessage": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ChatRequestMessage"
+        },
+        {
+          "$ref": "#/definitions/ChatCancelMessage"
+        }
+      ]
+    },
+    "LlmProviderMessage": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/LlmProviderInboundMessage"
+        },
+        {
+          "$ref": "#/definitions/LlmProviderOutboundMessage"
+        }
+      ]
+    },
+    "LlmProviderOutboundMessage": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ChatDeltaMessage"
+        },
+        {
+          "$ref": "#/definitions/ChatCompletedMessage"
+        },
+        {
+          "$ref": "#/definitions/ChatErrorMessage"
+        },
+        {
+          "$ref": "#/definitions/DispatchAckMessage"
+        }
+      ]
+    },
+    "LlmSelectedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "modelId": {
+              "type": "string"
+            },
+            "providerId": {
+              "type": "string"
+            },
+            "providerName": {
+              "type": "string"
+            },
+            "reason": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "conversationId",
+            "providerId",
+            "providerName",
+            "modelId",
+            "reason"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "llm.selected",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "LlmStreamingEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "delta": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "delta"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "llm.streaming",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "ModelInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "availability": {
+          "additionalProperties": false,
+          "properties": {
+            "maxConcurrentRequests": {
+              "description": "Capacidad declarada del nodo para este modelo (DEC-0072): cuántas peticiones simultáneas acepta antes de rechazar con `OVERLOADED`. El Agent Server la usa como filtro best-effort al resolver (evita mandar la N+1 a un nodo que ya tiene N en vuelo desde este mismo Agent Server); el provider es quien la hace cumplir de verdad.",
+              "type": "number"
+            },
+            "status": {
+              "$ref": "#/definitions/ServiceStatus"
+            }
+          },
+          "type": "object"
+        },
+        "capabilities": {
+          "description": "Capacidades del modelo, e.g. chat, tool.calling.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "contextWindow": {
+          "type": "number"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "languages": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "privacy": {
+          "additionalProperties": false,
+          "properties": {
+            "retention": {
+              "type": "string"
+            },
+            "trainingUse": {
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "toolCalling": {
+          "additionalProperties": false,
+          "properties": {
+            "formats": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "maxToolsPerRequest": {
+              "type": "number"
+            },
+            "mode": {
+              "enum": [
+                "native",
+                "prompt-template",
+                "unsupported"
+              ],
+              "type": "string"
+            },
+            "parallelCalls": {
+              "type": "boolean"
+            },
+            "parserProfile": {
+              "$ref": "#/definitions/ModelParserProfile",
+              "description": "Perfil de parseo tolerante declarado para este modelo (DEC-0050)."
+            },
+            "supported": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "supported"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "displayName",
+        "capabilities"
+      ],
+      "type": "object"
+    },
+    "ModelParserProfile": {
+      "additionalProperties": false,
+      "description": "Referencia declarativa (DEC-0050) a un perfil de parseo tolerante conocido por la comunidad para un modelo — nunca la regla en sí, solo el identificador y dónde vive el catálogo real. El catálogo (las reglas de parseo, cómo se versionan, cómo se evalúan) es un recurso externo al protocolo (ver `galaxia-parser-catalog`) — mismo principio que DEC-0026/DEC-0037/DEC-0046 ya establecieron para KB/ArtifactRef: el protocolo transporta la referencia, nunca el motor detrás de ella.",
+      "properties": {
+        "profileId": {
+          "description": "Id del perfil en el catálogo, e.g. \"jinja-plain-json-toolcall-fallback-v1\".",
+          "type": "string"
+        },
+        "registryRef": {
+          "description": "Dónde vive el catálogo real (repo, paquete, URL) — informativo, no resuelto por el protocolo.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profileId"
+      ],
+      "type": "object"
+    },
+    "MultiBeacon": {
+      "additionalProperties": false,
+      "properties": {
+        "authentication": {
+          "$ref": "#/definitions/AuthenticationInfo"
+        },
+        "endpoint": {
+          "$ref": "#/definitions/EndpointInfo"
+        },
+        "fhsVersion": {
+          "type": "string"
+        },
+        "nodeInfo": {
+          "$ref": "#/definitions/NodeInfo",
+          "description": "DEC-0031: metadatos de hardware/operador, opcionales y autodeclarados."
+        },
+        "privacy": {
+          "$ref": "#/definitions/PrivacyPolicy"
+        },
+        "provider": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "description": "Identificador verificable del proveedor. En v0.1 es did:key:<nombre-simple>.",
+              "type": "string"
+            },
+            "name": {
+              "description": "Nombre legible para humanos.",
+              "type": "string"
+            },
+            "region": {
+              "description": "Región opcional.",
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/definitions/NodeType",
+              "description": "Tipo de proveedor."
+            },
+            "visibility": {
+              "$ref": "#/definitions/NodeVisibility",
+              "description": "Visibilidad/ámbito del proveedor."
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "type",
+            "visibility"
+          ],
+          "type": "object"
+        },
+        "services": {
+          "items": {
+            "$ref": "#/definitions/MultiServiceEntry"
+          },
+          "type": "array"
+        },
+        "signature": {
+          "$ref": "#/definitions/SignatureInfo"
+        }
+      },
+      "required": [
+        "fhsVersion",
+        "provider",
+        "services"
+      ],
+      "type": "object"
+    },
+    "MultiServiceEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "$ref": "#/definitions/Signal"
+          },
+          "type": "array"
+        },
+        "endpoint": {
+          "$ref": "#/definitions/EndpointInfo"
+        },
+        "kind": {
+          "enum": [
+            "llm",
+            "mcp"
+          ],
+          "type": "string"
+        },
+        "models": {
+          "items": {
+            "$ref": "#/definitions/ModelInfo"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "endpoint"
+      ],
+      "type": "object"
+    },
+    "NodeIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "did": {
+          "type": "string"
+        },
+        "privateKey": {},
+        "privateKeyPem": {
+          "description": "PEM de la clave privada, para persistir en disco entre reinicios.",
+          "type": "string"
+        },
+        "publicKey": {}
+      },
+      "required": [
+        "did",
+        "publicKey",
+        "privateKey",
+        "privateKeyPem"
+      ],
+      "type": "object"
+    },
+    "NodeInfo": {
+      "additionalProperties": false,
+      "description": "DEC-0031: información declarativa del nodo que el operador publica en su manifiesto para que el Portal pueda mostrarla a los usuarios. Todos los campos son opcionales y autodeclarados — no verificados criptográficamente en esta versión del protocolo.",
+      "properties": {
+        "cpu": {
+          "description": "Procesador declarado, ej. \"Intel Core i9-13900K\"",
+          "type": "string"
+        },
+        "description": {
+          "description": "Descripción libre del operador",
+          "type": "string"
+        },
+        "gpu": {
+          "description": "GPU declarada, ej. \"NVIDIA RTX 4090 24 GB\"",
+          "type": "string"
+        },
+        "location": {
+          "description": "Ubicación geográfica declarada, ej. \"Madrid, España\"",
+          "type": "string"
+        },
+        "ram": {
+          "description": "Memoria RAM declarada, ej. \"64 GB DDR5\"",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "NodeLostEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "providerId": {
+              "type": "string"
+            },
+            "providerName": {
+              "type": "string"
+            },
+            "services": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "capabilities": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "kind": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "capabilities"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "providerId",
+            "providerName",
+            "services"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "node.lost",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "NodeLostMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "providerId": {
+          "type": "string"
+        },
+        "providerName": {
+          "type": "string"
+        },
+        "services": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "capabilities": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "capabilities"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "node.lost",
+          "type": "string"
+        }
+      },
+      "required": [
+        "providerId",
+        "providerName",
+        "services",
+        "type"
+      ],
+      "type": "object"
+    },
+    "NodeOnlineEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "providerId": {
+              "type": "string"
+            },
+            "providerName": {
+              "type": "string"
+            },
+            "services": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "capabilities": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "kind": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "capabilities"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "providerId",
+            "providerName",
+            "services"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "node.online",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "NodeOnlineMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "providerId": {
+          "type": "string"
+        },
+        "providerName": {
+          "type": "string"
+        },
+        "services": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "capabilities": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "capabilities"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "node.online",
+          "type": "string"
+        }
+      },
+      "required": [
+        "providerId",
+        "providerName",
+        "services",
+        "type"
+      ],
+      "type": "object"
+    },
+    "NodeProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Identificador verificable del proveedor. En v0.1 es did:key:<nombre-simple>.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Nombre legible para humanos.",
+          "type": "string"
+        },
+        "region": {
+          "description": "Región opcional.",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/definitions/NodeType",
+          "description": "Tipo de proveedor."
+        },
+        "visibility": {
+          "$ref": "#/definitions/NodeVisibility",
+          "description": "Visibilidad/ámbito del proveedor."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "type",
+        "visibility"
+      ],
+      "type": "object"
+    },
+    "NodeStatus": {
+      "enum": [
+        "online",
+        "lost",
+        "offline"
+      ],
+      "type": "string"
+    },
+    "NodeType": {
+      "description": "\"agent\" (Nova, DEC-0055) — nodo de razonamiento con loop propio (varias rondas internas antes de responder), a diferencia de \"llm\" (Star), que es una sola llamada de completions sin estado ni loop. El protocolo solo declara que el tipo existe y transporta la sugerencia de cuántos pasos usar (`GenerateRequest.maxReasoningSteps`) — cómo un Nova implementa su loop internamente es responsabilidad exclusiva del provider (DEC-0026).",
+      "enum": [
+        "llm",
+        "mcp",
+        "multi",
+        "agent"
+      ],
+      "type": "string"
+    },
+    "NodeUpdatedMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "providerId": {
+          "type": "string"
+        },
+        "providerName": {
+          "type": "string"
+        },
+        "services": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "capabilities": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "capabilities"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "node.updated",
+          "type": "string"
+        }
+      },
+      "required": [
+        "providerId",
+        "providerName",
+        "services",
+        "type"
+      ],
+      "type": "object"
+    },
+    "NodeVisibility": {
+      "enum": [
+        "local",
+        "network",
+        "community",
+        "external"
+      ],
+      "type": "string"
+    },
+    "NovaBeacon": {
+      "additionalProperties": false,
+      "description": "Nova (DEC-0055) — nodo de razonamiento con loop propio, a diferencia de un Star (una sola llamada). Mismo `models: ModelInfo[]` que un Star (un Nova también tiene un modelo subyacente); `reasoning.maxSteps` declara el techo de rondas que este Nova soporta — el motor real del loop es responsabilidad exclusiva del provider (DEC-0026), el protocolo solo transporta el dato.",
+      "properties": {
+        "authentication": {
+          "$ref": "#/definitions/AuthenticationInfo"
+        },
+        "endpoint": {
+          "$ref": "#/definitions/EndpointInfo"
+        },
+        "fhsVersion": {
+          "type": "string"
+        },
+        "models": {
+          "items": {
+            "$ref": "#/definitions/ModelInfo"
+          },
+          "type": "array"
+        },
+        "nodeInfo": {
+          "$ref": "#/definitions/NodeInfo",
+          "description": "DEC-0031: metadatos de hardware/operador, opcionales y autodeclarados."
+        },
+        "privacy": {
+          "$ref": "#/definitions/PrivacyPolicy"
+        },
+        "provider": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "description": "Identificador verificable del proveedor. En v0.1 es did:key:<nombre-simple>.",
+              "type": "string"
+            },
+            "name": {
+              "description": "Nombre legible para humanos.",
+              "type": "string"
+            },
+            "region": {
+              "description": "Región opcional.",
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/definitions/NodeType",
+              "description": "Tipo de proveedor."
+            },
+            "visibility": {
+              "$ref": "#/definitions/NodeVisibility",
+              "description": "Visibilidad/ámbito del proveedor."
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "type",
+            "visibility"
+          ],
+          "type": "object"
+        },
+        "reasoning": {
+          "additionalProperties": false,
+          "properties": {
+            "maxSteps": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "maxSteps"
+          ],
+          "type": "object"
+        },
+        "signature": {
+          "$ref": "#/definitions/SignatureInfo"
+        }
+      },
+      "required": [
+        "endpoint",
+        "fhsVersion",
+        "models",
+        "provider",
+        "reasoning"
+      ],
+      "type": "object"
+    },
+    "OcrExtractedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "filename": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "filename",
+            "text"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "ocr.extracted",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "PingMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "ping",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    "PongMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "pong",
+          "type": "string"
+        }
+      },
+      "required": [
+        "timestamp",
+        "type"
+      ],
+      "type": "object"
+    },
+    "PrivacyPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "jurisdiction": {
+          "type": "string"
+        },
+        "retention": {
+          "$ref": "#/definitions/RetentionPolicy"
+        },
+        "trainingUse": {
+          "type": "boolean"
+        },
+        "warning": {
+          "description": "Obligatorio quando `retention` no es `\"none\"` (DEC-0025) — texto que el Portal debe mostrar al usuario antes de aceptar el primer adjunto, explicando en lenguaje llano qué pasa con su contenido.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PrivacyScope": {
+      "enum": [
+        "local",
+        "network",
+        "community",
+        "external"
+      ],
+      "type": "string"
+    },
+    "ProvenanceInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "dataExported": {
+          "type": "string"
+        },
+        "jurisdiction": {
+          "type": "string"
+        },
+        "llm": {
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "type": "string"
+            },
+            "providerId": {
+              "type": "string"
+            },
+            "providerName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "providerId",
+            "providerName",
+            "model"
+          ],
+          "type": "object"
+        },
+        "tools": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "capability": {
+                "type": "string"
+              },
+              "citations": {
+                "description": "Citas de los fragmentos usados de esta tool, si las expone (DEC-0049).",
+                "items": {
+                  "$ref": "#/definitions/KbCitation"
+                },
+                "type": "array"
+              },
+              "providerId": {
+                "type": "string"
+              },
+              "providerName": {
+                "type": "string"
+              },
+              "retention": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "capability",
+              "providerId",
+              "providerName"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "llm",
+        "tools",
+        "dataExported",
+        "jurisdiction"
+      ],
+      "type": "object"
+    },
+    "ProviderFailoverEvent": {
+      "additionalProperties": false,
+      "description": "TASK-FHS-0010 — failover automático a la siguiente tool candidata tras un `tool.error`.",
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "capability": {
+              "type": "string"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "failedProviderId": {
+              "type": "string"
+            },
+            "failedProviderName": {
+              "type": "string"
+            },
+            "nextProviderId": {
+              "type": "string"
+            },
+            "nextProviderName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "capability",
+            "failedProviderId",
+            "failedProviderName",
+            "nextProviderId",
+            "nextProviderName"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "provider.failover",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "PublishedService": {
+      "additionalProperties": false,
+      "description": "Representación interna de un servicio publicado por un nodo.",
+      "properties": {
+        "authentication": {
+          "$ref": "#/definitions/AuthenticationInfo"
+        },
+        "capabilities": {
+          "items": {
+            "$ref": "#/definitions/Signal"
+          },
+          "type": "array"
+        },
+        "endpoint": {
+          "$ref": "#/definitions/EndpointInfo"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/NodeType"
+        },
+        "models": {
+          "items": {
+            "$ref": "#/definitions/ModelInfo"
+          },
+          "type": "array"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "privacy": {
+          "$ref": "#/definitions/PrivacyPolicy"
+        },
+        "status": {
+          "$ref": "#/definitions/ServiceStatus"
+        },
+        "updatedAt": {
+          "type": "number"
+        },
+        "visibility": {
+          "$ref": "#/definitions/NodeVisibility",
+          "description": "Ámbito declarado por el nodo (`NodeProfile.visibility`), propagado al servicio publicado para que el Agent Server pueda aplicar el scope de privacidad del usuario (regla 6 del protocolo) sin volver a pedir el manifiesto. Ausente en registros previos a la revisión 2026-07-10."
+        }
+      },
+      "required": [
+        "id",
+        "nodeId",
+        "kind",
+        "endpoint",
+        "capabilities",
+        "status",
+        "updatedAt"
+      ],
+      "type": "object"
+    },
+    "RegisterMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "manifest": {
+          "$ref": "#/definitions/Beacon"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "signature": {
+          "description": "Ed25519 base64 sobre `registerSignaturePayload(providerId, timestamp, manifest)` — la firma ancla el contenido del manifiesto (hash SHA-256 canónico), no solo identidad+frescura. Obligatorio: sin él (o sin cubrir el manifiesto) el Registry responde `INVALID_SIGNATURE` (DEC-0076 retiró el fallback al payload legado sin hash).",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix.",
+          "type": "number"
+        },
+        "type": {
+          "const": "register",
+          "type": "string"
+        }
+      },
+      "required": [
+        "manifest",
+        "providerId",
+        "timestamp",
+        "type"
+      ],
+      "type": "object"
+    },
+    "RegisteredMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptedServices": {
+          "type": "number"
+        },
+        "leaseExpires": {
+          "description": "Milisegundos desde epoch Unix (como todo timestamp del protocolo).",
+          "type": "number"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "registered",
+          "type": "string"
+        }
+      },
+      "required": [
+        "acceptedServices",
+        "leaseExpires",
+        "type"
+      ],
+      "type": "object"
+    },
+    "RegisteredNode": {
+      "additionalProperties": false,
+      "description": "Representación interna de un nodo registrado.",
+      "properties": {
+        "lastSeen": {
+          "type": "number"
+        },
+        "leaseExpires": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "registeredAt": {
+          "type": "number"
+        },
+        "services": {
+          "items": {
+            "$ref": "#/definitions/PublishedService"
+          },
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/definitions/NodeStatus"
+        }
+      },
+      "required": [
+        "providerId",
+        "name",
+        "status",
+        "lastSeen",
+        "leaseExpires",
+        "registeredAt",
+        "services"
+      ],
+      "type": "object"
+    },
+    "RegistryErrorMessage": {
+      "additionalProperties": false,
+      "description": "Rechazo del Registry antes de completar el registro — ej. `hello` con un `providerId` que ya tiene una conexión activa (DEC-0009). El provider debe tratar esto igual que un cierre de conexión: no reintentar con el mismo `providerId` sin resolver el conflicto primero.",
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "NOT_IDENTIFIED",
+                "ALREADY_REGISTERED",
+                "INVALID_MANIFEST",
+                "INVALID_SIGNATURE",
+                "PARSE_ERROR",
+                "UNSUPPORTED_VERSION",
+                "UNAUTHORIZED"
+              ],
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "error",
+          "type": "string"
+        }
+      },
+      "required": [
+        "data",
+        "type"
+      ],
+      "type": "object"
+    },
+    "RegistryInboundMessage": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/HelloMessage"
+        },
+        {
+          "$ref": "#/definitions/RegisterMessage"
+        },
+        {
+          "$ref": "#/definitions/PingMessage"
+        }
+      ]
+    },
+    "RegistryOutboundMessage": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/WelcomeMessage"
+        },
+        {
+          "$ref": "#/definitions/RegisteredMessage"
+        },
+        {
+          "$ref": "#/definitions/PongMessage"
+        },
+        {
+          "$ref": "#/definitions/NodeOnlineMessage"
+        },
+        {
+          "$ref": "#/definitions/NodeLostMessage"
+        },
+        {
+          "$ref": "#/definitions/RegistryErrorMessage"
+        },
+        {
+          "$ref": "#/definitions/NodeUpdatedMessage"
+        }
+      ]
+    },
+    "RetentionPolicy": {
+      "anyOf": [
+        {
+          "const": "none",
+          "type": "string"
+        },
+        {
+          "const": "session",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ttl": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "ttl"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "permanent-readonly",
+          "type": "string"
+        }
+      ],
+      "description": "Formato generalizado de retención (DEC-0025): `\"none\"` (no se guarda nada más allá de la petición en curso), `\"session\"` (vive mientras dure la conversación, sin más precisión), un TTL explícito en duración ISO 8601, o `\"permanent-readonly\"` (contenido curado por el operador, sin expiración — usado por kb-provider, nunca por contenido de usuario)."
+    },
+    "SatelliteBeacon": {
+      "additionalProperties": false,
+      "properties": {
+        "authentication": {
+          "$ref": "#/definitions/AuthenticationInfo"
+        },
+        "capabilities": {
+          "items": {
+            "$ref": "#/definitions/Signal"
+          },
+          "type": "array"
+        },
+        "endpoint": {
+          "$ref": "#/definitions/EndpointInfo"
+        },
+        "fhsVersion": {
+          "type": "string"
+        },
+        "nodeInfo": {
+          "$ref": "#/definitions/NodeInfo",
+          "description": "DEC-0031: metadatos de hardware/operador, opcionales y autodeclarados."
+        },
+        "privacy": {
+          "$ref": "#/definitions/PrivacyPolicy"
+        },
+        "provider": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "description": "Identificador verificable del proveedor. En v0.1 es did:key:<nombre-simple>.",
+              "type": "string"
+            },
+            "name": {
+              "description": "Nombre legible para humanos.",
+              "type": "string"
+            },
+            "region": {
+              "description": "Región opcional.",
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/definitions/NodeType",
+              "description": "Tipo de proveedor."
+            },
+            "visibility": {
+              "$ref": "#/definitions/NodeVisibility",
+              "description": "Visibilidad/ámbito del proveedor."
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "type",
+            "visibility"
+          ],
+          "type": "object"
+        },
+        "signature": {
+          "$ref": "#/definitions/SignatureInfo"
+        }
+      },
+      "required": [
+        "capabilities",
+        "endpoint",
+        "fhsVersion",
+        "provider"
+      ],
+      "type": "object"
+    },
+    "ServiceStatus": {
+      "enum": [
+        "available",
+        "unavailable",
+        "degraded",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "SessionEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "session",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "Signal": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Descripción corta.",
+          "type": "string"
+        },
+        "id": {
+          "description": "Identificador único de la capacidad, e.g. document.ocr.",
+          "type": "string"
+        },
+        "inputMediaTypes": {
+          "description": "Tipos MIME de entrada soportados.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "languages": {
+          "description": "Idiomas soportados.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Nombre legible.",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Tags autodeclarados por el operador (DEC-0028) — mismo nivel de confianza que `description`, no verificados por el Registry/Atlas. Señal adicional para el matching determinístico del modo \"recomendado\" de kb-provider (SPEC-KB-0001). Los tags de comunidad (agregados por Atlas a partir de feedback real de usuarios) quedan bloqueados hasta que exista identidad de usuario (SPEC-AUTH-0001) — no se agregan aquí.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "SignatureInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "type": "object"
+    },
+    "StarBeacon": {
+      "additionalProperties": false,
+      "properties": {
+        "authentication": {
+          "$ref": "#/definitions/AuthenticationInfo"
+        },
+        "endpoint": {
+          "$ref": "#/definitions/EndpointInfo"
+        },
+        "fhsVersion": {
+          "type": "string"
+        },
+        "models": {
+          "items": {
+            "$ref": "#/definitions/ModelInfo"
+          },
+          "type": "array"
+        },
+        "nodeInfo": {
+          "$ref": "#/definitions/NodeInfo",
+          "description": "DEC-0031: metadatos de hardware/operador, opcionales y autodeclarados."
+        },
+        "privacy": {
+          "$ref": "#/definitions/PrivacyPolicy"
+        },
+        "provider": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "description": "Identificador verificable del proveedor. En v0.1 es did:key:<nombre-simple>.",
+              "type": "string"
+            },
+            "name": {
+              "description": "Nombre legible para humanos.",
+              "type": "string"
+            },
+            "region": {
+              "description": "Región opcional.",
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/definitions/NodeType",
+              "description": "Tipo de proveedor."
+            },
+            "visibility": {
+              "$ref": "#/definitions/NodeVisibility",
+              "description": "Visibilidad/ámbito del proveedor."
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "type",
+            "visibility"
+          ],
+          "type": "object"
+        },
+        "signature": {
+          "$ref": "#/definitions/SignatureInfo"
+        }
+      },
+      "required": [
+        "endpoint",
+        "fhsVersion",
+        "models",
+        "provider"
+      ],
+      "type": "object"
+    },
+    "StreamHandler": {
+      "$comment": "(delta: string) => void",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "delta": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "delta"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "ToolCall": {
+      "additionalProperties": false,
+      "properties": {
+        "function": {
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "arguments"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "const": "function",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "function"
+      ],
+      "type": "object"
+    },
+    "ToolCallErrorMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "missionId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "toolName": {
+          "type": "string"
+        },
+        "type": {
+          "const": "tool.error",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "missionId",
+        "toolName",
+        "type"
+      ],
+      "type": "object"
+    },
+    "ToolCallRequestMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "callerId": {
+          "description": "did:key del invocador (Navigator u otro agente).",
+          "type": "string"
+        },
+        "missionId": {
+          "type": "string"
+        },
+        "signature": {
+          "description": "Ed25519 base64 sobre `invokeSignaturePayload(callerId, missionId, timestamp)`.",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "toolName": {
+          "type": "string"
+        },
+        "type": {
+          "const": "tool.call",
+          "type": "string"
+        }
+      },
+      "required": [
+        "arguments",
+        "missionId",
+        "toolName",
+        "type"
+      ],
+      "type": "object"
+    },
+    "ToolCallResultMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "description": "`{ type: \"artifact\" }` (DEC-0046) — un provider puede devolver un resultado binario grande subiéndolo él mismo a IPFS y regresando un `ArtifactRef` en vez de un payload inline, misma forma simétrica con la que puede recibir un adjunto.",
+          "items": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "const": "text",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "text"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "artifact": {
+                    "$ref": "#/definitions/ArtifactRef"
+                  },
+                  "type": {
+                    "const": "artifact",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "artifact"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "missionId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "toolName": {
+          "type": "string"
+        },
+        "type": {
+          "const": "tool.result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "missionId",
+        "toolName",
+        "type"
+      ],
+      "type": "object"
+    },
+    "ToolCancelMessage": {
+      "additionalProperties": false,
+      "description": "Cancelación best-effort de un `tool.call` — misma semántica que `chat.cancel`.",
+      "properties": {
+        "missionId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "tool.cancel",
+          "type": "string"
+        }
+      },
+      "required": [
+        "missionId",
+        "type"
+      ],
+      "type": "object"
+    },
+    "ToolCompletedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "duration": {
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            },
+            "success": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "conversationId",
+            "name",
+            "duration",
+            "success"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "tool.completed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "ToolDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "function": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "parameters": {
+              "$ref": "#/definitions/ToolParameterSchema"
+            }
+          },
+          "required": [
+            "name",
+            "parameters"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "function",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "function"
+      ],
+      "type": "object"
+    },
+    "ToolErrorEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "name",
+            "error"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "tool.error",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "ToolListRequestMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "callerId": {
+          "description": "did:key del invocador (Navigator u otro agente).",
+          "type": "string"
+        },
+        "missionId": {
+          "type": "string"
+        },
+        "signature": {
+          "description": "Ed25519 base64 sobre `invokeSignaturePayload(callerId, missionId, timestamp)`.",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "tool.list",
+          "type": "string"
+        }
+      },
+      "required": [
+        "missionId",
+        "type"
+      ],
+      "type": "object"
+    },
+    "ToolListResponseMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "missionId": {
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "tools": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "inputSchema": {
+                "$ref": "#/definitions/ToolParameterSchema"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "type": {
+          "const": "tool.list.response",
+          "type": "string"
+        }
+      },
+      "required": [
+        "missionId",
+        "tools",
+        "type"
+      ],
+      "type": "object"
+    },
+    "ToolParameterSchema": {
+      "additionalProperties": false,
+      "description": "Tipos para interacción con proveedores LLM.",
+      "properties": {
+        "properties": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "required": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    "ToolProviderInboundMessage": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ToolCallRequestMessage"
+        },
+        {
+          "$ref": "#/definitions/ToolListRequestMessage"
+        },
+        {
+          "$ref": "#/definitions/ToolCancelMessage"
+        }
+      ]
+    },
+    "ToolProviderMessage": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ToolProviderInboundMessage"
+        },
+        {
+          "$ref": "#/definitions/ToolProviderOutboundMessage"
+        }
+      ]
+    },
+    "ToolProviderOutboundMessage": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ToolCallResultMessage"
+        },
+        {
+          "$ref": "#/definitions/ToolCallErrorMessage"
+        },
+        {
+          "$ref": "#/definitions/ToolListResponseMessage"
+        },
+        {
+          "$ref": "#/definitions/DispatchAckMessage"
+        }
+      ]
+    },
+    "ToolRunningEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "providerId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "name",
+            "providerId"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "tool.running",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "ToolSelectedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "capability": {
+              "type": "string"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "providerId": {
+              "type": "string"
+            },
+            "providerName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "capability",
+            "providerId",
+            "providerName"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "tool.selected",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "UserMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "role": {
+          "const": "user",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "content"
+      ],
+      "type": "object"
+    },
+    "WelcomeMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "fhsVersion": {
+          "description": "Versión del protocolo que habla el Registry.",
+          "type": "string"
+        },
+        "heartbeatSeconds": {
+          "description": "Intervalo de heartbeat que este Registry espera (segundos) — permite ajustarlo sin recompilar nodos.",
+          "type": "number"
+        },
+        "leaseSeconds": {
+          "type": "number"
+        },
+        "registryId": {
+          "description": "did:key del Registry — con firma, deja de ser un string decorativo.",
+          "type": "string"
+        },
+        "signature": {
+          "description": "Ed25519 base64 sobre `welcomeSignaturePayload(registryId, timestamp)` — el nodo puede verificar que no está entregando su manifiesto a un Registry impostor (revisión 2026-07-10).",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Milisegundos desde epoch Unix (`Date.now()`) — ver `TIMESTAMP_UNIT` en constants.ts.",
+          "type": "number"
+        },
+        "type": {
+          "const": "welcome",
+          "type": "string"
+        }
+      },
+      "required": [
+        "leaseSeconds",
+        "registryId",
+        "type"
+      ],
+      "type": "object"
+    },
+    "base58Decode": {
+      "$comment": "(str: string) => Uint8Array",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "str": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "str"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "base58Encode": {
+      "$comment": "(bytes: Uint8Array) => string",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "bytes": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "properties": {
+                "BYTES_PER_ELEMENT": {
+                  "type": "number"
+                },
+                "buffer": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "byteLength": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "byteLength"
+                  ],
+                  "type": "object"
+                },
+                "byteLength": {
+                  "type": "number"
+                },
+                "byteOffset": {
+                  "type": "number"
+                },
+                "length": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "BYTES_PER_ELEMENT",
+                "buffer",
+                "byteLength",
+                "byteOffset",
+                "length"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "bytes"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "canonicalJson": {
+      "$comment": "(value: unknown) => string",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "value": {}
+          },
+          "required": [
+            "value"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "didToPublicKeyRaw": {
+      "$comment": "(did: string) => Uint8Array",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "did": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "did"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "flattenManifest": {
+      "$comment": "(\n  manifest: Beacon) => Generator<{\n  provider: NodeProfile;\n  kind: \"llm\" | \"mcp\" | \"agent\";\n  endpoint: EndpointInfo;\n  models?: ModelInfo[];\n  capabilities?: Signal[];\n}>",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "manifest": {
+              "$ref": "#/definitions/Beacon"
+            }
+          },
+          "required": [
+            "manifest"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "generateIdentity": {
+      "$comment": "() => NodeIdentity"
+    },
+    "helloSignaturePayload": {
+      "$comment": "(providerId: string, timestamp: number) => string",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "providerId": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "providerId",
+            "timestamp"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "invokeSignaturePayload": {
+      "$comment": "(callerId: string, missionId: string, timestamp: number) => string",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "callerId": {
+              "type": "string"
+            },
+            "missionId": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "callerId",
+            "missionId",
+            "timestamp"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "loadIdentity": {
+      "$comment": "(privateKeyPem: string) => NodeIdentity",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "privateKeyPem": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "privateKeyPem"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "publicKeyToDid": {
+      "$comment": "(rawPublicKey: Uint8Array) => string",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "rawPublicKey": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "properties": {
+                "BYTES_PER_ELEMENT": {
+                  "type": "number"
+                },
+                "buffer": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "byteLength": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "byteLength"
+                  ],
+                  "type": "object"
+                },
+                "byteLength": {
+                  "type": "number"
+                },
+                "byteOffset": {
+                  "type": "number"
+                },
+                "length": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "BYTES_PER_ELEMENT",
+                "buffer",
+                "byteLength",
+                "byteOffset",
+                "length"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "rawPublicKey"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "registerSignaturePayload": {
+      "$comment": "(providerId: string, timestamp: number, manifest: unknown) => string",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "manifest": {},
+            "providerId": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "providerId",
+            "timestamp",
+            "manifest"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "sha256CanonicalHex": {
+      "$comment": "(value: unknown) => string",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "value": {}
+          },
+          "required": [
+            "value"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "signPayload": {
+      "$comment": "(privateKey: KeyObject, payload: string) => string",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "type": "string"
+            },
+            "privateKey": {}
+          },
+          "required": [
+            "privateKey",
+            "payload"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "verifySignature": {
+      "$comment": "(did: string, payload: string, signatureBase64: string) => boolean",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "did": {
+              "type": "string"
+            },
+            "payload": {
+              "type": "string"
+            },
+            "signatureBase64": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "did",
+            "payload",
+            "signatureBase64"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "welcomeSignaturePayload": {
+      "$comment": "(registryId: string, timestamp: number) => string",
+      "properties": {
+        "namedArgs": {
+          "additionalProperties": false,
+          "properties": {
+            "registryId": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "registryId",
+            "timestamp"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    }
+  }
+}

@@ -1,0 +1,239 @@
+openapi: "3.1.0"
+
+info:
+  title: FHS REST API
+  version: "0.1.23"
+  description: |
+    Federation of Sovereign Horizons (FHS) — endpoints REST de Atlas (Registry)
+    y Navigator (Agent Runtime).
+
+    Versión de referencia: @rafex/galaxia-fhs-protocol@0.1.23
+    Repositorio de implementaciones: https://github.com/rafex/galaxIA-Core
+
+  license:
+    name: MIT
+  contact:
+    name: galaxIA
+    url: https://github.com/rafex/galaxIA
+
+servers:
+  - url: "http://{atlas_host}:{atlas_port}"
+    description: Atlas — Registry
+    variables:
+      atlas_host:
+        default: localhost
+      atlas_port:
+        default: "8081"
+  - url: "http://{navigator_host}:{navigator_port}"
+    description: Navigator — Agent Runtime
+    variables:
+      navigator_host:
+        default: localhost
+      navigator_port:
+        default: "8090"
+
+tags:
+  - name: Atlas
+    description: Endpoints del nodo Atlas (Registry federado)
+  - name: Navigator
+    description: Endpoints del nodo Navigator (Agent Runtime)
+
+paths:
+  # ── Atlas ──────────────────────────────────────────────────────────────────
+  /health:
+    get:
+      tags: [Atlas, Navigator]
+      summary: Estado del nodo
+      operationId: getHealth
+      responses:
+        "200":
+          description: Nodo operativo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /register:
+    get:
+      tags: [Atlas]
+      summary: Registrar nodo provider via WebSocket
+      description: |
+        Upgrade a WebSocket. El provider envía su manifiesto (`{"type":"register","manifest":{...}}`).
+        Atlas responde con `{"type":"welcome","visibility":"public"|"private"}`.
+        A partir de ahí recibe misiones del protocolo FHS (tool.call, chat.request, etc.).
+      operationId: registerProvider
+      responses:
+        "101":
+          description: Switching Protocols — conexión WebSocket establecida
+        "400":
+          description: Manifiesto inválido
+
+  /nodes:
+    get:
+      tags: [Atlas]
+      summary: Lista de nodos registrados
+      operationId: listNodes
+      responses:
+        "200":
+          description: Lista de nodos activos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NodeSummary"
+
+  /nodes/{providerId}:
+    get:
+      tags: [Atlas]
+      summary: Información de un nodo
+      operationId: getNode
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Información del nodo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeDetail"
+        "404":
+          description: Nodo no encontrado
+
+  /metrics:
+    get:
+      tags: [Atlas]
+      summary: Métricas del nodo Atlas
+      operationId: getMetrics
+      responses:
+        "200":
+          description: Métricas operativas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetricsResponse"
+
+  # ── Navigator ──────────────────────────────────────────────────────────────
+  /chat:
+    get:
+      tags: [Navigator]
+      summary: Sesión de chat via WebSocket
+      description: |
+        Upgrade a WebSocket. El cliente envía mensajes del protocolo FHS
+        (chat.request, chat.cancel, tool.result, tool.error, tool.list.response).
+        El Navigator devuelve (chat.delta, chat.completed, chat.error,
+        tool.call, tool.list).
+      operationId: chat
+      responses:
+        "101":
+          description: Switching Protocols — sesión WebSocket establecida
+
+  /chat/stream:
+    get:
+      tags: [Navigator]
+      summary: Stream de chat via Server-Sent Events
+      description: |
+        Alternativa SSE (text/event-stream) al WebSocket de /chat.
+        Recibe el missionId en query param y escucha los eventos.
+      operationId: chatStream
+      parameters:
+        - name: missionId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Stream SSE activo
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, nodeId, uptime]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        nodeId:
+          type: string
+          description: DID del nodo (did:key:...)
+        uptime:
+          type: integer
+          description: Segundos en línea
+        version:
+          type: string
+
+    NodeSummary:
+      type: object
+      required: [providerId, type, visibility, registeredAt]
+      properties:
+        providerId:
+          type: string
+          description: DID del provider
+        type:
+          type: string
+          enum: [star, satellite, nova, multi]
+        visibility:
+          type: string
+          enum: [public, private]
+        registeredAt:
+          type: integer
+          format: int64
+        rating:
+          type: number
+          format: float
+
+    NodeDetail:
+      allOf:
+        - $ref: "#/components/schemas/NodeSummary"
+        - type: object
+          properties:
+            manifest:
+              $ref: "#/components/schemas/NodeManifest"
+            lastSeen:
+              type: integer
+              format: int64
+
+    NodeManifest:
+      type: object
+      required: [type, did]
+      properties:
+        type:
+          type: string
+          enum: [star, satellite, nova, multi]
+        did:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        model:
+          type: string
+        visibility:
+          type: string
+          enum: [public, private]
+
+    MetricsResponse:
+      type: object
+      properties:
+        totalNodes:
+          type: integer
+        activeNodes:
+          type: integer
+        totalMissions:
+          type: integer
+        uptime:
+          type: integer
