@@ -34,7 +34,7 @@ import {
 /** Envoltorio mínimo de mensajes crudos del protocolo FHS (Atlas/tool WS) — este script mockea el wire format directamente, sin pasar por los tipos completos del SDK. */
 interface RawFhsMessage {
   type?: string;
-  requestId?: string;
+  missionId?: string;
   toolName?: string;
   data?: { conversationId?: string };
 }
@@ -129,7 +129,7 @@ class MockOcrProvider {
               ws.send(
                 JSON.stringify({
                   type: "tool.list.response",
-                  requestId: msg.requestId,
+                  missionId: msg.missionId,
                   tools: [
                     {
                       name: "ocr_extract",
@@ -151,7 +151,7 @@ class MockOcrProvider {
               ws.send(
                 JSON.stringify({
                   type: "dispatch.ack",
-                  requestId: msg.requestId,
+                  missionId: msg.missionId,
                 })
               );
 
@@ -163,7 +163,7 @@ class MockOcrProvider {
                 ws.send(
                   JSON.stringify({
                     type: "tool.error",
-                    requestId: msg.requestId,
+                    missionId: msg.missionId,
                     toolName: msg.toolName || "ocr_extract",
                     code: "PROVIDER_ERROR",
                     message: `${this.cfg.name}: proveedor no disponible (simulado)`,
@@ -176,7 +176,7 @@ class MockOcrProvider {
                   ws.send(
                     JSON.stringify({
                       type: "tool.result",
-                      requestId: msg.requestId,
+                      missionId: msg.missionId,
                       toolName: msg.toolName || "ocr_extract",
                       content: [{ type: "text", text: this.cfg.text }],
                     })
@@ -333,7 +333,7 @@ class MockLlmProvider {
             ws.send(
               JSON.stringify({
                 type: "chat.delta",
-                requestId: msg.requestId,
+                missionId: msg.missionId,
                 delta: responseText,
               })
             );
@@ -342,7 +342,7 @@ class MockLlmProvider {
               ws.send(
                 JSON.stringify({
                   type: "chat.completed",
-                  requestId: msg.requestId,
+                  missionId: msg.missionId,
                   response: {
                     message: {
                       role: "assistant",

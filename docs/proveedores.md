@@ -205,20 +205,20 @@ El modo "mágico" (recomendar sin pedir confirmación) queda documentado en DEC-
 ### Chat (LLM)
 
 ```
-Agent Server → Provider:  chat.request   { requestId, request: GenerateRequest }
-Provider → Agent Server:  chat.delta     { requestId, delta: string }
-Provider → Agent Server:  chat.completed { requestId, response: GenerateResponse }
-Provider → Agent Server:  chat.error     { requestId, code, message }
+Agent Server → Provider:  chat.request   { missionId, request: GenerateRequest }
+Provider → Agent Server:  chat.delta     { missionId, delta: string }
+Provider → Agent Server:  chat.completed { missionId, response: GenerateResponse }
+Provider → Agent Server:  chat.error     { missionId, code, message }
 ```
 
 ### Tools (OCR, MCP)
 
 ```
-Agent Server → Provider:  tool.list         { requestId }
-Provider → Agent Server:  tool.list.response  { requestId, tools: [...] }
-Agent Server → Provider:  tool.call         { requestId, toolName, arguments }
-Provider → Agent Server:  tool.result       { requestId, toolName, content: [...] }
-Provider → Agent Server:  tool.error        { requestId, toolName, code, message }
+Agent Server → Provider:  tool.list         { missionId }
+Provider → Agent Server:  tool.list.response  { missionId, tools: [...] }
+Agent Server → Provider:  tool.call         { missionId, toolName, arguments }
+Provider → Agent Server:  tool.result       { missionId, toolName, content: [...] }
+Provider → Agent Server:  tool.error        { missionId, toolName, code, message }
 ```
 
 ---

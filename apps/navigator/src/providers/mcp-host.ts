@@ -19,14 +19,14 @@ import { logTrace } from "../observability/trace.js";
  * callerId/timestamp/signature a un tool.call/tool.list — el provider puede
  * exigirlos y responder UNAUTHORIZED a peers anónimos de la LAN.
  */
-function withCallerAuth<T extends { requestId: string }>(msg: T): T {
+function withCallerAuth<T extends { missionId: string }>(msg: T): T {
   const identity = getNavigatorIdentity();
   const timestamp = Date.now();
   return {
     ...msg,
     timestamp,
     callerId: identity.did,
-    signature: signPayload(identity.privateKey, invokeSignaturePayload(identity.did, msg.requestId, timestamp)),
+    signature: signPayload(identity.privateKey, invokeSignaturePayload(identity.did, msg.missionId, timestamp)),
   };
 }
 
@@ -110,13 +110,13 @@ export class McpHost {
     });
 
     ws.on("message", (raw: Buffer) => {
-      let msg: Record<string, unknown> & { requestId: string; type: string; code?: string; message?: string };
+      let msg: Record<string, unknown> & { missionId: string; type: string; code?: string; message?: string };
       try {
         msg = JSON.parse(String(raw)) as typeof msg;
       } catch {
         return; // ignorar mensajes no JSON
       }
-      const entry = pending.get(msg.requestId);
+      const entry = pending.get(msg.missionId);
       if (!entry) return;
 
       // Mosquito: el ack de despacho no resuelve la petición — solo marca
@@ -128,13 +128,13 @@ export class McpHost {
         return;
       }
 
-      pending.delete(msg.requestId);
+      pending.delete(msg.missionId);
       const dispatchMs = entry.ackAt ? entry.ackAt - entry.startedAt : null;
       const success = msg.type !== "tool.error";
       if (entry.trace) {
         logTrace({
           conversationId: entry.trace.conversationId,
-          requestId: msg.requestId,
+          missionId: msg.missionId,
           providerId,
           capability: entry.trace.capabilityId,
           dispatchMs,
@@ -153,11 +153,11 @@ export class McpHost {
 
     ws.on("close", () => {
       this.clients.delete(providerId);
-      for (const [requestId, entry] of pending.entries()) {
+      for (const [missionId, entry] of pending.entries()) {
         if (entry.trace) {
           logTrace({
             conversationId: entry.trace.conversationId,
-            requestId,
+            missionId,
             providerId,
             capability: entry.trace.capabilityId,
             dispatchMs: entry.ackAt ? entry.ackAt - entry.startedAt : null,
@@ -174,9 +174,9 @@ export class McpHost {
 
     const providerClient: McpProviderClient = { providerId, providerName, service, ws, tools: [], pending };
 
-    const listRequestId = randomUUID();
-    const listMsg: ToolListRequestMessage = withCallerAuth<ToolListRequestMessage>({ type: "tool.list", requestId: listRequestId });
-    const { message: listResponse } = await this.sendAndWait(providerClient, listMsg, listRequestId) as { message: ToolListResponseMessage };
+    const listMissionId = randomUUID();
+    const listMsg: ToolListRequestMessage = withCallerAuth<ToolListRequestMessage>({ type: "tool.list", missionId: listMissionId });
+    const { message: listResponse } = await this.sendAndWait(providerClient, listMsg, listMissionId) as { message: ToolListResponseMessage };
 
     providerClient.tools = (listResponse.tools || []).map((tool) => ({
       name: tool.name,
@@ -224,11 +224,11 @@ export class McpHost {
     if (!client || client.ws.readyState !== WebSocket.OPEN) {
       throw new Error(`FHS tool provider no conectado: ${providerId}`);
     }
-    const requestId = randomUUID();
-    const msg: ToolCallRequestMessage = withCallerAuth<ToolCallRequestMessage>({ type: "tool.call", requestId, toolName, arguments: args });
+    const missionId = randomUUID();
+    const msg: ToolCallRequestMessage = withCallerAuth<ToolCallRequestMessage>({ type: "tool.call", missionId, toolName, arguments: args });
     // Backpressure (DEC-0072): misma contabilidad en vuelo que el gateway LLM.
     acquireInFlight(providerId);
-    return this.sendAndWait(client, msg, requestId, timeoutMs, trace).finally(() => releaseInFlight(providerId));
+    return this.sendAndWait(client, msg, missionId, timeoutMs, trace).finally(() => releaseInFlight(providerId));
   }
 
   disconnect(providerId: string) {
@@ -242,7 +242,7 @@ export class McpHost {
   private sendAndWait(
     client: McpProviderClient,
     msg: ToolCallRequestMessage | ToolListRequestMessage,
-    requestId: string,
+    missionId: string,
     timeoutMs?: number,
     trace?: TraceContext
   ): Promise<DispatchResult> {
@@ -253,15 +253,15 @@ export class McpHost {
         // nadie espera ya esta Mission antes de abandonarla — sin esto sigue
         // quemando CPU comunitaria hasta terminar.
         if (client.ws.readyState === WebSocket.OPEN) {
-          const cancel: ToolCancelMessage = { type: "tool.cancel", requestId, timestamp: Date.now() };
+          const cancel: ToolCancelMessage = { type: "tool.cancel", missionId, timestamp: Date.now() };
           client.ws.send(JSON.stringify(cancel));
         }
-        const pendingEntry = client.pending.get(requestId);
-        client.pending.delete(requestId);
+        const pendingEntry = client.pending.get(missionId);
+        client.pending.delete(missionId);
         if (trace) {
           logTrace({
             conversationId: trace.conversationId,
-            requestId,
+            missionId,
             providerId: client.providerId,
             capability: trace.capabilityId,
             dispatchMs: pendingEntry?.ackAt ? pendingEntry.ackAt - startedAt : null,
@@ -273,7 +273,7 @@ export class McpHost {
         }
         reject(new Error(`Timeout esperando respuesta FHS de ${client.providerId}`));
       }, clampTimeoutMs(timeoutMs, CALL_TIMEOUT_MS)); // lgtm[js/resource-exhaustion]: acotado a [1s, 10min] en ws-security.ts, CodeQL no sigue el clamp interprocedural
-      client.pending.set(requestId, {
+      client.pending.set(missionId, {
         startedAt,
         trace,
         resolve: (result) => {

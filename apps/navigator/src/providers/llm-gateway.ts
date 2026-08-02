@@ -21,31 +21,31 @@ import { logTrace } from "../observability/trace.js";
 // Invocación firmada (revisión del protocolo 2026-07-10): el Navigator prueba
 // su identidad ante el provider en cada chat.request — el provider puede
 // exigirla y responder UNAUTHORIZED a peers anónimos de la LAN.
-function signedChatRequest(requestId: string, request: GenerateRequest): ChatRequestMessage {
+function signedChatRequest(missionId: string, request: GenerateRequest): ChatRequestMessage {
   const identity = getNavigatorIdentity();
   const timestamp = Date.now();
   return {
     type: "chat.request",
-    requestId,
+    missionId,
     request,
     timestamp,
     callerId: identity.did,
-    signature: signPayload(identity.privateKey, invokeSignaturePayload(identity.did, requestId, timestamp)),
+    signature: signPayload(identity.privateKey, invokeSignaturePayload(identity.did, missionId, timestamp)),
   };
 }
 
 // Cancelación best-effort al abandonar por timeout: sin esto, el nodo sigue
 // quemando CPU minutos después de que nadie espera la respuesta.
-function sendCancel(ws: WebSocket, requestId: string) {
+function sendCancel(ws: WebSocket, missionId: string) {
   if (ws.readyState === WebSocket.OPEN) {
-    const msg: ChatCancelMessage = { type: "chat.cancel", requestId, timestamp: Date.now() };
+    const msg: ChatCancelMessage = { type: "chat.cancel", missionId, timestamp: Date.now() };
     ws.send(JSON.stringify(msg));
   }
 }
 
 /** Envoltorio mínimo para narrowing de mensajes FHS crudos antes de castear al tipo específico. */
 interface FhsMessageEnvelope {
-  requestId?: string;
+  missionId?: string;
   type?: string;
 }
 
@@ -111,7 +111,7 @@ export class LlmGateway {
     acquireInFlight(nodeId);
     const settle = new Promise<GenerateDispatchResult>((resolve, reject) => {
       const ws = new WebSocket(url, wsOptions(url));
-      const requestId = randomUUID();
+      const missionId = randomUUID();
       const startedAt = Date.now();
       // Mosquito: null hasta que llegue dispatch.ack (SPEC-SATRATING-0001).
       let ackAt: number | null = null;
@@ -120,7 +120,7 @@ export class LlmGateway {
         if (!trace) return;
         logTrace({
           conversationId: trace.conversationId,
-          requestId,
+          missionId,
           providerId: nodeId,
           capability: trace.capability,
           dispatchMs: ackAt ? ackAt - startedAt : null,
@@ -132,20 +132,20 @@ export class LlmGateway {
       };
 
       const timeout = setTimeout(() => {
-        sendCancel(ws, requestId);
+        sendCancel(ws, missionId);
         ws.close();
         emitTrace(false, "TIMEOUT");
         reject(new Error("Timeout esperando respuesta del LLM vía FHS"));
       }, clampTimeoutMs(timeoutMs, 310_000)); // lgtm[js/resource-exhaustion]: acotado a [1s, 10min] en ws-security.ts, CodeQL no sigue el clamp interprocedural
 
       ws.on("open", () => {
-        ws.send(JSON.stringify(signedChatRequest(requestId, { ...request, stream: false })));
+        ws.send(JSON.stringify(signedChatRequest(missionId, { ...request, stream: false })));
       });
 
       ws.on("message", (raw: Buffer) => {
         try {
           const msg = JSON.parse(String(raw)) as FhsMessageEnvelope;
-          if (msg.requestId !== requestId) return;
+          if (msg.missionId !== missionId) return;
 
           if (msg.type === "dispatch.ack") {
             ackAt = Date.now();
@@ -197,7 +197,7 @@ export class LlmGateway {
     request: GenerateRequest
   ): AsyncGenerator<string, GenerateResponse, unknown> {
     const ws = new WebSocket(url, wsOptions(url));
-    const requestId = randomUUID();
+    const missionId = randomUUID();
 
     type QueueItem =
       | { kind: "delta"; text: string }
@@ -222,13 +222,13 @@ export class LlmGateway {
       });
 
     ws.on("open", () => {
-      ws.send(JSON.stringify(signedChatRequest(requestId, { ...request, stream: true })));
+      ws.send(JSON.stringify(signedChatRequest(missionId, { ...request, stream: true })));
     });
 
     ws.on("message", (raw: Buffer) => {
       try {
         const msg = JSON.parse(raw.toString()) as FhsMessageEnvelope;
-        if (msg.requestId !== requestId) return;
+        if (msg.missionId !== missionId) return;
 
         if (msg.type === "chat.delta") {
           enqueue({ kind: "delta", text: (msg as ChatDeltaMessage).delta });
@@ -256,7 +256,7 @@ export class LlmGateway {
     });
 
     const timeout = setTimeout(() => {
-      sendCancel(ws, requestId);
+      sendCancel(ws, missionId);
       enqueue({ kind: "error", message: "Timeout esperando stream FHS" });
       ws.close();
     }, clampTimeoutMs(undefined, 310_000));

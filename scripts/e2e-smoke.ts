@@ -50,7 +50,7 @@ function ok(step: string, detail: string) {
 
 interface RawMsg {
   type?: string;
-  requestId?: string;
+  missionId?: string;
   registryId?: string;
   timestamp?: number;
   signature?: string;
@@ -68,24 +68,24 @@ async function main() {
   wss.on("connection", (socket) => {
     socket.on("message", (raw: Buffer) => {
       const msg = JSON.parse(raw.toString()) as RawMsg & { request?: { messages?: Array<{ content?: string }> } };
-      if (msg.type !== "chat.request" || !msg.requestId) return;
+      if (msg.type !== "chat.request" || !msg.missionId) return;
 
       // Garantía 4: el Navigator firma sus invocaciones (DEC-0069).
       if (!msg.callerId || !msg.timestamp || !msg.signature) {
         fail("caller-auth", `chat.request sin CallerAuth: ${JSON.stringify({ callerId: msg.callerId, timestamp: msg.timestamp })}`);
       }
-      const payload = invokeSignaturePayload(msg.callerId, msg.requestId, msg.timestamp);
+      const payload = invokeSignaturePayload(msg.callerId, msg.missionId, msg.timestamp);
       if (!verifySignature(msg.callerId, payload, msg.signature)) {
         fail("caller-auth", "firma de CallerAuth inválida en chat.request");
       }
       callerAuthVerified = true;
       ok("caller-auth", `chat.request firmado por ${msg.callerId.slice(0, 24)}…`);
 
-      socket.send(JSON.stringify({ type: "dispatch.ack", requestId: msg.requestId, queuedAt: Date.now() }));
+      socket.send(JSON.stringify({ type: "dispatch.ack", missionId: msg.missionId, queuedAt: Date.now() }));
       socket.send(
         JSON.stringify({
           type: "chat.completed",
-          requestId: msg.requestId,
+          missionId: msg.missionId,
           response: {
             message: { role: "assistant", content: REPLY_TEXT },
             model: "e2e-mock-model",

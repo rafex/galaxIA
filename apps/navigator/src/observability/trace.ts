@@ -6,7 +6,7 @@
  */
 export interface TraceEntry {
   conversationId: string;
-  requestId: string;
+  missionId: string;
   providerId: string;
   capability: string;
   dispatchMs: number | null;

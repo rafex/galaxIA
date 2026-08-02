@@ -156,8 +156,8 @@ export function welcomeSignaturePayload(registryId: string, timestamp: number): 
  * invocador (Navigator u otro agente) prueba su identidad ante el provider —
  * sin esto, cualquier peer de la LAN podía consumir el LLM/tools de un nodo.
  */
-export function invokeSignaturePayload(callerId: string, requestId: string, timestamp: number): string {
-  return `${callerId}:${requestId}:${timestamp}`;
+export function invokeSignaturePayload(callerId: string, missionId: string, timestamp: number): string {
+  return `${callerId}:${missionId}:${timestamp}`;
 }
 
 /** Firma un payload (ej. `${providerId}:${timestamp}`) con la clave privada del nodo. */

@@ -141,13 +141,13 @@ export type FhsMessage = RegistryInboundMessage | RegistryOutboundMessage;
 export interface CallerAuth {
   /** did:key del invocador (Navigator u otro agente). */
   callerId?: string;
-  /** Ed25519 base64 sobre `invokeSignaturePayload(callerId, requestId, timestamp)`. */
+  /** Ed25519 base64 sobre `invokeSignaturePayload(callerId, missionId, timestamp)`. */
   signature?: string;
 }
 
 export interface ChatRequestMessage extends BaseMessage, CallerAuth {
   type: "chat.request";
-  requestId: string;
+  missionId: string;
   request: GenerateRequest;
 }
 
@@ -160,24 +160,24 @@ export interface ChatRequestMessage extends BaseMessage, CallerAuth {
  */
 export interface ChatCancelMessage extends BaseMessage {
   type: "chat.cancel";
-  requestId: string;
+  missionId: string;
 }
 
 export interface ChatDeltaMessage extends BaseMessage {
   type: "chat.delta";
-  requestId: string;
+  missionId: string;
   delta: string;
 }
 
 export interface ChatCompletedMessage extends BaseMessage {
   type: "chat.completed";
-  requestId: string;
+  missionId: string;
   response: GenerateResponse;
 }
 
 export interface ChatErrorMessage extends BaseMessage {
   type: "chat.error";
-  requestId: string;
+  missionId: string;
   code: string;
   message: string;
 }
@@ -192,7 +192,7 @@ export interface ChatErrorMessage extends BaseMessage {
  */
 export interface DispatchAckMessage extends BaseMessage {
   type: "dispatch.ack";
-  requestId: string;
+  missionId: string;
   queuedAt: number;
 }
 
@@ -214,7 +214,7 @@ export type LlmProviderMessage =
 
 export interface ToolCallRequestMessage extends BaseMessage, CallerAuth {
   type: "tool.call";
-  requestId: string;
+  missionId: string;
   toolName: string;
   arguments: Record<string, unknown>;
 }
@@ -222,12 +222,12 @@ export interface ToolCallRequestMessage extends BaseMessage, CallerAuth {
 /** Cancelación best-effort de un `tool.call` — misma semántica que `chat.cancel`. */
 export interface ToolCancelMessage extends BaseMessage {
   type: "tool.cancel";
-  requestId: string;
+  missionId: string;
 }
 
 export interface ToolCallResultMessage extends BaseMessage {
   type: "tool.result";
-  requestId: string;
+  missionId: string;
   toolName: string;
   /**
    * `{ type: "artifact" }` (DEC-0046) — un provider puede devolver un
@@ -240,7 +240,7 @@ export interface ToolCallResultMessage extends BaseMessage {
 
 export interface ToolCallErrorMessage extends BaseMessage {
   type: "tool.error";
-  requestId: string;
+  missionId: string;
   toolName: string;
   code: string;
   message: string;
@@ -248,12 +248,12 @@ export interface ToolCallErrorMessage extends BaseMessage {
 
 export interface ToolListRequestMessage extends BaseMessage, CallerAuth {
   type: "tool.list";
-  requestId: string;
+  missionId: string;
 }
 
 export interface ToolListResponseMessage extends BaseMessage {
   type: "tool.list.response";
-  requestId: string;
+  missionId: string;
   tools: Array<{
     name: string;
     description?: string;

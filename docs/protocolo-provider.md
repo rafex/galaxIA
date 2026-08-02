@@ -51,7 +51,7 @@ flowchart TD
 
 Requisito concreto: el heartbeat (`ping`) debe implementarse en un timer/tarea independiente del manejo de peticiones — nunca dentro del mismo bucle síncrono que procesa `chat.request`/`tool.call`. En Node.js esto es casi gratis (event loop); en lenguajes con I/O bloqueante (ej. un script Python síncrono sin `asyncio`) es la razón principal por la que un provider mal escrito deja de responder heartbeat bajo carga.
 
-**Señal verificable de que el mosquito ya tomó la petición:** un heartbeat sano no prueba que una petición específica esté siendo atendida, solo que la conexión sigue viva. Por eso el mosquito debe enviar `dispatch.ack { requestId, queuedAt }` (ver `docs/protocolo.md`) inmediatamente al encolar cada `chat.request`/`tool.call`, antes de empezar el trabajo real — separa la latencia de despacho (tiempo hasta el ack) de la latencia de procesamiento (tiempo hasta el resultado final), y le da al Registry una base real para calcular fiabilidad por nodo (`spec-native/specs/satelite-rating/SPEC.md`). Es obligatorio para nodos nuevos, pero compatible hacia atrás: uno que no lo envíe sigue funcionando, solo sin esa métrica.
+**Señal verificable de que el mosquito ya tomó la petición:** un heartbeat sano no prueba que una petición específica esté siendo atendida, solo que la conexión sigue viva. Por eso el mosquito debe enviar `dispatch.ack { missionId, queuedAt }` (ver `docs/protocolo.md`) inmediatamente al encolar cada `chat.request`/`tool.call`, antes de empezar el trabajo real — separa la latencia de despacho (tiempo hasta el ack) de la latencia de procesamiento (tiempo hasta el resultado final), y le da al Registry una base real para calcular fiabilidad por nodo (`spec-native/specs/satelite-rating/SPEC.md`). Es obligatorio para nodos nuevos, pero compatible hacia atrás: uno que no lo envíe sigue funcionando, solo sin esa métrica.
 
 ## Manifiesto — campos obligatorios sin excepción
 
@@ -90,15 +90,15 @@ Todo provider debe usar estos códigos en `chat.error` / `tool.error` en vez de 
 Ejemplo:
 
 ```json
-{ "type": "tool.error", "requestId": "...", "toolName": "ocr_extract", "code": "UPSTREAM_UNAVAILABLE", "message": "ether-ocr-api no respondió en 30s" }
+{ "type": "tool.error", "missionId": "...", "toolName": "ocr_extract", "code": "UPSTREAM_UNAVAILABLE", "message": "ether-ocr-api no respondió en 30s" }
 ```
 
 ## Trazabilidad obligatoria del provider
 
-Cada provider debe loggear, por cada `requestId` que procesa, como mínimo:
+Cada provider debe loggear, por cada `missionId` que procesa, como mínimo:
 
 ```
-requestId | conversationId (si viaja en el mensaje) | tipo (chat/tool) | resultado (ok/error+code) | duración ms
+missionId | conversationId (si viaja en el mensaje) | tipo (chat/tool) | resultado (ok/error+code) | duración ms
 ```
 
 **Nunca el contenido** (texto del mensaje, archivo, respuesta del modelo) salvo que `privacy.retention` lo permita explícitamente. Esta es la misma distinción de la sección "Trazabilidad operacional" en `protocolo.md` — aquí se hace obligatoria a nivel de implementación, no solo de intención.
@@ -115,10 +115,10 @@ Un provider nuevo puede conectarse a Atlas (Registry) sin ningún cambio en `app
 - [ ] Si declara `availability.maxConcurrentRequests`, la hace cumplir: rechaza la petición N+1 con `OVERLOADED` de inmediato (sin `dispatch.ack`, sin encolar) — el Agent Server además evita mandarla si su propia vista local ya ve el cupo lleno (DEC-0072).
 - [ ] Maneja `chat.cancel`/`tool.cancel` abortando el trabajo si puede (respondiendo con código `CANCELLED`) — en hardware comunitario, seguir procesando una petición abandonada es el peor uso posible del recurso.
 - [ ] El heartbeat corre en una tarea/timer independiente del procesamiento de peticiones (dispatcher concurrente).
-- [ ] Envía `dispatch.ack { requestId, queuedAt }` inmediatamente al encolar cada `chat.request`/`tool.call` en su dispatcher, antes de empezar a procesar (ver "Regla central: el dispatcher concurrente" arriba).
+- [ ] Envía `dispatch.ack { missionId, queuedAt }` inmediatamente al encolar cada `chat.request`/`tool.call` en su dispatcher, antes de empezar a procesar (ver "Regla central: el dispatcher concurrente" arriba).
 - [ ] El manifiesto incluye todos los campos obligatorios de la tabla de arriba, incluidos los de privacidad.
 - [ ] Usa los códigos de error estandarizados, no códigos propios.
-- [ ] Loggea metadata de trazabilidad por `requestId`, nunca contenido fuera de lo permitido por `retention`.
+- [ ] Loggea metadata de trazabilidad por `missionId`, nunca contenido fuera de lo permitido por `retention`.
 - [ ] Responde `chat.error`/`tool.error` (nunca cierra la conexión en silencio) ante cualquier fallo del servicio real que envuelve.
 - [ ] Si es tipo `mcp`, responde correctamente a `tool.list` con el `inputSchema` real de cada tool (el Agent Server lo usa para armar las tool definitions del LLM sin conocer la tool de antemano).
 - [ ] **Se ejecutó al menos una tool call real de punta a punta** (no solo el registro/manifiesto) contra un cliente FHS real, verificando que `tool.capabilityId` resuelve al id esperado y que el resultado no está vacío. Ver "Lecciones de integración" más abajo — el registro exitoso de un provider no implica que las tool calls funcionen.
@@ -136,5 +136,5 @@ Estos tres bugs se encontraron probando el pipeline OCR de punta a punta por pri
 
 - **DEC-0013 (validación de manifiesto + códigos de error) ya está cerrado** (2026-07-06) — ver `apps/atlas/src/atlas/manifest-validation.ts` y `FHS_ERROR_CODES` en `packages/fhs-protocol/src/constants.ts`. Ver `spec-native/DECISIONS.md` DEC-0009 para la validación de identidad en `hello` (aparte, ya resuelta).
 - **DEC-0030 (identidad Ed25519 real vía `did:key`) ya está cerrado** (2026-07-06) — ver `packages/fhs-protocol/src/identity.ts`, verificación de firma en `apps/atlas/src/atlas/ws-handler.ts`. Cualquier provider debe generar su identidad una sola vez y persistirla (ver `identity-store.ts` en `examples/star-example`/`examples/satellite-ocr-example` como referencia) — perder el archivo de clave privada significa perder el `did` y el historial de rating asociado, sin mecanismo de recuperación todavía.
-- **DEC-0012 (trazabilidad) ya está cerrado del lado del Agent Server** (`apps/navigator/src/observability/trace.ts`, ver `mcp-host.ts`/`llm-gateway.ts`) — sigue como deuda que los providers de ejemplo (`examples/star-example`, `examples/satellite-ocr-example`) no loggeen todavía su propia metadata local por `requestId`, solo el Agent Server lo hace hoy.
+- **DEC-0012 (trazabilidad) ya está cerrado del lado del Agent Server** (`apps/navigator/src/observability/trace.ts`, ver `mcp-host.ts`/`llm-gateway.ts`) — sigue como deuda que los providers de ejemplo (`examples/star-example`, `examples/satellite-ocr-example`) no loggeen todavía su propia metadata local por `missionId`, solo el Agent Server lo hace hoy.
 - `examples/star-example` y `examples/satellite-ocr-example` no comparten código de dispatcher/heartbeat — cada uno lo reimplementa. Extraer un helper común (aunque sea solo para TypeScript) es la forma más directa de que el contrato de este documento deje de depender de que cada autor lo lea y lo siga a mano.
