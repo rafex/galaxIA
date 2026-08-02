@@ -1,22 +1,23 @@
 # Red — Protocolos de Comunicación en FHS
 
-Mapa completo de qué protocolo se usa en cada conexión del ecosistema:
-P2P FHS, WSS, HTTPS, REST y Protobuf.
+Mapa completo de qué protocolo se usa en cada capa del ecosistema:
+libp2p (DHT + GossipSub), stream directo FHS, WSS, HTTPS, REST y Protobuf.
 
 ---
 
 ## Vista de alto nivel
 
-El ecosistema FHS tiene **tres planos de comunicación** bien separados:
+El ecosistema FHS tiene **cuatro planos de comunicación** bien separados:
 
 | Plano | Propósito | Protocolos |
 | ----- | --------- | ---------- |
-| **Plano de protocolo** | Todo lo que es FHS: registro, Missions, heartbeat, federación | WSS + Protobuf (modo binario `fhs.v1`) |
+| **Plano P2P** | Descubrimiento, presencia, dispatch de Missions, reputación | libp2p: DHT Kademlia + GossipSub |
+| **Plano de ejecución** | Ejecución de Missions (chat, tools) y sesión de agente | Stream directo WSS + Protobuf (`fhs.v1`) |
 | **Plano de distribución** | Servir el Portal web y el WASM a los browsers | HTTPS estático |
 | **Plano de gestión** | Herramientas externas, dashboards, monitoreo | REST + JSON |
 
-La regla central: **si un mensaje es parte del protocolo FHS, viaja por WSS+Proto.
-Si es para un humano o una herramienta externa no-FHS, puede ir por HTTPS/REST.**
+La regla central: **si un mensaje es parte del protocolo FHS, va por libp2p (GossipSub o stream directo).
+Si es para herramientas externas no-FHS, puede ir por REST. Si es contenido estático para el browser, HTTPS.**
 
 ---
 
@@ -26,91 +27,239 @@ Si es para un humano o una herramienta externa no-FHS, puede ir por HTTPS/REST.*
 graph TB
     subgraph BROWSER["Browser / Dispositivo Móvil"]
         PORTAL_UI["Portal (UI de chat)"]
-        EPH["Ephemeral Satellite (Web Worker + WASM)"]
+        EPH["Ephemeral Satellite\n(Web Worker + WASM)"]
     end
 
-    subgraph BASTION["Bastion / Servidor principal"]
-        ATLAS["Atlas\n(Registry + Bootstrap)"]
+    subgraph BASTION["Bastion"]
+        ATLAS["Atlas\n(bootstrap peer)"]
         NAV["Navigator\n(Agent Runtime)"]
-        STAR["Star\n(LLM provider)"]
+        STAR["Star\n(LLM)"]
     end
 
-    subgraph RASPI["Raspi4B / Nodo remoto"]
-        SAT["Satellite\n(OCR, tools)"]
+    subgraph RASPI["Raspi4B"]
+        SAT["Satellite\n(OCR)"]
     end
 
     subgraph EXT["Externo"]
-        MON["Monitoreo\n(Prometheus, dashboards)"]
-        AT2["Atlas 2\n(Federación)"]
+        MON["Monitoreo\n(Prometheus)"]
     end
 
-    %% Plano de distribución — HTTPS
-    ATLAS -. "HTTPS — bundle.wasm\n(distribución del WASM al browser)" .-> EPH
-    ATLAS -. "HTTPS — index.html / Portal\n(servir la app web)" .-> PORTAL_UI
+    subgraph GOSSIP["GossipSub (malla P2P broadcast)"]
+        G1["fhs/v1/nodes/advertise"]
+        G2["fhs/v1/missions/offer + bid + assign"]
+        G3["fhs/v1/reputation/update"]
+    end
 
-    %% Plano de protocolo — WSS + Protobuf (P2P FHS)
-    PORTAL_UI =="|WSS + Proto|\nagent.start, chat.request\nassistant.delta, assistant.completed"==> NAV
-    NAV =="|WSS + Proto|\nchat.request, chat.delta\nchat.completed"==> STAR
-    NAV =="|WSS + Proto|\ntool.call, tool.result"==> SAT
-    NAV =="|WSS + Proto|\ntool.call, tool.result"==> EPH
+    subgraph DHT["DHT Kademlia"]
+        D1["Beacons\ndid → DhtBeaconRecord"]
+        D2["Reputación\nreputation/did → DhtReputationRecord"]
+    end
 
-    STAR =="|WSS + Proto|\nhandshake, ping/pong"==> ATLAS
-    SAT =="|WSS + Proto|\nhandshake, ping/pong"==> ATLAS
-    EPH =="|WSS + Proto|\nhandshake + DelegationToken\nping/pong"==> ATLAS
-    NAV =="|WSS + Proto|\nhandshake, node.online/lost\nmission.feedback"==> ATLAS
+    %% Plano de distribución — HTTPS (punteado verde)
+    ATLAS -. "HTTPS — bundle.wasm" .-> EPH
+    ATLAS -. "HTTPS — index.html + JS" .-> PORTAL_UI
 
-    %% Gossip P2P — WSS + Protobuf
-    ATLAS =="|WSS + Proto|\natlas.announce\natlas.sync"==> AT2
-    AT2 =="|WSS + Proto|\natlas.announce\natlas.sync"==> ATLAS
+    %% Plano P2P — GossipSub (todas las líneas hacia el mesh)
+    ATLAS --- G1 & G2 & G3
+    NAV --- G1 & G2 & G3
+    STAR --- G1 & G2
+    SAT --- G1 & G2
+    EPH --- G1
 
-    %% Plano de gestión — REST + JSON
-    MON -. "REST + JSON\nGET /api/fhs/providers\nGET /api/fhs/models" .-> ATLAS
+    %% Plano P2P — DHT
+    ATLAS --- D1 & D2
+    NAV --- D2
+    STAR --- D1
+    SAT --- D1
+    EPH --- D1
+
+    %% Plano de ejecución — Stream directo (solo durante Mission activa)
+    PORTAL_UI =="|WSS stream|\nagent.start, chat.request\nassistant.delta, completed"==> NAV
+    NAV -.->|"stream directo\nchat.request post-assign"| STAR
+    NAV -.->|"stream directo\ntool.call post-assign"| SAT
+    NAV -.->|"stream directo\ntool.call post-assign"| EPH
+
+    %% Plano de gestión — REST
+    MON -. "REST + JSON\nGET /api/fhs/providers" .-> ATLAS
 
     %% Estilos
-    classDef wssproto fill:#1d4ed8,color:#fff,stroke:#1e40af
-    classDef https fill:#15803d,color:#fff,stroke:#166534
-    classDef rest fill:#b45309,color:#fff,stroke:#92400e
-    class ATLAS,NAV,STAR,SAT,EPH wssproto
-    class PORTAL_UI https
-    class MON rest
+    classDef bootstrap fill:#f59e0b,color:#000,stroke:#d97706
+    classDef p2p fill:#1d4ed8,color:#fff,stroke:#1e40af
+    classDef browser fill:#15803d,color:#fff,stroke:#166534
+    classDef gossip fill:#6d28d9,color:#fff,stroke:#5b21b6
+    classDef dht fill:#7c3aed,color:#fff,stroke:#6d28d9
+    class ATLAS bootstrap
+    class NAV,STAR,SAT,EPH p2p
+    class PORTAL_UI browser
+    class G1,G2,G3 gossip
+    class D1,D2 dht
 ```
 
 **Convención visual:**
-- `==` línea doble — plano de protocolo (WSS + Protobuf)
-- `-.` línea punteada — plano de distribución (HTTPS) o gestión (REST)
+- `---` conexión GossipSub o DHT (permanente, bidireccional)
+- `==` stream directo permanente (Portal ↔ Navigator)
+- `-.->` stream directo temporal (solo durante Mission activa, post-assign)
+- `-.` punteado con texto — HTTPS o REST
 
 ---
 
-## P2P FHS — El protocolo
+## libp2p — La red P2P
 
-### Qué es
+libp2p es el motor de red sobre el que corre FHS. Proporciona:
 
-"P2P" en FHS significa que **cada nodo tiene identidad propia** (`did:key:z...`)
-y **autentica cada mensaje** que envía con su clave Ed25519.
-No hay un broker central que tenga que confiar en los mensajes — cada receptor
-verifica la firma del Envelope directamente, sin intermediarios.
+| Componente | Función |
+| ---------- | ------- |
+| **DHT Kademlia** | Descubrimiento: cualquier nodo puede buscar a otro por DID |
+| **GossipSub** | Pub/Sub broadcast: presencia, dispatch de Missions, reputación |
+| **Identify** | Intercambio automático de multiaddrs entre peers conectados |
+| **AutoNAT / Relay** | Conectividad para nodos detrás de NAT (móvil, home) |
+| **Noise / TLS** | Seguridad en el transporte libp2p |
 
-La topología actual es **estrella** con Atlas al centro (no una malla completa),
-pero el protocolo es P2P en el sentido de que cualquier nodo puede hablar con
-cualquier otro si conoce su DID y tiene una ruta.
+### Multiaddr — Dirección de un nodo FHS
 
-### Dónde se usa
+```
+/ip4/1.2.3.4/tcp/8443/tls/ws
+```
 
-| Conexión | Mensajes principales |
-| -------- | -------------------- |
-| Star → Atlas | `handshake`, `ping`, `pong` |
-| Satellite → Atlas | `handshake`, `ping`, `pong`, `dispatch.ack` |
-| Ephemeral Satellite → Atlas | `handshake + DelegationToken`, `ping`, `pong` |
-| Navigator → Atlas | `handshake`, `ping`, `pong`, `mission.feedback` |
-| Atlas → Navigator | `node.online`, `node.lost` |
-| Navigator → Star | `chat.request`, `chat.cancel`, `chat.delta`, `chat.completed` |
-| Navigator → Satellite | `tool.call`, `tool.cancel`, `tool.result` |
-| Navigator → Ephemeral Satellite | `tool.call`, `tool.cancel`, `tool.result` |
+- `/tls/` — TLS 1.2 mínimo, 1.3 recomendado
+- `/ws` — WebSocket (para compatibilidad con browsers)
+- El formato `wss://` de URL es la representación HTTP de la misma dirección
+
+### Identidad
+
+```
+Clave Ed25519 → DID: did:key:z<base58btc(pubkey)>
+              → PeerId libp2p: derivado de la misma clave pública
+```
+
+Un solo par de claves, dos representaciones. El DID se usa en el Envelope FHS;
+el PeerId lo usa libp2p para enrutar conexiones.
+
+---
+
+## GossipSub — Broadcast P2P
+
+GossipSub es la capa de pub/sub de libp2p. Los mensajes se propagan en malla —
+cada nodo los reenvía a sus peers suscritos. No hay servidor central.
+
+### Presencia de nodos
+
+**Tópico:** `fhs/v1/nodes/advertise`
+
+Cada nodo activo publica `NodeAdvertiseMessage` periódicamente (default: cada 30 segundos, TTL = 60s).
+Reemplaza el modelo centralizado `node.online` / `node.lost` de Atlas.
+
+```
+nodo → GossipSub: NodeAdvertiseMessage {
+  did, beacon (JSON), multiaddrs, timestamp, ttlSeconds, signature
+}
+```
+
+Si un nodo deja de publicar antes de que expire su TTL → los demás lo marcan offline.
+
+### Dispatch de Missions
+
+```mermaid
+sequenceDiagram
+    participant NAV as Navigator
+    participant G as GossipSub
+    participant S as Star / Satellite
+
+    NAV->>G: MissionOfferMessage (fhs/v1/missions/offer)<br/>{ missionId, requiredCapabilities, bidDeadlineMs }
+    G->>S: (reciben todos los providers suscritos)
+    S->>S: ¿Puedo satisfacer esta oferta?
+    S->>G: MissionBidMessage (fhs/v1/missions/bid)<br/>{ missionId, providerDid, reputationScore, estimatedLatencyMs }
+    G->>NAV: (recibe bids)
+    Note over NAV: Ordena: trustLevel > reputation > latencia
+    NAV->>G: MissionAssignMessage (fhs/v1/missions/assign)<br/>{ missionId, assignedProvider }
+    Note over NAV,S: Navigator abre stream directo<br/>con el provider ganador
+```
+
+### Reputación
+
+**Tópico:** `fhs/v1/reputation/update`
+
+Navigator publica `ReputationUpdateMessage` al completar cada Mission.
+Todos los nodos suscritos actualizan su caché local. Los nodos que
+mantienen registros en DHT actualizan `DhtReputationRecord`.
+
+### Mensajes GossipSub y sus firmas
+
+Los mensajes GossipSub **no son Envelopes**. Cada uno lleva:
+- `did` del emisor
+- `timestamp` (anti-replay)
+- `signature` Ed25519 sobre los campos del mensaje
+
+El receptor verifica la firma usando la clave pública embebida en `did:key`.
+
+---
+
+## DHT — Descubrimiento y reputación
+
+La **DHT Kademlia** almacena records persistentes accesibles por cualquier nodo.
+
+### DhtBeaconRecord
+
+- **Key:** DID del nodo (`did:key:z...`)
+- **Value:** `DhtBeaconRecord` serializado en Protobuf
+- **Publicado por:** el propio nodo al unirse al swarm
+- **TTL:** 24h, renovar cada 12h
+
+Cualquier peer puede hacer `DHT.get(did)` para obtener el Beacon y multiaddrs
+de un nodo conocido, incluso si ese nodo no está anunciando en GossipSub ahora mismo.
+
+### DhtReputationRecord
+
+- **Key:** `"reputation/" + DID del provider`
+- **Value:** `DhtReputationRecord` firmado por el Navigator evaluador
+- **Publicado por:** Navigators después de cada Mission
+
+Múltiples Navigators contribuyen registros independientes bajo la misma key.
+Cada registro está firmado por el Navigator que lo publica.
+
+### Flujo de bootstrap (unirse al swarm)
+
+```mermaid
+sequenceDiagram
+    participant N as Nodo nuevo
+    participant A as Atlas (bootstrap peer)
+    participant S as Swarm DHT
+
+    N->>A: Conectar a bootstrap peer conocido
+    A->>N: Lista de peers del swarm
+    N->>S: Unirse al DHT (Kademlia join)
+    N->>S: DHT.put(did, DhtBeaconRecord)
+    N->>S: GossipSub.subscribe(fhs/v1/*)
+    N->>S: NodeAdvertiseMessage (fhs/v1/nodes/advertise)
+    Note over N: Operativo. Ya no depende de Atlas.
+```
+
+---
+
+## Stream directo FHS — El plano de ejecución
+
+Una vez que Navigator asigna una Mission a un provider (via GossipSub),
+abre un **stream directo libp2p** con protocolo `/fhs/v1/0.1.0`.
+
+Los streams directos se usan exclusivamente para:
+- La sesión permanente **Portal ↔ Navigator** (agente + chat)
+- La ejecución de Missions **Navigator ↔ Star** (chat.request / chat.delta)
+- La ejecución de tools **Navigator ↔ Satellite** (tool.call / tool.result)
+- El **handshake** entre cualquier par de nodos FHS al abrir un stream
+
+### Mensajes por stream
+
+| Stream | Mensajes principales |
+| ------ | -------------------- |
 | Portal → Navigator | `agent.start`, `chat.request`, `chat.cancel` |
 | Navigator → Portal | `agent.status`, `star.selected`, `tool.selected`, `assistant.delta`, `assistant.completed` |
-| Atlas → Atlas | `atlas.announce`, `atlas.sync` (gossip de federación) |
+| Navigator → Star (post-assign) | `chat.request`, `chat.cancel` |
+| Star → Navigator | `chat.delta`, `chat.completed`, `chat.error`, `tool.call` |
+| Navigator → Satellite (post-assign) | `tool.call`, `tool.cancel`, `tool.list` |
+| Satellite → Navigator | `tool.result`, `tool.error`, `tool.list.response`, `dispatch.ack` |
+| Cualquier par | `handshake`, `handshake_ack`, `ping`, `pong`, `error` |
 
-### Flujo de un frame FHS
+### Flujo de un frame Envelope
 
 ```mermaid
 sequenceDiagram
@@ -120,14 +269,14 @@ sequenceDiagram
     note over E: Construye payload (proto message)
     note over E: Envuelve en Envelope { messageId, sourcePeerId, destPeerId, timestamp, version }
     note over E: Firma: Ed25519(privKey, sha256(fields + payload_bytes))
-    note over E: Serializa Envelope en Protobuf
+    note over E: Serializa Envelope → Protobuf
     note over E: Aplica LPP framing: [varint(len)][bytes]
 
-    E->>R: Frame binario por WSS
+    E->>R: Frame binario por WSS (stream libp2p /fhs/v1/0.1.0)
 
     note over R: Desenmarca LPP → Envelope bytes
     note over R: Deserializa Protobuf → Envelope
-    note over R: Extrae clave pública del DID en sourcePeerId (did:key, sin red)
+    note over R: Extrae pubKey del DID en sourcePeerId (did:key, sin red)
     note over R: Verifica firma Ed25519
     note over R: Verifica timestamp (anti-replay ±30 000 ms)
     note over R: Despacha payload según oneof
@@ -137,100 +286,88 @@ sequenceDiagram
 
 ## WSS — El transporte
 
-WSS es el **medio físico** por donde viajan los frames FHS. No es el protocolo
-en sí — es la capa de red segura que los transporta.
+WSS (WebSocket Secure) es el **transporte físico** de los streams libp2p FHS.
 
 ```
 WSS = WebSocket sobre TLS
     = TCP + TLS 1.2/1.3 + upgrade HTTP a WebSocket
 ```
 
-### Por qué WSS y no ws:// plano
+### Por qué WSS es obligatorio
 
 | Razón | Detalle |
 | ----- | ------- |
-| **Coherencia** | El Portal web va por HTTPS; la red inter-nodo debe cifrar igual |
-| **Browsers** | Un browser en página HTTPS bloquea conexiones `ws://` (*Mixed Content*) — WSS es el único camino posible para Ephemeral Satellites |
-| **Privacidad** | Las conversaciones y los datos de herramientas viajan por el canal — el cifrado de transporte protege contra eavesdropping pasivo en la red |
-| **Enforcement** | `endpoint.url` en el Beacon tiene `pattern: "^wss://"` — Atlas rechaza `INVALID_MANIFEST` si el nodo declara `ws://` |
+| **Coherencia** | El Portal va por HTTPS; la red inter-nodo cifra igual |
+| **Browsers** | HTTPS bloquea `ws://` (*Mixed Content*) — WSS es el único camino para Ephemeral Satellites en browser |
+| **Privacidad** | Conversaciones y datos de tools viajan por el canal; TLS protege contra eavesdropping pasivo |
+| **Enforcement** | `endpoint.url` en el Beacon tiene `pattern: "^wss://"` — cualquier receptor rechaza `INVALID_MANIFEST` si el nodo declara `ws://` |
 
-### Roles de WSS y Ed25519
-
-WSS y la firma de Envelope son **complementarios**, no alternativos:
+### TLS + Ed25519 son complementarios
 
 | Capa | Qué protege | Qué no protege |
 | ---- | ----------- | -------------- |
-| **WSS / TLS** | Cifrado en tránsito entre dos puntos directos (punto A → punto B) | No autentica la identidad FHS del nodo, no protege mensajes que pasen por relays |
-| **Ed25519 (Envelope)** | Autenticidad del emisor FHS (cualquier nodo puede verificar sin haber estado en la conexión original) | No cifra — solo firma |
+| **TLS (WSS)** | Cifrado en tránsito entre dos puntos directos | No autentica la identidad FHS; no protege mensajes en GossipSub (donde hay relays) |
+| **Ed25519 (Envelope / GossipSub)** | Autenticidad del emisor FHS; cualquier nodo puede verificar sin haber estado en la conexión | No cifra — solo firma |
 
-Juntos cubren: el canal está cifrado (TLS) **y** el mensaje está firmado (Ed25519).
+Juntos: el canal está **cifrado** (TLS) **y** cada mensaje está **firmado** (Ed25519).
 
 ---
 
 ## HTTPS — El plano de distribución
 
-HTTPS es para servir contenido estático al browser. **No es parte del protocolo FHS.**
-
-### Dónde aparece
+HTTPS sirve contenido estático al browser. **No es parte del protocolo FHS.**
 
 | Recurso | Quién lo sirve | Quién lo consume |
 | ------- | -------------- | ---------------- |
-| `index.html`, CSS, JS del Portal | Servidor web (nginx / Vite dev) | Browser del usuario |
-| `bundle.wasm` + `DelegationToken` | Nodo Host (Satellite que publicó el WASM) | Browser del Ephemeral Satellite |
-| Certificados TLS (Let's Encrypt renewal) | CA pública | El propio servidor |
+| `index.html`, CSS, JS del Portal | Servidor web (nginx) | Browser del usuario |
+| `bundle.wasm` + `DelegationToken` | Nodo Host (Satellite) | Browser del Ephemeral Satellite |
+| Certificados TLS (Let's Encrypt) | CA pública | El propio servidor |
 
-### Por qué HTTPS y no WSS aquí
-
-La descarga del WASM y la carga del Portal son operaciones de **request/response** de una sola vez,
-no flujos de mensajería continua. HTTP(S) es el protocolo natural para eso. Además, los servidores
-de contenido estático (nginx, CDN) no hablan WSS.
+La descarga del WASM y la carga del Portal son operaciones **request/response** de una sola vez.
+HTTP(S) es el protocolo natural para eso.
 
 ```mermaid
 sequenceDiagram
     participant B as Browser
-    participant H as Nodo Host (HTTPS server)
-    participant A as Atlas (WSS server)
+    participant H as Nodo Host (HTTPS)
+    participant S as Swarm DHT + GossipSub
 
     B->>H: GET https://host.ejemplo.com/wasm-bundle (HTTPS)
-    H->>B: bundle.wasm + DelegationToken (JSON en header o body)
+    H->>B: bundle.wasm + DelegationToken
 
     note over B: Verifica SHA-256 del bundle
     note over B: Genera did:key efímero
-    note over B: Abre WebSocket...
+    note over B: Conecta al bootstrap peer Atlas...
 
-    B->>A: WSS CONNECT wss://atlas.ejemplo.com:8443/register (fhs.v1)
-    note over B,A: Desde aquí todo es WSS + Protobuf (protocolo FHS)
+    B->>S: Unirse al swarm DHT
+    B->>S: DHT.put(ephDid, DhtBeaconRecord { beacon, delegatedBy: hostDid })
+    B->>S: NodeAdvertiseMessage (fhs/v1/nodes/advertise, ephemeral=true)
+    note over B,S: Desde aquí todo es libp2p P2P (GossipSub + streams directos WSS)
 ```
 
 ---
 
 ## REST — El plano de gestión
 
-REST existe para **integraciones externas** con herramientas que no implementan el protocolo FHS:
-dashboards de monitoreo, scripts de CI, herramientas de introspección. Definido en `idl/openapi.yaml`.
-
-### Qué expone
+REST es para **integraciones externas** que no implementan el protocolo FHS.
+Definido en `idl/openapi.yaml`.
 
 | Endpoint | Método | Quién lo consume |
 | -------- | ------ | ---------------- |
-| `/api/fhs/providers` | GET | Dashboards, scripts de monitoreo |
-| `/api/fhs/providers?type=star` | GET | Clientes externos que necesitan listar Stars |
-| `/api/fhs/models` | GET | UIs que muestran modelos disponibles |
-| `/api/fhs/metrics/sample` | POST | Agentes de métricas (Prometheus exporter) |
-| `/api/fhs/atlas/peers` | GET / POST | Gestión manual de peers de federación |
+| `/api/fhs/providers` | GET | Dashboards, monitoreo |
+| `/api/fhs/models` | GET | UIs externas |
+| `/api/fhs/metrics/sample` | POST | Prometheus exporter |
+| `/api/fhs/atlas/peers` | GET / POST | Gestión de bootstrap peers conocidos |
 
-### Lo que REST NO hace
-
-- **No registra nodos** — los nodos se registran vía `handshake` por WSS+Proto
-- **No despacha Missions** — las Missions viajan por WSS+Proto entre Navigator y providers
-- **No recibe heartbeat** — el Pulse (ping/pong) es exclusivo del canal WSS
-- **No envía `mission.feedback`** — el feedback va por el canal WSS+Proto de Atlas
-
-### Regla de decisión
+**Lo que REST NO hace en el modelo P2P:**
+- No registra nodos — el nodo se publica en DHT (`DhtBeaconRecord`) directamente
+- No despacha Missions — el dispatch es GossipSub (offer/bid/assign)
+- No recibe heartbeat — la presencia es GossipSub `NodeAdvertiseMessage` con TTL
+- No envía reputación — el feedback es GossipSub `ReputationUpdateMessage`
 
 ```
-¿El cliente puede abrir una conexión WebSocket y hablar FHS?
-  Sí → WSS + Protobuf (protocolo FHS)
+¿El cliente puede unirse al swarm libp2p y hablar FHS?
+  Sí → GossipSub + stream directo (protocolo FHS completo)
   No → REST (plano de gestión, solo lectura de estado)
 ```
 
@@ -239,72 +376,63 @@ dashboards de monitoreo, scripts de CI, herramientas de introspección. Definido
 ## Protobuf — El encoding
 
 Protobuf 3 es el **formato de serialización** de todos los mensajes FHS.
-No es un protocolo de red — es cómo los bytes se convierten en estructuras de datos.
+Se usa tanto en streams directos (Envelope) como en mensajes GossipSub.
 
-### Modos
+| Contexto | Subprotocol / Encoding | Uso |
+| -------- | ---------------------- | --- |
+| Stream directo (primario) | `fhs.v1` — Protobuf + LPP framing | Producción |
+| Stream directo (compat) | `fhs.v1.json` — JSON | Desarrollo / debugging |
+| GossipSub | Protobuf binario (sin LPP) | Producción |
+| DHT records | Protobuf binario | Producción |
 
-| Subprotocol WSS | Encoding | Uso |
-| --------------- | -------- | --- |
-| `fhs.v1` | Protobuf binario + LPP framing | **Producción** |
-| `fhs.v1.json` | JSON (modo compat) | Desarrollo / debugging |
+### Por qué Protobuf en GossipSub también
 
-Ambos modos viajan siempre por WSS. La diferencia es solo el encoding del payload.
+La firma Ed25519 de los mensajes GossipSub requiere serialización **determinista** —
+el mismo mensaje debe producir los mismos bytes en cualquier nodo.
+Protobuf canónico lo garantiza; JSON no.
 
-### Por qué Protobuf y no JSON en producción
-
-| Criterio | Protobuf | JSON |
-| -------- | -------- | ---- |
-| Tamaño | 3-10× menor | Mayor |
-| Velocidad de parse | Más rápido | Más lento |
-| Schema enforcement | Compilado (`.proto`) | Runtime |
-| Firma determinista | Sí (serialización canónica para Ed25519) | No (whitespace, orden de claves) |
-| Legibilidad humana | No | Sí |
-
-La firma Ed25519 del Envelope requiere serialización **determinista** — el mismo mensaje
-siempre produce los mismos bytes. Protobuf canónico lo garantiza; JSON no.
-
-### LPP Framing
-
-En modo binario, cada frame WebSocket contiene:
+### LPP Framing (solo en stream directo)
 
 ```
 [varint: N bytes del Envelope proto][N bytes del Envelope serializado]
 ```
 
-El varint usa la misma codificación que Protobuf internamente (base-128, little-endian de 7 bits).
-Esto permite parsear mensajes de longitud arbitraria sin depender de los frames WebSocket.
-Ver `idl/framing.md` para la especificación completa.
+Ver `idl/framing.md` para la spec completa.
 
 ---
 
 ## Tabla resumen
 
-| ¿Qué necesitas hacer? | Protocolo | Encoding |
-| --------------------- | --------- | -------- |
-| Registrar un nodo (Star/Satellite/Nova/Navigator) | WSS P2P FHS | Protobuf |
-| Mantener un nodo en Orbit (Pulse) | WSS P2P FHS | Protobuf |
-| Registrar un Ephemeral Satellite con DelegationToken | WSS P2P FHS | Protobuf |
-| Ejecutar una Mission de chat | WSS P2P FHS | Protobuf |
-| Invocar un tool de un Satellite | WSS P2P FHS | Protobuf |
-| Enviar reputación post-Mission a Atlas | WSS P2P FHS | Protobuf |
-| Federar dos instancias de Atlas | WSS P2P FHS (gossip) | Protobuf |
-| Notificar al Portal sobre el agente | WSS P2P FHS | Protobuf |
-| Servir el Portal web al browser | HTTPS | HTML/CSS/JS |
-| Distribuir el bundle WASM a un Ephemeral Satellite | HTTPS | binario |
-| Consultar providers desde un dashboard | REST | JSON |
-| Listar modelos desde una UI no-FHS | REST | JSON |
-| Ingesta de métricas (Prometheus) | REST | JSON |
-| Debugging de mensajes en desarrollo | WSS P2P FHS | JSON (fhs.v1.json) |
+| ¿Qué necesitas hacer? | Plano | Protocolo | Encoding |
+| --------------------- | ----- | --------- | -------- |
+| Unirte al swarm P2P | P2P | libp2p DHT | — |
+| Publicar tu Beacon en la red | P2P | DHT Kademlia | Protobuf |
+| Anunciar tu presencia en tiempo real | P2P | GossipSub `fhs/v1/nodes/advertise` | Protobuf |
+| Buscar un nodo por DID | P2P | DHT Kademlia | Protobuf |
+| Registrar un Ephemeral Satellite | P2P | DHT + GossipSub | Protobuf |
+| Despachar una Mission (buscar provider) | P2P | GossipSub offer/bid/assign | Protobuf |
+| Consultar reputación de un provider | P2P | DHT `reputation/{did}` | Protobuf |
+| Actualizar reputación post-Mission | P2P | GossipSub `fhs/v1/reputation/update` | Protobuf |
+| Establecer sesión Portal ↔ Navigator | Ejecución | Stream directo WSS `/fhs/v1/0.1.0` | Protobuf |
+| Ejecutar una Mission de chat | Ejecución | Stream directo WSS | Protobuf |
+| Invocar un tool de un Satellite | Ejecución | Stream directo WSS | Protobuf |
+| Mantener streams activos (heartbeat) | Ejecución | Stream directo — `ping/pong` | Protobuf |
+| Servir el Portal web al browser | Distribución | HTTPS | HTML/CSS/JS |
+| Distribuir el bundle WASM | Distribución | HTTPS | binario |
+| Consultar providers desde un dashboard | Gestión | REST | JSON |
+| Listar modelos desde una UI no-FHS | Gestión | REST | JSON |
+| Ingesta de métricas (Prometheus) | Gestión | REST | JSON |
+| Debugging de streams directos | Ejecución | `fhs.v1.json` (stream WSS) | JSON |
 
 ---
 
 ## Puertos de referencia
 
-| Servicio | Puerto | Protocolo |
-| -------- | ------ | --------- |
-| Atlas (registro + gossip) | 8443 | WSS |
-| Navigator (Portal ↔ Navigator) | 8444 | WSS |
-| Portal web | 443 | HTTPS |
-| Star (LLM) | 43111 | WSS |
-| Satellite OCR | 43112 | WSS |
-| REST API (gestión) | 8443 | HTTPS (mismo servidor que Atlas, ruta `/api/`) |
+| Servicio | Puerto | Protocolo | Rol |
+| -------- | ------ | --------- | --- |
+| Atlas | 8443 | WSS + libp2p | Bootstrap peer, participa en DHT y GossipSub |
+| Navigator | 8444 | WSS + libp2p | Agent Runtime, stream permanente con Portal |
+| Portal web | 443 | HTTPS | Sirve la app web al browser |
+| Star (LLM) | 43111 | WSS + libp2p | Stream directo post-assign |
+| Satellite OCR | 43112 | WSS + libp2p | Stream directo post-assign |
+| REST API (gestión) | 8443 | HTTPS | Mismo servidor que Atlas, ruta `/api/` |
