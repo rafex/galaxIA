@@ -230,11 +230,46 @@ message NodeLostMessage {
   repeated NodeService services   = 3;
 }
 
-// ── Envelope de mensajes (para desambiguación en transporte) ─────────────────
+// ── Framing (modo binario P2P) ───────────────────────────────────────────────
+// En modo WebSocket binario (Sec-WebSocket-Protocol: fhs.v1), cada frame es:
+//   [varint: byte-length del FhsMessage serializado][FhsMessage bytes]
+// El varint usa la codificación estándar de protobuf (little-endian base-128).
+// Longitud máxima de frame: 16 MiB. Ver: idl/framing.md
+//
+// En modo JSON compat (Sec-WebSocket-Protocol: fhs.v1.json), el frame es texto
+// y el campo `type` actúa como discriminador equivalente al oneof.
 
-// FhsMessage — envelope para uso en transporte binario (gRPC, AMQP, etc.)
-// En WebSocket/JSON el campo `type` cumple esta función.
+// ── Gossip P2P (Atlas ↔ Atlas) ───────────────────────────────────────────────
+
+// atlas.announce — Atlas → Atlas
+// Un Atlas anuncia a otro Atlas los providers que tiene en Orbit.
+// Permite federación entre instancias Atlas sin coordinator central.
+message AtlasAnnounceMessage {
+  string           atlas_id      = 1; // DID del Atlas que anuncia (did:key:z...)
+  repeated string  provider_ids  = 2; // DIDs de providers actualmente en Orbit
+  int64            timestamp     = 3; // Unix ms
+  string           signature     = 4; // Ed25519 de "atlasId:timestamp"
+}
+
+// atlas.sync — Atlas → Atlas (respuesta a atlas.announce)
+// Devuelve el estado completo de los providers para sincronizar el routing table.
+message AtlasSyncMessage {
+  string                    atlas_id  = 1; // DID del Atlas que responde
+  repeated NodeOnlineMessage providers = 2; // Estado completo de cada provider
+  int64                     timestamp = 3;
+}
+
+// ── Envelope de mensajes ──────────────────────────────────────────────────────
+
+// FhsMessage — frame del wire protocol FHS.
+// En modo binario (fhs.v1): serializado como proto3 con LPP framing (ver arriba).
+// En modo JSON (fhs.v1.json): el campo `type` equivale al oneof.
 message FhsMessage {
+  // Versión del protocolo usada en este frame (ej. "1").
+  // Complementa la negociación fhsVersion de hello/welcome.
+  // Receptores que no reconozcan la versión DEBEN ignorar el frame.
+  string version = 22;
+
   oneof payload {
     // Mensajes de misión (chat + tool)
     ChatRequestMessage      chat_request    = 1;
@@ -260,5 +295,8 @@ message FhsMessage {
     // Notificaciones internas (Atlas → Navigator)
     NodeOnlineMessage       node_online     = 20;
     NodeLostMessage         node_lost       = 21;
+    // Gossip P2P (Atlas ↔ Atlas) — DEC-0086
+    AtlasAnnounceMessage    atlas_announce  = 23;
+    AtlasSyncMessage        atlas_sync      = 24;
   }
 }

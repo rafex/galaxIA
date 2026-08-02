@@ -1334,3 +1334,29 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
   - Verificación de `sourceUrl`/build reproducible — debate pendiente de su propia decisión.
 - **Limitaciones mantenidas (ver DEC-0031):** `FHS_TRUSTED_PROVIDERS` es config del operador local, no una señal de red verificable. Un operador puede marcar como `trusted` cualquier nodo que quiera, sin proceso de auditoría externa. Se documenta explícitamente para que no se presente como una garantía más fuerte de lo que es.
 - **Consecuencias:** `packages/fhs-protocol/src/manifest.ts` (agrega `NodeInfo` + `nodeInfo?`), `apps/atlas/src/atlas/registry.ts` (parsea `FHS_TRUSTED_PROVIDERS`, almacena `nodeInfos`, expone `trusted`/`nodeInfo` en `getProviders()`), `apps/atlas/src/api/providers.ts` (agrega `trusted` a `ModelListEntry` y a la respuesta de `/api/fhs/models`), `apps/portal-chat/src/components/chat-view.ts` (muestra `★` en el selector de modelo si `trusted`). Verificado: typecheck/tests verdes.
+
+## DEC-0086 — Protocolo FHS sobre P2P: Protobuf binario primario + Atlas como bootstrap peer
+
+- **Fecha:** 2026-08-02
+- **Estado:** `accepted` — aplicado en IDL (asyncapi.yaml, fhs-protocol.proto, idl/framing.md)
+- **Contexto:** FHS fue diseñado con premisas de red descentralizada (DIDs, firmas Ed25519, Beacons firmados, leases con TTL), pero el transporte actual es WebSocket + JSON con Atlas como único punto de registro centralizado. Para hacer el protocolo coherente con la premisa P2P, se necesita: (1) formato de wire binario eficiente para nodos modestos, (2) framing explícito que permita multiplexar sobre cualquier stream, (3) descubrimiento sin dependencia rígida de un Atlas único.
+- **Decisión:**
+  1. **Protobuf binario como formato primario del wire.** El `FhsMessage` envelope que ya existe en `fhs-protocol.proto` pasa de ser "documentación/codegen" a ser el frame real sobre el stream. JSON se preserva como modo de compatibilidad — mismo canal, misma semántica, frames de texto en lugar de binarios.
+  2. **LPP framing (Length-Prefix Protocol).** Cada frame binario es: `[varint: byte-length del FhsMessage serializado][FhsMessage bytes]`. El varint sigue la codificación estándar de protobuf (little-endian base-128). Longitud máxima de frame: 16 MiB. Especificado en `idl/framing.md`. Esto desacopla el protocolo del transporte: el mismo framing funciona sobre WebSocket binary, TCP, QUIC o Unix sockets.
+  3. **WebSocket subprotocol negotiation.** Header `Sec-WebSocket-Protocol: fhs.v1` indica modo binario LPP+Protobuf. Header `fhs.v1.json` indica modo JSON compat. Si el cliente no envía el header, el servidor puede elegir el modo por defecto (JSON para compat con implementaciones existentes).
+  4. **Atlas pasa de "único registry centralizado" a "bootstrap peer".** Un nodo puede conectarse a múltiples instancias Atlas. Atlas publica su identidad (`did:key:z...`) en el campo `endpoint.multiaddr` del Beacon (nuevo campo opcional junto a `endpoint.url`). Los mensajes de gossip `atlas.announce` y `atlas.sync` permiten que instancias Atlas se sincronicen entre sí para federar sus routing tables.
+  5. **`FhsMessage` añade campo `version: string` (field 22, fuera del oneof)** para identificar la versión del protocolo usada en la sesión. Valor esperado: `"1"`. Complementa la negociación de `fhsVersion` en `hello`/`welcome`.
+  6. **Nuevos mensajes de gossip Atlas↔Atlas:** `atlas.announce` (field 23) y `atlas.sync` (field 24). Permiten que instancias Atlas compartan su routing table sin coordinator central.
+- **Lo que NO cambia:**
+  - Todos los tipos de mensaje existentes y sus semánticas (hello/welcome/register/registered/ping/pong/error, misiones de chat y tool, node.online/node.lost).
+  - El modelo de seguridad (Ed25519, CallerAuth, firmas en hello/register).
+  - El concepto de Beacon y el flujo de registro.
+  - El vocabulario (Star, Satellite, Nova, Atlas, Navigator, Portal, Mission, Orbit, Pulse).
+  - Los nodos actuales (Bastion, Raspi4B, Laptop) no necesitan cambios de código — la negociación de subprotocolo es progressive enhancement.
+- **Implementación por fases:**
+  - **Phase 1 (IDL):** Esta DEC — formalizar framing, bindings, gossip en el IDL. Sin cambios de código en Atlas/Navigator.
+  - **Phase 2 (SDK):** `@rafex/galaxia-fhs-protocol` añade `encodeMessage()`/`decodeMessage()` LPP. Los nodos pueden anunciar soporte binario.
+  - **Phase 3 (Atlas):** Atlas implementa gossip `atlas.announce`/`atlas.sync` con otras instancias Atlas.
+  - **Phase 4 (opcional):** Transporte nativo libp2p para nodos que lo soporten (no rompe nada — sigue siendo el mismo framing).
+- **Premisas eje preservadas:** Hardware modesto → Phase 1 tiene costo cero en runtime. Soberanía → datos siguen sin pasar por Atlas en mensajes de misión. Privacidad → Provenance sin cambios. Descentralización → Atlas pasa de requerido a opcional para operación (mDNS para redes locales en Phase 3).
+- **Consecuencias IDL:** `idl/framing.md` (nuevo), `idl/asyncapi.yaml` (bindings WS, canal `/atlas/gossip`, mensajes `AtlasAnnounceMessage`/`AtlasSyncMessage`), `idl/fhs-protocol.proto` (field `version` en `FhsMessage`, nuevos mensajes gossip, referencia a framing). TASKS.md: TASK-IDL-009, TASK-IDL-010, TASK-IDL-011.

@@ -8,11 +8,29 @@ info:
     nodos federados: Atlas (Registry), Navigator (Agent Runtime) y
     Satellites/Stars (Providers de LLM, tools, OCR, RAG, KB).
 
-    Los mensajes viajan por WebSocket (ws://navigator/chat) y por HTTP SSE
-    (GET /chat stream desde Navigator hacia Atlas).
+    ## Modos de transporte (DEC-0086)
+
+    El protocolo opera en dos modos sobre WebSocket, negociados con el
+    header `Sec-WebSocket-Protocol`:
+
+    | Subprotocol    | Frames    | Formato                        |
+    |----------------|-----------|-------------------------------|
+    | `fhs.v1`       | binary    | LPP + Protobuf (primario, P2P) |
+    | `fhs.v1.json`  | text      | JSON compat                    |
+
+    En modo `fhs.v1`, cada frame binario es un FhsMessage LPP-prefijado
+    (varint-length + proto3 bytes). Ver `idl/framing.md` para la spec completa.
+    En modo `fhs.v1.json`, el campo `type` del JSON actúa como discriminador.
+
+    ## Topología P2P
+
+    Atlas opera como bootstrap peer en una malla P2P federada, no como único
+    registry centralizado. Los mensajes `atlas.announce` / `atlas.sync`
+    permiten que múltiples instancias Atlas sincronicen sus routing tables.
 
     Versión de referencia: @rafex/galaxia-fhs-protocol@0.1.23
     Repositorio de tipos: https://github.com/rafex/galaxIA-SDK
+    Framing spec: idl/framing.md
 
   license:
     name: MIT
@@ -41,6 +59,13 @@ channels:
     bindings:
       ws:
         method: GET
+        headers:
+          type: object
+          properties:
+            Sec-WebSocket-Protocol:
+              type: string
+              enum: [fhs.v1, fhs.v1.json]
+              description: "fhs.v1: binario LPP+Protobuf (P2P). fhs.v1.json: texto JSON (compat)."
 
   # ── WebSocket: Navigator → Cliente ───────────────────────────────────────
   /chat/stream:
@@ -86,6 +111,13 @@ channels:
     bindings:
       ws:
         method: GET
+        headers:
+          type: object
+          properties:
+            Sec-WebSocket-Protocol:
+              type: string
+              enum: [fhs.v1, fhs.v1.json]
+              description: "fhs.v1: binario LPP+Protobuf (P2P). fhs.v1.json: texto JSON (compat)."
 
   # ── WebSocket: Atlas → Navigator (notificaciones de topología) ───────────
   /atlas/nodes:
@@ -101,6 +133,37 @@ channels:
     bindings:
       ws:
         method: GET
+        headers:
+          type: object
+          properties:
+            Sec-WebSocket-Protocol:
+              type: string
+              enum: [fhs.v1, fhs.v1.json]
+              description: "fhs.v1: binario LPP+Protobuf (P2P). fhs.v1.json: texto JSON (compat)."
+
+  # ── WebSocket: Atlas ↔ Atlas (gossip P2P, DEC-0086) ───────────────────────
+  /atlas/gossip:
+    address: ws://{atlas}/gossip
+    description: |
+      Canal de gossip entre instancias Atlas. Permite que múltiples Atlas sincronicen
+      sus routing tables sin coordinator central, formando una malla federada P2P.
+      El Atlas que inicia la conexión envía atlas.announce; el receptor responde con
+      atlas.sync devolviendo el estado completo de sus providers en Orbit.
+    messages:
+      atlasAnnounce:
+        $ref: "#/components/messages/AtlasAnnounceMessage"
+      atlasSync:
+        $ref: "#/components/messages/AtlasSyncMessage"
+    bindings:
+      ws:
+        method: GET
+        headers:
+          type: object
+          properties:
+            Sec-WebSocket-Protocol:
+              type: string
+              enum: [fhs.v1, fhs.v1.json]
+              description: "fhs.v1: binario LPP+Protobuf (P2P). fhs.v1.json: texto JSON (compat)."
 
 components:
   messages:
@@ -167,6 +230,21 @@ components:
       summary: Atlas → Navigator. Un provider perdió su lease o cerró la conexión.
       payload:
         $ref: "#/components/schemas/NodeLostMessage"
+
+    # ── Gossip P2P (Atlas ↔ Atlas, DEC-0086) ─────────────────────────────
+    AtlasAnnounceMessage:
+      name: atlas.announce
+      title: Anuncio de providers de un Atlas a otro
+      summary: Atlas → Atlas. Anuncia los providers en Orbit para sincronizar routing tables federadas.
+      payload:
+        $ref: "#/components/schemas/AtlasAnnounceMessage"
+
+    AtlasSyncMessage:
+      name: atlas.sync
+      title: Respuesta de sincronización entre instancias Atlas
+      summary: Atlas → Atlas. Devuelve el estado completo de providers en respuesta a atlas.announce.
+      payload:
+        $ref: "#/components/schemas/AtlasSyncMessage"
 
     # ── Mensajes de Chat ──────────────────────────────────────────────────
     ChatRequestMessage:
@@ -426,6 +504,48 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/NodeService"
+
+    # ── Gossip P2P (Atlas ↔ Atlas, DEC-0086) ─────────────────────────────
+    AtlasAnnounceMessage:
+      type: object
+      required: [type, atlasId, providerIds, timestamp, signature]
+      properties:
+        type:
+          type: string
+          enum: [atlas.announce]
+        atlasId:
+          type: string
+          description: DID del Atlas que anuncia (did:key:z...)
+        providerIds:
+          type: array
+          items:
+            type: string
+          description: DIDs de providers actualmente en Orbit en este Atlas
+        timestamp:
+          type: integer
+          format: int64
+        signature:
+          type: string
+          description: Firma Ed25519 en base64 de "atlasId:timestamp"
+
+    AtlasSyncMessage:
+      type: object
+      required: [type, atlasId, providers, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [atlas.sync]
+        atlasId:
+          type: string
+          description: DID del Atlas que responde (did:key:z...)
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeOnlineMessage"
+          description: Estado completo de cada provider en Orbit en este Atlas
+        timestamp:
+          type: integer
+          format: int64
 
     # ── Tipos base ────────────────────────────────────────────────────────
     CallerAuth:

@@ -223,6 +223,59 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 
 ---
 
+### TASK-IDL-009 — Endpoint multiaddr en Beacon schemas (P2P)
+
+- ID: TASK-IDL-009
+- State: `todo`
+- Owner: rafex
+- Dependencies: TASK-IDL-002
+- Expected files:
+  - `schemas/beacon-base.schema.json` (modificado — campo `endpoint.multiaddr`)
+  - `idl/asyncapi.yaml` (modificado — campo `endpoint.multiaddr` en schema RegisterMessage)
+- Close criteria: Los schemas de Beacon incluyen el campo opcional `endpoint.multiaddr` (string,
+  formato multiaddr: `/ip4/…/tcp/…/ws/p2p/did:key:z…`) junto al `endpoint.url` existente.
+  La presencia de `multiaddr` permite a otros nodos conectarse directamente como peer P2P
+  sin depender de DNS o IP estática. Al menos uno de los dos campos (`url` o `multiaddr`)
+  debe estar presente (validado por `oneOf` o `anyOf` en el schema).
+- Validation: Comparar con `idl/framing.md` sección de multiaddr y DEC-0086.
+
+---
+
+### TASK-IDL-010 — Actualizar idl/flows.md con el flujo de gossip Atlas↔Atlas
+
+- ID: TASK-IDL-010
+- State: `todo`
+- Owner: rafex
+- Dependencies: TASK-IDL-003, TASK-IDL-009
+- Expected files:
+  - `idl/flows.md` (modificado — 5to diagrama de secuencia)
+- Close criteria: `idl/flows.md` incluye un 5to `sequenceDiagram` que muestra el flujo de
+  gossip P2P entre dos instancias Atlas:
+  `Atlas-A → Atlas-B: WebSocket /gossip (Sec-WebSocket-Protocol: fhs.v1)`
+  `Atlas-A → Atlas-B: atlas.announce { atlasId, providerIds[] }`
+  `Atlas-B → Atlas-A: atlas.sync { providers[] }`
+  El diagrama incluye la nota del framing LPP en modo binario.
+- Validation: Coherente con `idl/framing.md`, DEC-0086 y los schemas de AtlasAnnounce/AtlasSync.
+
+---
+
+### TASK-IDL-011 — Actualizar openapi.yaml con endpoint de discovery P2P
+
+- ID: TASK-IDL-011
+- State: `todo`
+- Owner: rafex
+- Dependencies: TASK-IDL-004
+- Expected files:
+  - `idl/openapi.yaml` (modificado)
+- Close criteria: `openapi.yaml` incluye:
+  - `GET /api/fhs/atlas/peers` — lista de Atlas peers conocidos por este Atlas (para bootstrap)
+    Respuesta: `[{ atlasId, endpoint, multiaddr?, lastSync }]`
+  - `POST /api/fhs/atlas/peers` — registrar un Atlas peer manualmente (config del operador)
+  El campo `multiaddr` aparece en `NodeSummary` y `NodeDetail` como opcional (P2P endpoint).
+- Validation: Coherente con DEC-0086 y el canal `/atlas/gossip` de asyncapi.yaml.
+
+---
+
 ## Dependencias visuales
 
 ```
@@ -231,10 +284,18 @@ TASK-IDL-001 (mensajes registro) ✅
     ├──► TASK-IDL-002 (schemas Beacon) ← availability, region
     │         │
     │         ├──► TASK-IDL-004 (openapi.yaml) ← scope, provenance, NodeManifest.did→providerId
+    │         │         │
+    │         │         └──► TASK-IDL-011 (openapi P2P endpoints)
     │         │
-    │         └──► TASK-IDL-005 (vocabulario) ← DID reales, star/satellite en docs
+    │         ├──► TASK-IDL-005 (vocabulario) ← DID reales, star/satellite en docs
+    │         │
+    │         └──► TASK-IDL-009 (multiaddr en Beacon)
+    │                   │
+    │                   └──► TASK-IDL-010 (flow gossip en flows.md)
     │
     ├──► TASK-IDL-003 (flows.md Mermaid)
+    │         │
+    │         └──► TASK-IDL-010 (flow gossip)
     │
     ├──► TASK-IDL-007 (canal Portal↔Navigator) ← star.selected, provenance
     │
@@ -248,3 +309,4 @@ TASK-IDL-003, TASK-IDL-007 y TASK-IDL-008 pueden ejecutarse en paralelo
 una vez terminada TASK-IDL-001 (no dependen de Beacon schemas).
 TASK-IDL-004 y TASK-IDL-005 pueden ejecutarse en paralelo una vez
 terminada TASK-IDL-002.
+TASK-IDL-009, TASK-IDL-010, TASK-IDL-011 son la serie P2P (DEC-0086).
