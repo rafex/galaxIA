@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+// FHS Wire Protocol — Protobuf IDL
+// Versión de referencia: @rafex/galaxia-fhs-protocol@0.1.23
+// Repositorio de tipos: https://github.com/rafex/galaxIA-SDK
+//
+// NOTA: El transporte primario del protocolo FHS es WebSocket con JSON.
+// Este archivo Protobuf documenta los contratos de forma independiente
+// del lenguaje para facilitar la generación de clientes (Java, Python,
+// Rust, Go). El campo `type` en los mensajes JSON equivale al `oneof`
+// en Protobuf.
+
+package fhs.v1;
+
+option java_package = "io.galax_ia.fhs.v1";
+option java_outer_classname = "FhsProtocol";
+option go_package = "github.com/rafex/galaxIA/idl/fhs/v1";
+
+// ── Tipos base ───────────────────────────────────────────────────────────────
+
+message CallerAuth {
+  string caller_id  = 1; // DID del nodo que origina la solicitud (did:key:...)
+  string signature  = 2; // Firma Ed25519 en base64 de `callerId:missionId:timestamp`
+  int64  timestamp  = 3; // Unix ms del momento de firma
+}
+
+message Message {
+  string role         = 1; // user | assistant | system | tool
+  string content      = 2;
+  string tool_call_id = 3; // Solo cuando role == "tool"
+  repeated ToolCall tool_calls = 4;
+}
+
+message ToolDefinition {
+  string name         = 1;
+  string description  = 2;
+  string input_schema = 3; // JSON Schema serializado
+}
+
+message ToolCall {
+  string id   = 1;
+  string type = 2; // Siempre "function"
+  ToolCallFunction function = 3;
+}
+
+message ToolCallFunction {
+  string name      = 1;
+  string arguments = 2; // JSON serializado de los argumentos
+}
+
+// ── Mensajes del protocolo FHS ───────────────────────────────────────────────
+
+// chat.request — Cliente → Navigator
+message ChatRequestMessage {
+  string mission_id                     = 1;
+  repeated Message messages             = 2;
+  repeated ToolDefinition tools         = 3;
+  string model                          = 4;
+  int64  timestamp                      = 5;
+  CallerAuth auth                       = 6;
+}
+
+// chat.cancel — Cliente → Navigator
+message ChatCancelMessage {
+  string mission_id = 1;
+  int64  timestamp  = 2;
+}
+
+// chat.delta — Navigator → Cliente (streaming)
+message ChatDeltaMessage {
+  string mission_id = 1;
+  string delta      = 2;
+  int64  timestamp  = 3;
+}
+
+// chat.completed — Navigator → Cliente
+message ChatCompletedMessage {
+  string mission_id              = 1;
+  string content                 = 2;
+  repeated ToolCall tool_calls   = 3;
+  int64  timestamp               = 4;
+}
+
+// chat.error — Navigator → Cliente
+message ChatErrorMessage {
+  string mission_id = 1;
+  string error      = 2;
+  int64  timestamp  = 3;
+}
+
+// dispatch.ack — Navigator → Atlas (confirmación de dispatch)
+message DispatchAckMessage {
+  string mission_id = 1;
+  int64  queued_at  = 2;
+}
+
+// tool.call — Navigator → Provider (solicitud de tool)
+message ToolCallRequestMessage {
+  string mission_id              = 1;
+  repeated ToolCall tool_calls   = 2;
+  int64  timestamp               = 3;
+}
+
+// tool.cancel — Navigator → Provider
+message ToolCancelMessage {
+  string mission_id = 1;
+  int64  timestamp  = 2;
+}
+
+// tool.result — Provider → Navigator
+message ToolCallResultMessage {
+  string mission_id   = 1;
+  string tool_call_id = 2;
+  string result       = 3; // JSON serializado del resultado
+  int64  timestamp    = 4;
+}
+
+// tool.error — Provider → Navigator
+message ToolCallErrorMessage {
+  string mission_id   = 1;
+  string tool_call_id = 2;
+  string error        = 3;
+  int64  timestamp    = 4;
+}
+
+// tool.list — Navigator → Provider (solicitud de lista de tools)
+message ToolListRequestMessage {
+  string mission_id = 1;
+  int64  timestamp  = 2;
+}
+
+// tool.list.response — Provider → Navigator
+message ToolListResponseMessage {
+  string mission_id                   = 1;
+  repeated ToolDefinition tools       = 2;
+  int64  timestamp                    = 3;
+}
+
+// ── Envelope de mensajes (para desambiguación en transporte) ─────────────────
+
+// FhsMessage — envelope para uso en transporte binario (gRPC, AMQP, etc.)
+// En WebSocket/JSON el campo `type` cumple esta función.
+message FhsMessage {
+  oneof payload {
+    ChatRequestMessage    chat_request      = 1;
+    ChatCancelMessage     chat_cancel       = 2;
+    ChatDeltaMessage      chat_delta        = 3;
+    ChatCompletedMessage  chat_completed    = 4;
+    ChatErrorMessage      chat_error        = 5;
+    DispatchAckMessage    dispatch_ack      = 6;
+    ToolCallRequestMessage tool_call        = 7;
+    ToolCancelMessage     tool_cancel       = 8;
+    ToolCallResultMessage  tool_result      = 9;
+    ToolCallErrorMessage   tool_error       = 10;
+    ToolListRequestMessage tool_list        = 11;
+    ToolListResponseMessage tool_list_resp  = 12;
+  }
+}

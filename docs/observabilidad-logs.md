@@ -1,6 +1,6 @@
 # Observabilidad de logs multi-host (DEC-0083)
 
-Diagnosticar un problema en la topología multi-host (`docs/despliegue-multi-host.md`) requiere hoy saltar por SSH a cada máquina y revisar `podman logs` uno por uno, sin línea de tiempo unificada ni forma de correlacionar un `conversationId`/`requestId` entre hosts. Esto lo resuelve sin cambiar el protocolo FHS ni el hábito operativo existente: sigue siendo un archivo de texto plano que se abre con `lnav`, solo que ahora también se agrega uno central.
+Diagnosticar un problema en la topología multi-host (`docs/despliegue-multi-host.md`) requiere hoy saltar por SSH a cada máquina y revisar `podman logs` uno por uno, sin línea de tiempo unificada ni forma de correlacionar un `conversationId`/`missionId` entre hosts. Esto lo resuelve sin cambiar el protocolo FHS ni el hábito operativo existente: sigue siendo un archivo de texto plano que se abre con `lnav`, solo que ahora también se agrega uno central.
 
 **No forma parte del protocolo FHS** — es una capa operativa, igual que el bridge de eventos NATS (`SPEC-BRIDGE-0001`, DEC-0074) del que reusa la infraestructura y el patrón de degradación.
 
