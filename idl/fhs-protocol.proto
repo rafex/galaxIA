@@ -73,6 +73,11 @@ message Envelope {
     ToolSelectedMessage       tool_selected       = 63;
     AssistantDeltaMessage     assistant_delta     = 64;
     AssistantCompletedMessage assistant_completed = 65;
+
+    // Ephemeral Satellite (SPEC-EPHSAT-0001)   [70-79]
+    // Navigator conecta al canal /register de Atlas y envía mission.feedback
+    // tras completar una Mission con un Ephemeral Satellite.
+    MissionFeedbackMessage    mission_feedback    = 70;
   }
 }
 
@@ -84,20 +89,25 @@ message Envelope {
 // handshake — Provider → Atlas
 // Reemplaza el flujo anterior de 4 mensajes: hello → welcome → register → registered.
 // Lleva el Beacon firmado y los endpoints P2P del nodo.
+// Si es un Ephemeral Satellite (beacon.provider.ephemeral == true), incluye delegation_token.
 message HandshakeMessage {
-  string          fhs_version   = 1;  // Versión del protocolo FHS que soporta este nodo
-  repeated string listen_addrs  = 2;  // Multiaddrs P2P (ej. /ip4/1.2.3.4/tcp/8081/ws)
-  string          beacon        = 3;  // Beacon JSON serializado (manifiesto completo del nodo)
+  string          fhs_version      = 1;  // Versión del protocolo FHS que soporta este nodo
+  repeated string listen_addrs     = 2;  // Multiaddrs P2P (ej. /ip4/1.2.3.4/tcp/8081/ws)
+  string          beacon           = 3;  // Beacon JSON serializado (manifiesto completo del nodo)
+  DelegationToken delegation_token = 4;  // Solo presente en Ephemeral Satellites (SPEC-EPHSAT-0001)
 }
 
 // handshake_ack — Atlas → Provider
 // El provider está en Orbit tras recibir este mensaje.
+// Si el handshake fue rechazado, Atlas envía un ErrorMessage (DELEGATION_INVALID / DELEGATION_EXPIRED)
+// y cierra la conexión sin enviar handshake_ack.
 message HandshakeAckMessage {
   string fhs_version       = 1;  // Versión del protocolo acordada para esta sesión
   int32  lease_seconds     = 2;  // Duración del lease en segundos (default 30)
   int32  heartbeat_seconds = 3;  // Intervalo de ping recomendado en segundos (default 10)
   int64  lease_expires     = 4;  // Unix ms cuando vence el lease actual
   int32  accepted_services = 5;  // Número de capabilities aceptadas del Beacon
+  string trust_level       = 6;  // "standard" | "delegated" | "community" | "unverified" (SPEC-EPHSAT-0001)
 }
 
 // ping — Provider → Atlas (Pulse / heartbeat)
@@ -125,6 +135,10 @@ enum FhsErrorCode {
   CANCELLED                     = 10; // Petición abortada tras chat.cancel/tool.cancel
   OVERLOADED                    = 11; // Nodo a capacidad máxima (availability.maxConcurrentRequests)
   INTERNAL_ERROR                = 12; // Fallo no clasificado
+  // Ephemeral Satellite (SPEC-EPHSAT-0001)
+  DELEGATION_INVALID            = 13; // DelegationToken: firma inválida, Host no en Orbit, o campos mal formados
+  DELEGATION_EXPIRED            = 14; // DelegationToken.expires_at ya venció (o Host salió del Orbit)
+  WASM_HASH_MISMATCH            = 15; // Hash SHA-256 del bundle WASM no coincide con DelegationToken.wasm_hash
 }
 
 message ErrorMessage {
@@ -241,6 +255,40 @@ message ToolListResponseMessage {
   repeated ToolDefinition tools   = 2;
 }
 
+// ── Ephemeral Satellite (SPEC-EPHSAT-0001) ────────────────────────────────────
+// DelegationToken — Credencial firmada por el Nodo Host para delegar capacidades
+// a un Ephemeral Satellite. Viaja en HandshakeMessage.delegation_token.
+//
+// La firma cubre los campos 1-5 (issuer, subject, capabilities, wasm_hash, expires_at)
+// en su serialización proto canónica (determinista). Atlas verifica la firma usando
+// la clave pública Ed25519 derivada directamente del DID issuer (did:key:z... codifica
+// la clave pública — no se requiere PKI externa).
+message DelegationToken {
+  string          issuer       = 1;  // DID del Nodo Host firmante (did:key:z...)
+  string          subject      = 2;  // DID del Ephemeral Satellite (did:key:z...) — debe coincidir con Envelope.sourcePeerId
+  repeated string capabilities = 3;  // Capability IDs que el Host delega (subconjunto de los suyos)
+  string          wasm_hash    = 4;  // "sha256:<64-hex>" del bundle WASM que el Ephemeral Satellite ejecutará
+  int64           expires_at   = 5;  // Unix ms de expiración del token
+  bytes           signature    = 6;  // Firma Ed25519 sobre el canonical proto de campos 1-5
+}
+
+// mission.feedback — Navigator → Atlas (canal /register, SPEC-EPHSAT-0001)
+// Navigator reporta la calidad de una Mission completada por un Ephemeral Satellite.
+// Extiende SPEC-SATRATING-0001: Atlas actualiza la reputación del Ephemeral Satellite
+// y el contador de delegaciones exitosas del Nodo Host.
+//
+// Navigator mantiene una conexión WS al canal /register de Atlas (mismo canal que
+// los providers usan para handshake/ping). Navigator también hace handshake al
+// iniciar — es un nodo más en la red FHS.
+message MissionFeedbackMessage {
+  string mission_id    = 1;  // UUID de la Mission completada
+  string satellite_did = 2;  // DID del Ephemeral Satellite evaluado
+  float  latency_ms    = 3;  // Latencia real de la Mission (ms)
+  bool   success       = 4;  // true = completó sin error
+  string error_code    = 5;  // FhsErrorCode como string; vacío si success = true
+  string delegated_by  = 6;  // DID del Nodo Host (para actualizar reputación derivada); vacío si TrustLevel.UNVERIFIED
+}
+
 // ── Notificaciones internas (Atlas → Navigator) ───────────────────────────────
 
 message NodeService {
@@ -250,14 +298,20 @@ message NodeService {
 
 // node.online — Atlas → Navigator
 // Un provider entró en Orbit tras handshake exitoso.
+// Para Ephemeral Satellites, trust_level y delegated_by permiten que Navigator
+// muestre el nivel de confianza en la ProvenanceInfo sin consultar Atlas.
 message NodeOnlineMessage {
   string             provider_id   = 1;
   string             provider_name = 2;
   repeated NodeService services    = 3;
+  bool               ephemeral     = 4;  // true si es un Ephemeral Satellite (SPEC-EPHSAT-0001)
+  string             trust_level   = 5;  // "standard" | "delegated" | "community" | "unverified"
+  string             delegated_by  = 6;  // DID del Nodo Host; vacío si no es Ephemeral Satellite
 }
 
 // node.lost — Atlas → Navigator
 // Un provider perdió su lease o cerró la conexión.
+// Para Ephemeral Satellites, también se emite cuando su Nodo Host sale del Orbit.
 message NodeLostMessage {
   string             provider_id   = 1;
   string             provider_name = 2;

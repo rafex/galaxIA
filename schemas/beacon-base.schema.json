@@ -45,6 +45,44 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Etiquetas para filtrado y descubrimiento."
+        },
+        "ephemeral": {
+          "type": "boolean",
+          "default": false,
+          "description": "true si este nodo tiene ciclo de vida corto (dispositivo móvil, navegador, sesión WASM). Requiere DelegationToken en HandshakeMessage (SPEC-EPHSAT-0001)."
+        },
+        "delegatedBy": {
+          "type": "string",
+          "pattern": "^did:key:z",
+          "description": "DID del Nodo Host que emite el DelegationToken. Solo presente si ephemeral es true."
+        },
+        "leaseSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400,
+          "default": 3600,
+          "description": "TTL máximo de Orbit que este nodo solicita. Atlas puede reducirlo pero nunca aumentarlo. Solo relevante si ephemeral es true."
+        }
+      },
+      "additionalProperties": false
+    },
+    "device": {
+      "type": "object",
+      "description": "Información del dispositivo físico. Opcional. Solo incluir en Ephemeral Satellites (SPEC-EPHSAT-0001). No debe contener PII.",
+      "properties": {
+        "fingerprint": {
+          "type": "string",
+          "description": "Hash SHA-256 unidireccional de características del hardware (CPU ABI, RAM tier, pantalla). No reversible. Propósito: Sybil resistance básico (un mismo dispositivo no puede acumular reputación bajo múltiples DIDs efímeros sin ser detectado por Atlas)."
+        },
+        "platform": {
+          "type": "string",
+          "enum": ["android", "ios", "browser", "desktop"],
+          "description": "Plataforma de ejecución del Ephemeral Satellite."
+        },
+        "wasmTier": {
+          "type": "string",
+          "enum": ["baseline", "simd", "threads"],
+          "description": "Capacidades WASM del dispositivo. baseline: WASM básico. simd: SIMD 128-bit. threads: SharedArrayBuffer + Atomics."
         }
       },
       "additionalProperties": false

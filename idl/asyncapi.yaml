@@ -2,7 +2,7 @@ asyncapi: "3.0.0"
 
 info:
   title: FHS Wire Protocol
-  version: "0.3.0"
+  version: "0.4.0"
   description: |
     Federation of Sovereign Horizons (FHS) — protocolo de mensajería entre
     nodos federados: Atlas (Registry), Navigator (Agent Runtime) y
@@ -109,9 +109,15 @@ channels:
   /register:
     address: ws://{atlas}/register
     description: |
-      Canal de ciclo de vida de un provider con Atlas (DEC-0087).
+      Canal de ciclo de vida de un nodo con Atlas (DEC-0087).
+      Cualquier nodo (Provider, Navigator, Ephemeral Satellite) usa este canal.
       Flujo 2-step: handshake → handshake_ack → ping/pong (cada heartbeatSeconds).
-      Una vez en Orbit el canal recibe dispatch.ack y tool.cancel.
+      Una vez en Orbit: dispatch.ack, tool.cancel, mission.feedback.
+      Para Ephemeral Satellites (SPEC-EPHSAT-0001): el HandshakeMessage incluye
+      un DelegationToken. Si la validación falla, Atlas responde con error
+      (DELEGATION_INVALID / DELEGATION_EXPIRED) y cierra la conexión.
+      Navigator también usa este canal para enviar mission.feedback tras
+      completar Missions con Ephemeral Satellites.
       Todos los mensajes viajan en un Envelope firmado.
     messages:
       handshake:
@@ -128,6 +134,8 @@ channels:
         $ref: "#/components/messages/DispatchAckMessage"
       toolCancel:
         $ref: "#/components/messages/ToolCancelMessage"
+      missionFeedback:
+        $ref: "#/components/messages/MissionFeedbackMessage"
     bindings:
       ws:
         method: GET
@@ -242,6 +250,17 @@ components:
         jurisdicción, si se exportaron datos, etc.
       payload:
         $ref: "#/components/schemas/AssistantCompletedMessage"
+
+    # ── Ephemeral Satellite (SPEC-EPHSAT-0001) ───────────────────────────────
+    MissionFeedbackMessage:
+      name: mission.feedback
+      title: Retroalimentación de misión de Ephemeral Satellite
+      summary: |
+        Navigator → Atlas (canal /register). Reporta la calidad de una Mission
+        completada por un Ephemeral Satellite. Atlas actualiza la reputación del
+        Satellite y el contador de delegaciones exitosas del Nodo Host.
+      payload:
+        $ref: "#/components/schemas/MissionFeedbackMessage"
 
     # ── Ciclo de vida P2P (Provider ↔ Atlas, DEC-0087) ───────────────────────
     HandshakeMessage:
@@ -388,6 +407,71 @@ components:
         $ref: "#/components/schemas/NodeLostMessage"
 
   schemas:
+    # ── Ephemeral Satellite (SPEC-EPHSAT-0001) ────────────────────────────────
+    DelegationToken:
+      type: object
+      description: |
+        Credencial firmada por el Nodo Host que autoriza a un Ephemeral Satellite
+        a operar en su nombre. Viaja en HandshakeMessage.delegationToken (proto field 4).
+        La firma cubre los campos issuer, subject, capabilities, wasmHash, expiresAt
+        en serialización proto canónica (determinista). Atlas verifica con la clave
+        pública Ed25519 derivada del DID issuer (did:key embeds pubkey — sin PKI externa).
+      required: [issuer, subject, capabilities, wasmHash, expiresAt, signature]
+      properties:
+        issuer:
+          type: string
+          pattern: "^did:key:z"
+          description: DID del Nodo Host firmante
+        subject:
+          type: string
+          pattern: "^did:key:z"
+          description: DID del Ephemeral Satellite; debe coincidir con Envelope.sourcePeerId
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Capability IDs que el Host delega (subconjunto de los suyos)
+        wasmHash:
+          type: string
+          pattern: "^sha256:[0-9a-f]{64}$"
+          description: Hash SHA-256 del bundle WASM que el Ephemeral Satellite ejecutará
+        expiresAt:
+          type: integer
+          format: int64
+          description: Unix ms de expiración del token
+        signature:
+          type: string
+          description: Firma Ed25519 en bytes base64 sobre los campos 1-5 en proto canónico
+
+    MissionFeedbackMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, satelliteDid, latencyMs, success]
+          properties:
+            type:
+              type: string
+              enum: [mission.feedback]
+            missionId:
+              type: string
+              format: uuid
+              description: UUID de la Mission completada
+            satelliteDid:
+              type: string
+              description: DID del Ephemeral Satellite evaluado
+            latencyMs:
+              type: number
+              description: Latencia real de la Mission en milisegundos
+            success:
+              type: boolean
+              description: true si la Mission completó sin error
+            errorCode:
+              type: string
+              description: FhsErrorCode como string; vacío si success es true
+            delegatedBy:
+              type: string
+              description: DID del Nodo Host; vacío si TrustLevel es UNVERIFIED
+
     # ── Portal ↔ Navigator — Canal de agente (IDL-007) ────────────────────────
     AgentStartMessage:
       allOf:
@@ -580,6 +664,11 @@ components:
             beacon:
               type: object
               description: Beacon (manifiesto completo del nodo). Ver schemas/beacon-*.schema.json
+            delegationToken:
+              $ref: "#/components/schemas/DelegationToken"
+              description: |
+                Solo presente en Ephemeral Satellites (beacon.provider.ephemeral == true).
+                Credencial firmada por el Nodo Host. Atlas la valida antes de emitir handshake_ack.
 
     HandshakeAckMessage:
       allOf:
@@ -606,6 +695,14 @@ components:
             acceptedServices:
               type: integer
               description: Número de capabilities aceptadas del Beacon
+            trustLevel:
+              type: string
+              enum: [standard, delegated, community, unverified]
+              description: |
+                Nivel de confianza asignado por Atlas (SPEC-EPHSAT-0001).
+                standard: nodo regular (no efímero). delegated: Ephemeral Satellite con
+                DelegationToken válido. community: Host conocido pero WASM de terceros.
+                unverified: sin DelegationToken (desarrollo local).
 
     PingMessage:
       allOf:
@@ -646,7 +743,14 @@ components:
         - CANCELLED
         - OVERLOADED
         - INTERNAL_ERROR
-      description: Código semántico de error FHS. Quien consume puede tomar decisiones solo con el código.
+        - DELEGATION_INVALID
+        - DELEGATION_EXPIRED
+        - WASM_HASH_MISMATCH
+      description: |
+        Código semántico de error FHS. Quien consume puede tomar decisiones solo con el código.
+        DELEGATION_INVALID: DelegationToken con firma inválida, Host no en Orbit, o campos mal formados.
+        DELEGATION_EXPIRED: DelegationToken.expiresAt vencido o Nodo Host salió del Orbit.
+        WASM_HASH_MISMATCH: hash SHA-256 del bundle WASM no coincide con DelegationToken.wasmHash (SPEC-EPHSAT-0001).
 
     ErrorMessage:
       allOf:
@@ -967,6 +1071,16 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/NodeService"
+            ephemeral:
+              type: boolean
+              description: true si es un Ephemeral Satellite (SPEC-EPHSAT-0001)
+            trustLevel:
+              type: string
+              enum: [standard, delegated, community, unverified]
+              description: Nivel de confianza asignado por Atlas. Navigator lo propaga a Portal en ProvenanceInfo.
+            delegatedBy:
+              type: string
+              description: DID del Nodo Host; vacío si no es Ephemeral Satellite
 
     NodeLostMessage:
       allOf:
