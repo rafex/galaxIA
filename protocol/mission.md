@@ -24,7 +24,7 @@ sequenceDiagram
 
     P->>NAV: Envelope { chat_request }<br/>missionId, messages[]
 
-    note over NAV: Resuelve Star en routing table (node.online cache)
+    note over NAV: Resuelve Star en caché local de GossipSub (NodeAdvertiseMessage)
 
     NAV->>P: Envelope { star_selected }<br/>missionId, providerId (DID del Star), model
 
@@ -100,7 +100,7 @@ Cuando Navigator busca un Star o Satellite para una Mission, usa el `scope` del 
 | Scope | Qué providers considera |
 | ----- | ----------------------- |
 | `local` | Solo nodos en el mismo host (misma IP) |
-| `network` | Nodos en la red local (mismo Atlas) |
+| `network` | Nodos en la red local (mismo swarm DHT) |
 | `community` | Nodos con `visibility: "community"` en el Atlas y sus pares federados |
 | `external` | Todos los nodos públicos de la federación |
 
@@ -120,4 +120,4 @@ Cada `AssistantCompletedMessage` incluye `ProvenanceInfo` con la trazabilidad co
 ```
 
 Portal muestra esta información al usuario como la "Tarjeta de Procedencia" de la misión.
-Para Ephemeral Satellites, Navigator añade el `trustLevel` del nodo (obtenido de su caché de `node.online`).
+Para Ephemeral Satellites, Navigator añade el `trustLevel` del nodo (obtenido del `NodeAdvertiseMessage` o del `MissionBidMessage`).

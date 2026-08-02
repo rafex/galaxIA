@@ -1,158 +1,205 @@
-# FHS Protocol — Flujos de secuencia
+# FHS Protocol — Flujos de Secuencia
 
-**Versión:** 1.0  
-**DECs:** DEC-0086 (LPP framing + gossip), DEC-0087 (Envelope P2P, Handshake 2-step)  
+**Versión:** 2.0  
+**DECs:** DEC-P2P-001 (libp2p: DHT + GossipSub)  
 **Fecha:** 2026-08-02
 
-Todos los mensajes viajan dentro de un `Envelope` firmado con Ed25519 (`source_peer_id` + `signature`).  
+Todos los mensajes de stream directo viajan dentro de un `Envelope` firmado con Ed25519.  
+Los mensajes GossipSub llevan su propia firma (sin Envelope).  
 El framing binario se describe en [idl/framing.md](framing.md).
 
 ---
 
-## 1. Registro de Provider — Handshake 2-step (DEC-0087)
+## 1. Bootstrap — Unión al Swarm P2P
 
-Flujo de registro de un Star, Satellite o Nova ante un Atlas. Reemplaza el flujo de 4 mensajes (hello → welcome → register → registered) con 2 mensajes mutuamente autenticados vía Envelope.
+Flujo de un nodo nuevo (Star, Satellite, Nova, Navigator) al unirse a la red FHS.
 
 ```mermaid
 sequenceDiagram
-  participant P as Provider<br/>(Star / Satellite / Nova)
-  participant A as Atlas
+  participant N as Nodo nuevo<br/>(Star / Satellite / Nova)
+  participant A as Atlas<br/>(bootstrap peer)
+  participant D as DHT Swarm
+  participant G as GossipSub
 
-  P->>A: WebSocket connect /register<br/>Sec-WebSocket-Protocol: fhs.v1
-  note over P,A: Negociación de subprotocolo; Atlas elige fhs.v1 (binario) o fhs.v1.json
+  N->>A: Conectar a bootstrap peer (multiaddr conocido)
+  A->>N: Lista de peers del swarm
 
-  P->>A: Envelope { sourcePeerId: provider.DID, signature } → handshake<br/>{ fhsVersion, listenAddrs: ["/ip4/…/tcp/8081/ws"], beacon: "{…JSON…}" }
-  note over A: Valida Envelope.signature + beacon schema (beacon-base.schema.json)
+  N->>D: Kademlia Join
+  N->>D: DHT.put(did, DhtBeaconRecord { beacon, multiaddrs, expiresAt, signature })
+  note over D: Record distribuido en el swarm (TTL 24 h, renovar cada 12 h)
 
-  A->>P: Envelope { sourcePeerId: atlas.DID, signature } → handshake_ack<br/>{ fhsVersion, leaseSeconds: 30, heartbeatSeconds: 10, leaseExpires, acceptedServices }
-  note over P: Provider entra en estado Orbit
+  N->>G: Suscribir a fhs/v1/nodes/advertise, fhs/v1/missions/*, fhs/v1/reputation/update
+  N->>G: NodeAdvertiseMessage { did, beacon, multiaddrs, ttlSeconds=60, signature }
 
-  loop Cada heartbeatSeconds (Pulse)
-    P->>A: Envelope → ping {}
-    A->>P: Envelope → pong { serverTimestamp }
-  end
-
-  note over A: Sin ping antes de leaseSeconds → emite node.lost y libera el DID del routing table
+  note over N: Nodo operativo.<br/>No necesita Atlas para ninguna operación posterior.
 ```
 
 ---
 
-## 2. Misión de Chat — Portal → Navigator → Star
+## 2. Dispatch de Misión — GossipSub (offer → bid → assign)
 
-Flujo completo de una conversación con un LLM a través de la red FHS.
+Navigator recibe una Mission del Portal y asigna el mejor provider vía GossipSub antes de abrir el stream directo.
 
 ```mermaid
 sequenceDiagram
   participant Po as Portal
   participant N as Navigator
-  participant A as Atlas
-  participant S as Star
+  participant G as GossipSub
+  participant S as Star (provider)
 
-  Po->>N: Envelope → agent.start { sessionId, scope: "network", model }
-  Po->>N: Envelope → chat.request { missionId, messages[], tools[], model }
+  Po->>N: Envelope → agent.start { sessionId, scope, model }
+  Po->>N: Envelope → chat.request { missionId, messages[], model }
 
   N->>Po: Envelope → dispatch.ack { missionId, queuedAt }
-  note over N: Navigator consulta Atlas para elegir el Star disponible
 
+  N->>G: MissionOfferMessage { missionId, requiredCapabilities, scope, bidDeadlineMs }
+  N->>Po: Envelope → agent.status { status: "offering" }
+
+  note over G: Stars elegibles reciben la oferta y evalúan si pueden satisfacerla
+  S->>G: MissionBidMessage { missionId, providerDid, reputationScore, estimatedLatencyMs, trustLevel }
+  note over N: Acumula bids hasta bidDeadlineMs<br/>Ordena: trustLevel > reputationScore > estimatedLatencyMs
+
+  N->>G: MissionAssignMessage { missionId, assignedProvider: star.DID }
+  N->>Po: Envelope → agent.status { status: "assigning" }
   N->>Po: Envelope → star.selected { missionId, providerId: star.DID, model }
-  N->>Po: Envelope → agent.status { missionId, status: "calling_star" }
 
-  N->>S: Envelope → chat.request { missionId, messages[], tools[], model }
+  N->>S: libp2p dial (multiaddrs del MissionBidMessage)
+  N->>S: Envelope → handshake { fhsVersion, listenAddrs, beacon }
+  S->>N: Envelope → handshake_ack { leaseSeconds, heartbeatSeconds }
+
+  N->>S: Envelope → chat.request { missionId, messages[], model }
+  N->>Po: Envelope → agent.status { status: "calling_star" }
 
   loop Streaming de tokens
     S->>N: Envelope → chat.delta { missionId, delta }
     N->>Po: Envelope → assistant.delta { missionId, delta }
   end
 
-  S->>N: Envelope → chat.completed { missionId, content, toolCalls[] }
+  S->>N: Envelope → chat.completed { missionId, content }
   N->>Po: Envelope → assistant.completed { missionId, content, provenance }
-  note over Po: provenance = { providerId, model, completionTokens, toolProviderIds[], dataExported, jurisdiction }
+  N->>Po: Envelope → agent.status { status: "completed" }
+
+  N->>G: ReputationUpdateMessage { missionId, providerDid: star.DID, latencyMs, success }
 ```
 
 ---
 
 ## 3. Misión de Tool Call — Navigator → Satellite
 
-Subflujo que se intercala dentro de la Misión de Chat cuando el Star solicita invocar una herramienta.
+Subflujo intercalado en la Misión de Chat cuando el Star solicita invocar una herramienta.
 
 ```mermaid
 sequenceDiagram
   participant N as Navigator
-  participant S as Satellite
+  participant G as GossipSub
+  participant SAT as Satellite
   participant Po as Portal
 
-  note over N: Star devolvió toolCalls[] en chat.completed — Navigator inicia tool mission
+  note over N: Star devolvió toolCalls[] — Navigator inicia Tool Mission
 
-  N->>S: Envelope → tool.list { missionId }
-  S->>N: Envelope → tool.list.response { missionId, tools[] }
+  N->>G: MissionOfferMessage { missionId, requiredCapabilities: ["ocr.extract"], missionType: "tool_call" }
+  SAT->>G: MissionBidMessage { missionId, providerDid: sat.DID, offeredCapabilities: ["ocr.extract"] }
+  N->>G: MissionAssignMessage { missionId, assignedProvider: sat.DID }
 
-  N->>Po: Envelope → tool.selected { missionId, providerId: satellite.DID, capabilityId }
-  N->>Po: Envelope → agent.status { missionId, status: "calling_satellite" }
+  N->>SAT: libp2p dial (multiaddrs del bid)
+  N->>SAT: Envelope → handshake { beacon }
+  SAT->>N: Envelope → handshake_ack
 
-  N->>S: Envelope → tool.call { missionId, toolCalls[] }
+  N->>Po: Envelope → tool.selected { missionId, providerId: sat.DID, capabilityId }
+  N->>Po: Envelope → agent.status { status: "calling_satellite" }
+
+  N->>SAT: Envelope → tool.call { missionId, toolCalls[] }
 
   alt Éxito
-    S->>N: Envelope → tool.result { missionId, toolCallId, result }
+    SAT->>N: Envelope → tool.result { missionId, toolCallId, result }
   else Error del Satellite
-    S->>N: Envelope → tool.error { missionId, toolCallId, error }
+    SAT->>N: Envelope → tool.error { missionId, toolCallId, error }
   end
 
-  note over N: Resultado inyectado como Message { role: "tool" } en el próximo chat.request al Star
+  note over N: Resultado inyectado como Message { role: "tool" } en el próximo chat.request
 
   alt Cancelación del Portal
     Po->>N: Envelope → chat.cancel { missionId }
-    N->>S: Envelope → tool.cancel { missionId }
+    N->>SAT: Envelope → tool.cancel { missionId }
   end
+
+  N->>G: ReputationUpdateMessage { missionId, providerDid: sat.DID, success }
 ```
 
 ---
 
-## 4. Error y reconexión
+## 4. Handshake de Stream Directo
 
-Manejo de errores de autenticación y reconexión con backoff exponencial.
+Establecimiento de un stream directo `/fhs/v1/0.1.0` entre cualquier par de nodos FHS: Navigator↔Star, Navigator↔Satellite, Portal↔Navigator.
 
 ```mermaid
 sequenceDiagram
-  participant P as Provider
-  participant A as Atlas
+  participant I as Iniciador<br/>(Navigator / Portal)
+  participant R as Receptor<br/>(Star / Satellite / Navigator)
 
-  P->>A: WebSocket connect /register
-  P->>A: Envelope → handshake { fhsVersion, listenAddrs, beacon }
-  A->>P: Envelope → error { code: INVALID_SIGNATURE, message: "…" }
-  note over P: Provider verifica su clave privada Ed25519 — no hace retry inmediato
+  I->>R: libp2p dial (multiaddr del bid o DHT lookup)
+  note over I,R: Negociación de subprotocolo: fhs.v1 (binario) o fhs.v1.json
 
-  note over P: Backoff exponencial: 1 s → 2 s → 4 s → 8 s → 16 s (máx.)
+  I->>R: Envelope { handshake: HandshakeMessage }<br/>fhsVersion, listenAddrs, beacon (JSON serializado)
 
-  P->>A: WebSocket reconnect
-  P->>A: Envelope → handshake (beacon firmado correctamente)
-  A->>P: Envelope → handshake_ack { leaseSeconds: 30, … }
-  note over P: En Orbit
+  note over R: 1. Valida Envelope.signature Ed25519<br/>2. Verifica DID en caché GossipSub o DHT lookup<br/>3. Valida Beacon contra JSON Schema
 
-  note over P,A: Si el lease expira sin ping (Provider crasheó o perdió red)
-  A-->>N: Envelope → node.lost { providerId, providerName, services[] }
-  note over N: Navigator retira el Star/Satellite del routing table
+  alt Handshake exitoso
+    R->>I: Envelope { handshake_ack: HandshakeAckMessage }<br/>leaseSeconds, heartbeatSeconds, leaseExpires, trustLevel
+    note over I,R: Stream ACTIVO — en Orbit (peer-to-peer)
+  else Firma inválida o DID desconocido
+    R->>I: Envelope { error: INVALID_SIGNATURE }
+    note over R: Cierra stream
+  end
+
+  loop cada heartbeatSeconds
+    I->>R: Envelope { ping }
+    R->>I: Envelope { pong { serverTimestamp } }
+  end
+
+  note over I,R: Lease expira sin ping → cada nodo cierra stream localmente
 ```
 
 ---
 
-## 5. Gossip Atlas ↔ Atlas
+## 5. Error y Reconexión
 
-Sincronización de routing tables entre Atlas en una federación distribuida sin coordinador central (DEC-0086).
+Manejo de errores P2P: sin bids disponibles, peer inalcanzable, y reconexión con backoff.
 
 ```mermaid
 sequenceDiagram
-  participant A1 as Atlas-1
-  participant A2 as Atlas-2
+  participant N as Navigator
+  participant G as GossipSub
+  participant D as DHT
+  participant Po as Portal
 
-  A1->>A2: WebSocket connect /gossip<br/>Sec-WebSocket-Protocol: fhs.v1
+  N->>G: MissionOfferMessage { missionId, bidDeadlineMs }
+  note over N: Espera bids…
 
-  A1->>A2: Envelope { sourcePeerId: atlas1.DID, signature } → atlas.announce<br/>{ providerIds: ["did:key:zStar1", "did:key:zSatellite1"] }
-  note over A2: Atlas-2 conoce los providers que ve Atlas-1
+  alt Sin bids antes de bidDeadlineMs
+    N->>Po: Envelope → error { missionId, code: BID_TIMEOUT }
+    note over Po: Usuario recibe error — puede reintentar
+  end
 
-  A2->>A1: Envelope { sourcePeerId: atlas2.DID, signature } → atlas.sync<br/>{ providers: [NodeOnlineMessage{ providerId, providerName, services[] }, …] }
-  note over A1: Routing tables sincronizadas bidirec­cionalmente
+  alt Peer asignado inalcanzable al abrir stream
+    note over N: Backoff exponencial: 1 s → 2 s → 4 s → 8 s → 16 s (máx.)
+    N->>D: DHT.get(assignedDid) — buscar multiaddrs actualizadas
 
-  note over A1,A2: A partir de aquí, cualquier Atlas puede rutear misiones<br/>a providers registrados en cualquier otro Atlas de la federación
+    alt Reconexión exitosa
+      N->>G: MissionAssignMessage (mismo missionId, mismo provider)
+      note over N: Continúa la misión
+    else Fallo definitivo
+      N->>Po: Envelope → error { missionId, code: PEER_UNREACHABLE }
+      N->>G: MissionOfferMessage — nueva oferta para el mismo missionId
+      note over N: Intenta asignar a otro provider
+    end
+  end
+
+  alt Provider pierde conectividad (TTL de NodeAdvertiseMessage expira)
+    note over G: Nodo deja de publicar NodeAdvertiseMessage
+    note over N: TTL expira en caché local — Navigator marca el nodo offline
+    note over N: No hay node.lost explícito — el silencio es la señal
+  end
 ```
 
 ---
@@ -160,7 +207,9 @@ sequenceDiagram
 ## Referencias
 
 - [idl/fhs-protocol.proto](fhs-protocol.proto) — definición completa de todos los tipos de mensaje
-- [idl/asyncapi.yaml](asyncapi.yaml) — canales WebSocket y bindings
+- [idl/asyncapi.yaml](asyncapi.yaml) — canales WebSocket y GossipSub
+- [idl/gossipsub.md](gossipsub.md) — especificación de tópicos GossipSub
 - [idl/framing.md](framing.md) — especificación LPP de framing binario
+- [protocol/p2p.md](../protocol/p2p.md) — modelo de red P2P completo
 - [schemas/](../schemas/) — JSON Schemas de los Beacons
-- [spec-native/DECISIONS.md](../spec-native/DECISIONS.md) — DEC-0086, DEC-0087
+- [spec-native/DECISIONS.md](../spec-native/DECISIONS.md) — DEC-P2P-001

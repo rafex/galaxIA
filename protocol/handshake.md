@@ -1,105 +1,111 @@
-# Handshake — Protocolo de Conexión y Ciclo de Vida
+# Handshake — Stream Directo y Ciclo de Vida
 
 ## Visión General
 
-Un nodo entra en **Orbit** mediante un handshake de 2 pasos seguido de un Pulse (ping/pong) periódico. Este flujo reemplaza el protocolo de 4 pasos (hello/welcome/register/registered) eliminado en DEC-0087.
+El **handshake** establece un **stream directo** `/fhs/v1/0.1.0` entre cualquier par de nodos FHS. Se usa en tres contextos:
 
-## Handshake Estándar (Nodo Persistente)
+- **Portal → Navigator**: al inicio de cada sesión de agente (siempre activo).
+- **Navigator → Star**: post-`MissionAssignMessage` en GossipSub.
+- **Navigator → Satellite**: post-`MissionAssignMessage` para una Tool Mission.
+
+El handshake **no** sustituye el descubrimiento de nodos — eso ocurre antes mediante DHT y GossipSub (ver `protocol/p2p.md`).
+
+## Handshake de Stream Directo
 
 ```mermaid
 sequenceDiagram
-    participant N as Nodo<br/>(Star/Satellite/Nova/Navigator)
-    participant A as Atlas
+    participant I as Iniciador<br/>(Navigator / Portal)
+    participant R as Receptor<br/>(Star / Satellite / Navigator)
 
-    N->>A: WS CONNECT wss://atlas/register<br/>Sec-WebSocket-Protocol: fhs.v1
+    I->>R: libp2p dial (multiaddr del MissionBidMessage o DHT lookup)
+    note over I,R: Negociación de subprotocolo: fhs.v1 (binario) o fhs.v1.json
 
-    note over N,A: Handshake 2-step (DEC-0087)
+    I->>R: Envelope { handshake: HandshakeMessage }<br/>fhsVersion, listenAddrs, beacon (JSON serializado)
 
-    N->>A: Envelope { handshake: HandshakeMessage }<br/>fhsVersion, listenAddrs, beacon (JSON Beacon firmado)
+    note over R: 1. Valida Envelope.signature Ed25519 del iniciador<br/>2. Verifica DID del iniciador en caché GossipSub o DHT<br/>3. Valida Beacon contra JSON Schema
 
-    note over A: Valida Envelope.signature (Ed25519)<br/>Valida Beacon contra JSON Schema<br/>Registra en Orbit con lease
-
-    A->>N: Envelope { handshake_ack: HandshakeAckMessage }<br/>leaseSeconds, heartbeatSeconds, leaseExpires,<br/>acceptedServices, trustLevel="standard"
-
-    note over N,A: Nodo en Orbit
-
-    loop cada heartbeatSeconds
-        N->>A: Envelope { ping: PingMessage }
-        A->>N: Envelope { pong: PongMessage } — serverTimestamp para RTT
+    alt Handshake exitoso
+        R->>I: Envelope { handshake_ack: HandshakeAckMessage }<br/>leaseSeconds, heartbeatSeconds, leaseExpires, trustLevel
+        note over I,R: Stream ACTIVO — en Orbit (lease peer-to-peer activo)
+    else Firma inválida o DID desconocido
+        R->>I: Envelope { error: INVALID_SIGNATURE }
+        note over R: Cierra stream
     end
 
-    note over A: Atlas emite node.online a Navigators conectados
+    loop cada heartbeatSeconds
+        I->>R: Envelope { ping }
+        R->>I: Envelope { pong { serverTimestamp } }
+    end
 ```
 
+Un nodo en **Orbit** respecto a otro peer tiene un stream activo con lease vigente. No es un estado global — cada par de nodos mantiene su propio lease de forma independiente.
+
 ## Handshake de Ephemeral Satellite
+
+El Ephemeral Satellite (WASM en browser o móvil) se une al swarm como cualquier nodo, pero su confianza se verifica via `DelegationToken` — un credential Ed25519 firmado por el Nodo Host que lo avala.
 
 ```mermaid
 sequenceDiagram
     participant B as Browser/Móvil<br/>(Ephemeral Satellite)
-    participant H as Nodo Host<br/>(ya en Orbit)
-    participant A as Atlas
+    participant H as Nodo Host<br/>(activo en el swarm)
+    participant D as DHT Swarm
+    participant G as GossipSub
+    participant NAV as Navigator
 
-    note over B,H: Pre-handshake: obtener DelegationToken
+    note over B,H: Pre-unión: obtener WASM + DelegationToken
 
-    B->>H: GET /wasm-bundle<br/>(HTTP/HTTPS — plano de distribución, no protocolo FHS)
-    H->>B: bundle.wasm + DelegationToken pre-firmado
-    note over B: Verifica SHA-256 del bundle<br/>contra DelegationToken.wasmHash
+    B->>H: GET /wasm-bundle (HTTPS — plano de distribución, no protocolo FHS)
+    H->>B: bundle.wasm + DelegationToken pre-firmado<br/>{ issuer: hostDID, subject: ephDID,<br/>  capabilities, wasmHash, expiresAt, signature }
+    note over B: Verifica SHA-256(bundle) == DelegationToken.wasmHash
 
-    note over B,A: Handshake con delegación
+    note over B: Unirse al swarm P2P (igual que cualquier nodo)
 
-    B->>A: WS CONNECT wss://atlas/register<br/>Sec-WebSocket-Protocol: fhs.v1
+    B->>D: Kademlia Join (vía bootstrap peer: Atlas u otro conocido)
+    B->>D: DHT.put(ephDID, DhtBeaconRecord { ephemeral:true, delegatedBy: hostDID })
+    B->>G: NodeAdvertiseMessage { did: ephDID, ephemeral:true, delegatedBy: hostDID }
 
-    B->>A: Envelope { handshake: HandshakeMessage }<br/>beacon { provider.ephemeral:true, provider.delegatedBy: hostDID }<br/>delegation_token { issuer:hostDID, subject:ephDID,<br/>capabilities, wasmHash, expiresAt, signature }
+    note over NAV: Recibe MissionBidMessage del ephDID<br/>Verifica DelegationToken de forma autónoma (sin Atlas)
 
-    note over A: 1. Valida Envelope.signature del Ephemeral Satellite<br/>2. Extrae delegation_token.issuer (DID del Host)<br/>3. Verifica que Host esté en Orbit<br/>4. Extrae pubKey del Host desde did:key (sin PKI)<br/>5. Verifica firma Ed25519 del DelegationToken<br/>6. Verifica expiresAt > now()<br/>7. Verifica delegation_token.subject == Envelope.sourcePeerId<br/>8. Asigna TrustLevel según resultado
+    NAV->>D: DHT.get(hostDID) → DhtBeaconRecord del Host
+    note over NAV: Extrae pubKey del hostDID (did:key embeds pubkey, sin PKI)<br/>Verifica firma Ed25519 del DelegationToken<br/>Verifica expiresAt > now()<br/>Verifica DelegationToken.subject == ephDID
 
-    alt Validación exitosa → TrustLevel = DELEGATED
-        A->>B: Envelope { handshake_ack }<br/>trustLevel="delegated"<br/>leaseExpires = min(delegation_token.expiresAt, now+leaseSeconds)
-        note over A: Emite node.online { ephemeral:true, trustLevel:"delegated" } a Navigators
-    else Host no en Orbit o firma inválida
-        A->>B: Envelope { error: DELEGATION_INVALID }
-        note over A: Cierra conexión WS
-    else Token expirado
-        A->>B: Envelope { error: DELEGATION_EXPIRED }
-        note over A: Cierra conexión WS
-    end
-
-    loop cada heartbeatSeconds
-        B->>A: Envelope { ping }
-        A->>B: Envelope { pong }
+    alt Validación exitosa → trustLevel = DELEGATED
+        NAV->>B: libp2p dial → Handshake estándar
+        B->>NAV: Envelope { handshake_ack }
+        note over NAV,B: Stream ACTIVO con trustLevel = "delegated"
+    else Token inválido, expirado o Host no encontrado en DHT
+        note over NAV: Rechaza el bid → BID_REJECTED
     end
 ```
 
-## Salida del Orbit
+La verificación del `DelegationToken` es autónoma: Navigator la realiza usando solo el DHT y la clave pública embebida en el DID del Host. Atlas no interviene.
+
+## Salida del Swarm
+
+Un nodo sale del swarm cuando deja de publicar `NodeAdvertiseMessage`. No hay un mensaje `node.lost` explícito:
 
 ```mermaid
 sequenceDiagram
     participant N as Nodo
-    participant A as Atlas
+    participant G as GossipSub
     participant NAV as Navigator
 
     alt Cierre limpio
-        N->>A: Cierra WebSocket (close frame)
-        note over A: Elimina de Orbit inmediatamente
-    else Timeout de Pulse
-        note over A: No recibe ping en > leaseSeconds
-        note over A: Marca como expired
+        N->>G: NodeAdvertiseMessage { ttlSeconds: 0 }
+        note over G: Peers marcan el nodo offline inmediatamente
+    else Caída inesperada
+        note over G: Nodo deja de publicar NodeAdvertiseMessage
+        note over NAV: TTL del último anuncio expira en caché local<br/>Navigator marca el nodo offline (sin notificación externa)
     end
 
-    A->>NAV: Envelope { node_lost: NodeLostMessage }<br/>providerId, providerName, services
-
-    note over A: Si el nodo que salió es un Nodo Host<br/>que tiene Ephemeral Satellites activos...
-
-    loop Por cada Ephemeral Satellite del Host
-        A->>EphNode: Envelope { error: DELEGATION_EXPIRED }
-        note over A: Cierra conexión WS del Ephemeral Satellite
-        A->>NAV: Envelope { node_lost } — para cada Ephemeral Satellite expulsado
-    end
+    note over NAV: Si había un stream directo activo con ese nodo:<br/>Lease expira por timeout (leaseSeconds) → cierre local
 ```
+
+Si el Nodo Host de un Ephemeral Satellite deja de publicar (DhtBeaconRecord expira), los Navigators que intenten verificar el DelegationToken del efímero obtendrán error de verificación y rechazarán sus bids.
 
 ## Campos del Beacon
 
-El `HandshakeMessage.beacon` es un JSON serializado que sigue el schema `beacon-base.schema.json` (y sus extensiones por tipo: `beacon-star`, `beacon-satellite`, `beacon-nova`).
+El `HandshakeMessage.beacon` es un JSON serializado siguiendo el schema `beacon-base.schema.json` (y sus extensiones por tipo: `beacon-star`, `beacon-satellite`, `beacon-nova`).
 
 Campos clave para Ephemeral Satellites:
 
@@ -136,6 +142,6 @@ Campos clave para Ephemeral Satellites:
 
 | Parámetro | Default | Descripción |
 | --------- | ------- | ----------- |
-| `leaseSeconds` | 30 | TTL del Orbit. El nodo debe renovar con ping antes de que expire. |
+| `leaseSeconds` | 30 | TTL del stream directo. El iniciador debe renovar con ping antes de que expire. |
 | `heartbeatSeconds` | 10 | Intervalo recomendado de ping. |
-| `leaseExpires` (Ephemeral) | `min(token.expiresAt, now + leaseSeconds)` | Atlas nunca extiende más allá de la expiración del DelegationToken. |
+| `leaseExpires` (Ephemeral) | `min(token.expiresAt, now + leaseSeconds)` | El receptor nunca extiende el lease más allá de la expiración del DelegationToken. |
