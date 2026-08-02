@@ -1,17 +1,36 @@
 syntax = "proto3";
 
-// FHS Wire Protocol — Protobuf IDL v2
+// FHS Wire Protocol — Protobuf IDL v3
 // DEC-0086: Protobuf binario primario, LPP framing (idl/framing.md)
 // DEC-0087: Envelope P2P con routing fields, Handshake 2-step, sin CallerAuth
+// DEC-P2P-001: Red descentralizada libp2p — DHT para descubrimiento y reputación,
+//              GossipSub para ofertas de Mission, streams directos para ejecución.
+//              Atlas = bootstrap peer únicamente. Sin registro central.
 //
 // Versión de referencia: @rafex/galaxia-fhs-protocol
 // Repositorio de tipos: https://github.com/rafex/galaxIA-SDK
 //
-// Framing (modo binario, Sec-WebSocket-Protocol: fhs.v1):
-//   [varint: byte-length del Envelope serializado][Envelope bytes]
-// Modo JSON compat (Sec-WebSocket-Protocol: fhs.v1.json):
-//   el campo `type` del JSON actúa como discriminador del oneof.
-// Ver idl/framing.md para la spec completa.
+// ── Dos planos de mensajería ──────────────────────────────────────────────────
+//
+// 1. STREAM DIRECTO FHS (Envelope, binario)
+//    Protocolo libp2p: /fhs/v1/0.1.0
+//    Transport: WSS (WebSocket + TLS 1.2/1.3)
+//    Framing (modo binario, Sec-WebSocket-Protocol: fhs.v1):
+//      [varint: byte-length del Envelope serializado][Envelope bytes]
+//    Modo JSON compat (Sec-WebSocket-Protocol: fhs.v1.json):
+//      el campo `type` del JSON actúa como discriminador del oneof.
+//    Ver idl/framing.md para la spec completa.
+//
+// 2. GOSSIPSUB (mensajes de pubsub, también Protobuf)
+//    Publicados en tópicos libp2p GossipSub. No son Envelopes.
+//    Cada mensaje GossipSub lleva su propia firma Ed25519.
+//    Tópicos:
+//      fhs/v1/nodes/advertise     — NodeAdvertiseMessage
+//      fhs/v1/missions/offer      — MissionOfferMessage
+//      fhs/v1/missions/bid        — MissionBidMessage
+//      fhs/v1/missions/assign     — MissionAssignMessage
+//      fhs/v1/reputation/update   — ReputationUpdateMessage
+//    Ver idl/gossipsub.md y protocol/p2p.md para la spec completa.
 
 package fhs.v1;
 
@@ -19,8 +38,9 @@ option java_package = "io.galax_ia.fhs.v1";
 option java_outer_classname = "FhsProtocol";
 option go_package = "github.com/rafex/galaxIA/idl/fhs/v1";
 
-// ── Envelope P2P ─────────────────────────────────────────────────────────────
-// Frame raíz del wire protocol FHS.
+// ── Envelope — Frame de stream directo FHS ────────────────────────────────────
+// Frame raíz del stream directo peer-to-peer entre dos nodos FHS.
+// Identificado por el protocolo libp2p /fhs/v1/0.1.0.
 // En modo binario: serializado con LPP framing (idl/framing.md).
 // En modo JSON: los campos del Envelope van al nivel raíz del objeto JSON.
 
@@ -28,21 +48,22 @@ message Envelope {
   // ── Campos de routing (nivel de frame) ─────────────────────────────────────
   string message_id     = 1;  // UUID único por frame (deduplicación en redes P2P)
   string source_peer_id = 2;  // DID del nodo emisor (did:key:z...)
-  string dest_peer_id   = 3;  // DID del destino; vacío = broadcast / cualquier Atlas
+  string dest_peer_id   = 3;  // DID del destino; vacío solo en handshake inicial
   int64  timestamp      = 4;  // Unix ms — anti-replay (ventana recomendada ±30 000 ms)
   string version        = 5;  // Versión del protocolo FHS ("1")
   string signature      = 6;  // Ed25519 base64 de sha256(message_id:source:dest:timestamp:payload_bytes_hex)
 
   // ── Payload ─────────────────────────────────────────────────────────────────
   oneof payload {
-    // Ciclo de vida P2P (Provider ↔ Atlas)     [10-19]
+    // Stream directo — Ciclo de vida de conexión        [10-19]
+    // Handshake entre CUALQUIER par de nodos FHS, no solo Provider↔Atlas.
     HandshakeMessage        handshake       = 10;
     HandshakeAckMessage     handshake_ack   = 11;
     PingMessage             ping            = 12;
     PongMessage             pong            = 13;
     ErrorMessage            error           = 14;
 
-    // Misiones — Chat (Navigator ↔ Star/Cliente) [20-29]
+    // Stream directo — Misiones: Chat (Navigator ↔ Star) [20-29]
     ChatRequestMessage      chat_request    = 20;
     ChatCancelMessage       chat_cancel     = 21;
     ChatDeltaMessage        chat_delta      = 22;
@@ -50,7 +71,7 @@ message Envelope {
     ChatErrorMessage        chat_error      = 24;
     DispatchAckMessage      dispatch_ack    = 25;
 
-    // Misiones — Tool (Navigator ↔ Satellite)  [30-39]
+    // Stream directo — Misiones: Tool (Navigator ↔ Satellite) [30-39]
     ToolCallRequestMessage  tool_call       = 30;
     ToolCancelMessage       tool_cancel     = 31;
     ToolCallResultMessage   tool_result     = 32;
@@ -58,15 +79,22 @@ message Envelope {
     ToolListRequestMessage  tool_list       = 34;
     ToolListResponseMessage tool_list_resp  = 35;
 
-    // Notificaciones internas (Atlas → Navigator) [40-49]
-    NodeOnlineMessage       node_online     = 40;
-    NodeLostMessage         node_lost       = 41;
+    // GossipSub — Presencia y descubrimiento             [40-49]
+    // Estos mensajes también viajan en GossipSub (tópico fhs/v1/nodes/advertise).
+    // Cuando viajan en Envelope (stream directo), son para nodos sin GossipSub activo.
+    NodeAdvertiseMessage    node_advertise  = 40;
 
-    // Gossip P2P (Atlas ↔ Atlas)               [50-59]
-    AtlasAnnounceMessage      atlas_announce      = 50;
-    AtlasSyncMessage          atlas_sync          = 51;
+    // GossipSub — Dispatch de Missions                   [50-59]
+    // Publicados en tópicos de GossipSub. En Envelope solo para debugging.
+    MissionOfferMessage     mission_offer   = 50;
+    MissionBidMessage       mission_bid     = 51;
+    MissionAssignMessage    mission_assign  = 52;
 
-    // Portal ↔ Navigator (interfaz de agente)  [60-69]
+    // DHT — Records almacenados en la DHT Kademlia        [53-59]
+    DhtBeaconRecord         dht_beacon      = 53;
+    DhtReputationRecord     dht_reputation  = 54;
+
+    // Portal ↔ Navigator (interfaz de agente)            [60-69]
     AgentStartMessage         agent_start         = 60;
     AgentStatusMessage        agent_status        = 61;
     StarSelectedMessage       star_selected       = 62;
@@ -74,76 +102,81 @@ message Envelope {
     AssistantDeltaMessage     assistant_delta     = 64;
     AssistantCompletedMessage assistant_completed = 65;
 
-    // Ephemeral Satellite (SPEC-EPHSAT-0001)   [70-79]
-    // Navigator conecta al canal /register de Atlas y envía mission.feedback
-    // tras completar una Mission con un Ephemeral Satellite.
+    // Ephemeral Satellite (SPEC-EPHSAT-0001)             [70-79]
     MissionFeedbackMessage    mission_feedback    = 70;
+
+    // GossipSub — Reputación                             [80-89]
+    ReputationUpdateMessage   reputation_update   = 80;
   }
 }
 
-// ── Ciclo de vida P2P ─────────────────────────────────────────────────────────
+// ── Ciclo de vida de stream directo ──────────────────────────────────────────
+// El handshake se establece entre CUALQUIER par de nodos FHS (no solo con Atlas).
 // Flujo: handshake → handshake_ack → ping/pong (cada heartbeatSeconds).
-// La identidad del provider viene de Envelope.source_peer_id.
+// La identidad viene de Envelope.source_peer_id (DID del nodo).
 // La autenticación bilateral usa Envelope.signature (cada sentido firma su Envelope).
 
-// handshake — Provider → Atlas
-// Reemplaza el flujo anterior de 4 mensajes: hello → welcome → register → registered.
-// Lleva el Beacon firmado y los endpoints P2P del nodo.
-// Si es un Ephemeral Satellite (beacon.provider.ephemeral == true), incluye delegation_token.
+// handshake — Nodo A → Nodo B
+// Primer mensaje al abrir un stream libp2p /fhs/v1/0.1.0.
+// El Nodo A se presenta con su Beacon y sus multiaddrs.
+// Si es un Ephemeral Satellite, incluye delegation_token.
 message HandshakeMessage {
   string          fhs_version      = 1;  // Versión del protocolo FHS que soporta este nodo
-  repeated string listen_addrs     = 2;  // Multiaddrs P2P con TLS obligatorio (ej. /ip4/1.2.3.4/tcp/8443/tls/ws)
+  repeated string listen_addrs     = 2;  // Multiaddrs P2P con TLS: /ip4/.../tcp/.../tls/ws
   string          beacon           = 3;  // Beacon JSON serializado (manifiesto completo del nodo)
-  DelegationToken delegation_token = 4;  // Solo presente en Ephemeral Satellites (SPEC-EPHSAT-0001)
+  DelegationToken delegation_token = 4;  // Solo para Ephemeral Satellites (SPEC-EPHSAT-0001)
 }
 
-// handshake_ack — Atlas → Provider
-// El provider está en Orbit tras recibir este mensaje.
-// Si el handshake fue rechazado, Atlas envía un ErrorMessage (DELEGATION_INVALID / DELEGATION_EXPIRED)
-// y cierra la conexión sin enviar handshake_ack.
+// handshake_ack — Nodo B → Nodo A
+// Confirma que el stream está establecido. Devuelve parámetros de sesión.
 message HandshakeAckMessage {
   string fhs_version       = 1;  // Versión del protocolo acordada para esta sesión
-  int32  lease_seconds     = 2;  // Duración del lease en segundos (default 30)
+  int32  lease_seconds     = 2;  // Duración del lease del stream en segundos (default 30)
   int32  heartbeat_seconds = 3;  // Intervalo de ping recomendado en segundos (default 10)
   int64  lease_expires     = 4;  // Unix ms cuando vence el lease actual
-  int32  accepted_services = 5;  // Número de capabilities aceptadas del Beacon
-  string trust_level       = 6;  // "standard" | "delegated" | "community" | "unverified" (SPEC-EPHSAT-0001)
+  int32  accepted_services = 5;  // Número de capabilities reconocidas del Beacon
+  string trust_level       = 6;  // "standard" | "delegated" | "community" | "unverified"
 }
 
-// ping — Provider → Atlas (Pulse / heartbeat)
-// Mensaje vacío: el provider lo emite cada heartbeatSeconds para renovar el lease.
+// ping — Nodo A → Nodo B (Pulse / heartbeat)
+// Emitido cada heartbeatSeconds para renovar el lease del stream.
 message PingMessage {}
 
-// pong — Atlas → Provider
-// Respuesta al ping. Conserva el server_timestamp para calcular el RTT.
+// pong — Nodo B → Nodo A
+// Respuesta al ping. Conserva server_timestamp para calcular RTT.
 message PongMessage {
-  int64 server_timestamp = 1;  // Unix ms cuando Atlas procesa el ping
+  int64 server_timestamp = 1;  // Unix ms cuando el receptor procesa el ping
 }
 
-// error — Atlas ↔ Provider (o cualquier nodo → cualquier nodo)
+// error — cualquier nodo → cualquier nodo
 enum FhsErrorCode {
   FHS_ERROR_CODE_UNSPECIFIED    = 0;
   NOT_IDENTIFIED                = 1;  // Mensaje recibido antes de handshake completo
-  INVALID_MANIFEST              = 2;  // Beacon no cumple el schema mínimo
-  INVALID_SIGNATURE             = 3;  // Firma inválida en Envelope o handshake
-  UNSUPPORTED_VERSION           = 4;  // fhsVersion no compatible con el Registry
+  INVALID_MANIFEST              = 2;  // Beacon no cumple el schema mínimo; o endpoint.url no es wss://
+  INVALID_SIGNATURE             = 3;  // Firma inválida en Envelope, GossipSub message o DHTRecord
+  UNSUPPORTED_VERSION           = 4;  // fhsVersion no compatible
   UPSTREAM_UNAVAILABLE          = 5;  // Servicio detrás del provider no responde
   UPSTREAM_TIMEOUT              = 6;  // Servicio respondió más lento que el timeout
   INVALID_ARGUMENTS             = 7;  // Argumentos de tool.call/chat.request inválidos
-  UNSUPPORTED_CAPABILITY        = 8;  // Capability o modelo no registrado en el provider
+  UNSUPPORTED_CAPABILITY        = 8;  // Capability o modelo no disponible en el provider
   UNAUTHORIZED                  = 9;  // source_peer_id/signature inválidos o vetados
   CANCELLED                     = 10; // Petición abortada tras chat.cancel/tool.cancel
-  OVERLOADED                    = 11; // Nodo a capacidad máxima (availability.maxConcurrentRequests)
+  OVERLOADED                    = 11; // Nodo a capacidad máxima
   INTERNAL_ERROR                = 12; // Fallo no clasificado
   // Ephemeral Satellite (SPEC-EPHSAT-0001)
-  DELEGATION_INVALID            = 13; // DelegationToken: firma inválida, Host no en Orbit, o campos mal formados
-  DELEGATION_EXPIRED            = 14; // DelegationToken.expires_at ya venció (o Host salió del Orbit)
-  WASM_HASH_MISMATCH            = 15; // Hash SHA-256 del bundle WASM no coincide con DelegationToken.wasm_hash
+  DELEGATION_INVALID            = 13; // DelegationToken: firma inválida o campos mal formados
+  DELEGATION_EXPIRED            = 14; // DelegationToken.expires_at vencido o Host sin stream activo
+  WASM_HASH_MISMATCH            = 15; // Hash SHA-256 del WASM no coincide con DelegationToken.wasm_hash
+  // P2P (DEC-P2P-001)
+  PEER_UNREACHABLE              = 16; // libp2p no puede establecer conexión con el peer
+  DHT_RECORD_INVALID            = 17; // Registro DHT con firma inválida, expirado o malformado
+  BID_TIMEOUT                   = 18; // Navigator no recibió bids antes de bid_deadline_ms
+  BID_REJECTED                  = 19; // Provider rechazó una oferta de Mission (sin capacidad, trust insuficiente, etc.)
 }
 
 message ErrorMessage {
   FhsErrorCode code    = 1;
-  string       message = 2;  // Descripción legible (opcional, no machine-readable)
+  string       message = 2;  // Descripción legible (no machine-readable)
 }
 
 // ── Tipos base ───────────────────────────────────────────────────────────────
@@ -177,7 +210,7 @@ message ToolCallFunction {
 // La autenticación viene de Envelope.signature.
 // El timestamp viene de Envelope.timestamp.
 
-// chat.request — Cliente/Navigator → Star
+// chat.request — Navigator → Star (stream directo)
 message ChatRequestMessage {
   string              mission_id = 1;
   repeated Message    messages   = 2;
@@ -185,33 +218,32 @@ message ChatRequestMessage {
   string              model      = 4;  // Modelo LLM solicitado (opcional)
 }
 
-// chat.cancel — Cliente → Navigator
+// chat.cancel — Portal → Navigator (stream directo)
 message ChatCancelMessage {
   string mission_id = 1;
 }
 
-// chat.delta — Navigator → Cliente (streaming)
+// chat.delta — Star → Navigator (stream directo, streaming)
 message ChatDeltaMessage {
   string mission_id = 1;
   string delta      = 2;
 }
 
-// chat.completed — Navigator → Cliente
+// chat.completed — Star → Navigator (stream directo)
 message ChatCompletedMessage {
   string            mission_id = 1;
   string            content    = 2;
   repeated ToolCall tool_calls = 3;
 }
 
-// chat.error — Navigator → Cliente
+// chat.error — Star → Navigator (stream directo)
 message ChatErrorMessage {
   string mission_id = 1;
   string error      = 2;
 }
 
-// dispatch.ack — Navigator → Atlas
-// Confirma que Navigator encoló la misión. queued_at es el timestamp de negocio
-// (cuándo entró en la cola, puede diferir del Envelope.timestamp).
+// dispatch.ack — Provider → Navigator (stream directo)
+// El provider confirma que encoló la misión. queued_at es el timestamp de negocio.
 message DispatchAckMessage {
   string mission_id = 1;
   int64  queued_at  = 2;
@@ -219,178 +251,243 @@ message DispatchAckMessage {
 
 // ── Mensajes de misión — Tool ─────────────────────────────────────────────────
 
-// tool.call — Navigator → Satellite
+// tool.call — Navigator → Satellite (stream directo)
 message ToolCallRequestMessage {
   string            mission_id = 1;
   repeated ToolCall tool_calls = 2;
 }
 
-// tool.cancel — Navigator → Satellite
+// tool.cancel — Navigator → Satellite (stream directo)
 message ToolCancelMessage {
   string mission_id = 1;
 }
 
-// tool.result — Satellite → Navigator
+// tool.result — Satellite → Navigator (stream directo)
 message ToolCallResultMessage {
   string mission_id   = 1;
   string tool_call_id = 2;
   string result       = 3;  // JSON serializado del resultado
 }
 
-// tool.error — Satellite → Navigator
+// tool.error — Satellite → Navigator (stream directo)
 message ToolCallErrorMessage {
   string mission_id   = 1;
   string tool_call_id = 2;
   string error        = 3;
 }
 
-// tool.list — Navigator → Satellite
+// tool.list — Navigator → Satellite (stream directo)
 message ToolListRequestMessage {
   string mission_id = 1;
 }
 
-// tool.list.response — Satellite → Navigator
+// tool.list.response — Satellite → Navigator (stream directo)
 message ToolListResponseMessage {
   string               mission_id = 1;
   repeated ToolDefinition tools   = 2;
+}
+
+// ── GossipSub — Presencia y descubrimiento ────────────────────────────────────
+// Tópico: fhs/v1/nodes/advertise
+//
+// Publicado periódicamente por CADA nodo activo en la red.
+// Reemplaza el modelo Atlas-centralizado de node.online / node.lost.
+// Basado en TTL: si un nodo deja de publicar, se considera offline.
+// La firma permite verificar sin confiar en el emisor GossipSub.
+
+message NodeAdvertiseMessage {
+  string          did          = 1;  // DID del nodo emisor (did:key:z...)
+  string          beacon       = 2;  // Beacon JSON serializado (capabilities, tipo, nombre)
+  repeated string multiaddrs   = 3;  // Multiaddrs P2P: /ip4/.../tcp/.../tls/ws
+  int64           timestamp    = 4;  // Unix ms del anuncio
+  int32           ttl_seconds  = 5;  // Tiempo de vida del anuncio (default 60s)
+  bool            ephemeral    = 6;  // true si es un Ephemeral Satellite (WASM/browser)
+  string          delegated_by = 7;  // DID del Nodo Host; solo si ephemeral == true
+  string          trust_level  = 8;  // "standard" | "delegated" | "community" | "unverified"
+  bytes           signature    = 9;  // Ed25519 de (did + sha256(beacon) + timestamp + ttl_seconds)
+}
+
+// ── GossipSub — Dispatch de Missions ─────────────────────────────────────────
+// Tópico: fhs/v1/missions/offer  → fhs/v1/missions/bid → fhs/v1/missions/assign
+//
+// Flujo de asignación descentralizado (reemplaza dispatch centralizado por Atlas):
+//   1. Navigator publica MissionOfferMessage en fhs/v1/missions/offer.
+//   2. Providers que pueden satisfacer la oferta publican MissionBidMessage.
+//   3. Navigator selecciona el bid ganador (por reputación, latencia, trust).
+//   4. Navigator publica MissionAssignMessage con el DID del ganador.
+//   5. Navigator abre un stream directo /fhs/v1/0.1.0 con el provider ganador.
+//   6. La Mission se ejecuta por el stream directo (chat.request / tool.call).
+
+// Tópico: fhs/v1/missions/offer
+message MissionOfferMessage {
+  string          mission_id            = 1;  // UUID de la misión
+  string          navigator_did         = 2;  // DID del Navigator que publica la oferta
+  repeated string navigator_multiaddrs  = 3;  // Multiaddrs del Navigator para stream directo post-assign
+  string          mission_type          = 4;  // "chat" | "tool_call" | "agent"
+  repeated string required_capabilities = 5;  // IDs de capabilities requeridas
+  string          preferred_model       = 6;  // Modelo LLM preferido (para mission_type = "chat")
+  string          scope                 = 7;  // "local" | "network" | "community" | "external"
+  int64           bid_deadline_ms       = 8;  // Unix ms límite para recibir bids
+  int64           timestamp             = 9;
+  bytes           signature             = 10; // Ed25519 sobre campos 1-9
+}
+
+// Tópico: fhs/v1/missions/bid
+message MissionBidMessage {
+  string          mission_id            = 1;  // UUID de la misión ofertada
+  string          provider_did          = 2;  // DID del provider que hace la oferta
+  repeated string provider_multiaddrs   = 3;  // Multiaddrs para stream directo
+  string          provider_type         = 4;  // "star" | "satellite" | "nova"
+  repeated string offered_capabilities  = 5;  // Capabilities que puede ejecutar
+  string          offered_model         = 6;  // Modelo LLM disponible (para tipo "chat")
+  float           reputation_score      = 7;  // Score local del provider (0.0 - 1.0)
+  int32           estimated_latency_ms  = 8;  // Latencia estimada basada en carga actual
+  string          trust_level           = 9;  // Trust level del provider
+  int64           timestamp             = 10;
+  bytes           signature             = 11; // Ed25519 sobre campos 1-10
+}
+
+// Tópico: fhs/v1/missions/assign
+message MissionAssignMessage {
+  string mission_id        = 1;  // UUID de la misión
+  string navigator_did     = 2;  // DID del Navigator que asigna
+  string assigned_provider = 3;  // DID del provider ganador del bid
+  int64  timestamp         = 4;
+  bytes  signature         = 5;  // Ed25519 sobre campos 1-4
+}
+
+// ── DHT Kademlia — Records almacenados en la red P2P ─────────────────────────
+// Key: DID del nodo (did:key:z...)
+// Value: DhtBeaconRecord serializado en Protobuf
+//
+// Cualquier nodo puede publicar y leer de la DHT.
+// La firma permite verificar autenticidad sin confiar en nodos intermedios.
+// Atlas (como bootstrap) participa en la DHT igual que cualquier otro nodo.
+
+// DHT Key: did del nodo
+message DhtBeaconRecord {
+  string          did          = 1;  // DID del nodo (coincide con la key DHT)
+  string          beacon       = 2;  // Beacon JSON serializado
+  repeated string multiaddrs   = 3;  // Multiaddrs P2P del nodo
+  int64           published_at = 4;  // Unix ms cuando se publicó
+  int64           expires_at   = 5;  // Unix ms de expiración del registro DHT
+  string          fhs_version  = 6;  // Versión del protocolo FHS del nodo
+  bytes           signature    = 7;  // Ed25519 de (did + sha256(beacon) + published_at + expires_at)
+}
+
+// DHT Key: "reputation/" + DID del provider
+// Publicado por Navigators después de completar Missions con el provider.
+// Múltiples Navigators contribuyen; cada registro está firmado por el Navigator que lo publica.
+message DhtReputationRecord {
+  string provider_did     = 1;  // DID del provider evaluado
+  string evaluator_did    = 2;  // DID del Navigator que publica este registro
+  float  score            = 3;  // Score (0.0 - 1.0; 1.0 = perfecto)
+  int64  missions_success = 4;  // Misiones completadas con éxito (según este evaluador)
+  int64  missions_failed  = 5;  // Misiones fallidas (según este evaluador)
+  float  avg_latency_ms   = 6;  // Latencia promedio
+  int64  last_updated     = 7;  // Unix ms de la última actualización
+  bytes  signature        = 8;  // Ed25519 del evaluator_did sobre los campos 1-7
+}
+
+// ── GossipSub — Reputación ────────────────────────────────────────────────────
+// Tópico: fhs/v1/reputation/update
+//
+// Publicado por Navigator después de completar una Mission.
+// Reemplaza el mission.feedback punto-a-punto con Atlas.
+// Todos los nodos suscritos pueden actualizar su caché local de reputación.
+// Los nodos que mantienen DhtReputationRecord actualizado también usan este mensaje.
+
+message ReputationUpdateMessage {
+  string mission_id    = 1;  // UUID de la Mission completada
+  string provider_did  = 2;  // DID del provider evaluado
+  string navigator_did = 3;  // DID del Navigator que evalúa
+  float  latency_ms    = 4;  // Latencia real de la Mission (ms)
+  bool   success       = 5;  // true = completó sin error
+  string error_code    = 6;  // FhsErrorCode como string; vacío si success = true
+  string delegated_by  = 7;  // DID del Nodo Host; solo para Ephemeral Satellites
+  int64  timestamp     = 8;
+  bytes  signature     = 9;  // Ed25519 del navigator_did sobre los campos 1-8
 }
 
 // ── Ephemeral Satellite (SPEC-EPHSAT-0001) ────────────────────────────────────
 // DelegationToken — Credencial firmada por el Nodo Host para delegar capacidades
 // a un Ephemeral Satellite. Viaja en HandshakeMessage.delegation_token.
 //
-// La firma cubre los campos 1-5 (issuer, subject, capabilities, wasm_hash, expires_at)
-// en su serialización proto canónica (determinista). Atlas verifica la firma usando
-// la clave pública Ed25519 derivada directamente del DID issuer (did:key:z... codifica
-// la clave pública — no se requiere PKI externa).
+// La firma cubre los campos 1-5 en su serialización proto canónica (determinista).
+// El receptor verifica usando la clave pública Ed25519 derivada del DID issuer
+// (did:key:z... codifica la clave pública — no se requiere PKI externa).
+// En el modelo P2P, el receptor es cualquier peer que acepte el stream;
+// la verificación del Host en DHT reemplaza la verificación "Host en Orbit en Atlas".
 message DelegationToken {
   string          issuer       = 1;  // DID del Nodo Host firmante (did:key:z...)
-  string          subject      = 2;  // DID del Ephemeral Satellite (did:key:z...) — debe coincidir con Envelope.sourcePeerId
-  repeated string capabilities = 3;  // Capability IDs que el Host delega (subconjunto de los suyos)
-  string          wasm_hash    = 4;  // "sha256:<64-hex>" del bundle WASM que el Ephemeral Satellite ejecutará
+  string          subject      = 2;  // DID del Ephemeral Satellite; debe coincidir con Envelope.sourcePeerId
+  repeated string capabilities = 3;  // Capability IDs que el Host delega
+  string          wasm_hash    = 4;  // "sha256:<64-hex>" del bundle WASM
   int64           expires_at   = 5;  // Unix ms de expiración del token
-  bytes           signature    = 6;  // Firma Ed25519 sobre el canonical proto de campos 1-5
+  bytes           signature    = 6;  // Ed25519 sobre el canonical proto de campos 1-5
 }
 
-// mission.feedback — Navigator → Atlas (canal /register, SPEC-EPHSAT-0001)
-// Navigator reporta la calidad de una Mission completada por un Ephemeral Satellite.
-// Extiende SPEC-SATRATING-0001: Atlas actualiza la reputación del Ephemeral Satellite
-// y el contador de delegaciones exitosas del Nodo Host.
-//
-// Navigator mantiene una conexión WS al canal /register de Atlas (mismo canal que
-// los providers usan para handshake/ping). Navigator también hace handshake al
-// iniciar — es un nodo más en la red FHS.
+// mission.feedback — En el modelo P2P viaja también como ReputationUpdateMessage
+// en GossipSub. Este tipo se mantiene para streams directos (ej. Ephemeral Satellite
+// reportando directamente a un Nodo Host sin GossipSub activo).
 message MissionFeedbackMessage {
   string mission_id    = 1;  // UUID de la Mission completada
-  string satellite_did = 2;  // DID del Ephemeral Satellite evaluado
+  string provider_did  = 2;  // DID del provider evaluado (era satellite_did, generalizado)
   float  latency_ms    = 3;  // Latencia real de la Mission (ms)
   bool   success       = 4;  // true = completó sin error
   string error_code    = 5;  // FhsErrorCode como string; vacío si success = true
-  string delegated_by  = 6;  // DID del Nodo Host (para actualizar reputación derivada); vacío si TrustLevel.UNVERIFIED
-}
-
-// ── Notificaciones internas (Atlas → Navigator) ───────────────────────────────
-
-message NodeService {
-  string          kind         = 1;  // "star" | "satellite" | "nova" | "multi"
-  repeated string capabilities = 2;  // IDs de las capabilities del nodo
-}
-
-// node.online — Atlas → Navigator
-// Un provider entró en Orbit tras handshake exitoso.
-// Para Ephemeral Satellites, trust_level y delegated_by permiten que Navigator
-// muestre el nivel de confianza en la ProvenanceInfo sin consultar Atlas.
-message NodeOnlineMessage {
-  string             provider_id   = 1;
-  string             provider_name = 2;
-  repeated NodeService services    = 3;
-  bool               ephemeral     = 4;  // true si es un Ephemeral Satellite (SPEC-EPHSAT-0001)
-  string             trust_level   = 5;  // "standard" | "delegated" | "community" | "unverified"
-  string             delegated_by  = 6;  // DID del Nodo Host; vacío si no es Ephemeral Satellite
-}
-
-// node.lost — Atlas → Navigator
-// Un provider perdió su lease o cerró la conexión.
-// Para Ephemeral Satellites, también se emite cuando su Nodo Host sale del Orbit.
-message NodeLostMessage {
-  string             provider_id   = 1;
-  string             provider_name = 2;
-  repeated NodeService services    = 3;
-}
-
-// ── Gossip P2P (Atlas ↔ Atlas) ───────────────────────────────────────────────
-// El atlasId viene de Envelope.source_peer_id.
-// El timestamp y la firma vienen del Envelope.
-
-// atlas.announce — Atlas → Atlas
-// Anuncia los providers en Orbit para sincronizar routing tables.
-message AtlasAnnounceMessage {
-  repeated string provider_ids = 1;  // DIDs de providers actualmente en Orbit
-}
-
-// atlas.sync — Atlas → Atlas (respuesta a atlas.announce)
-// Devuelve el estado completo de los providers para sincronizar el routing table.
-message AtlasSyncMessage {
-  repeated NodeOnlineMessage providers = 1;
+  string delegated_by  = 6;  // DID del Nodo Host; solo para Ephemeral Satellites
 }
 
 // ── Portal ↔ Navigator (interfaz de agente, IDL-007) ─────────────────────────
-// Mensajes que viajan entre el Portal (chat UI) y el Navigator (Agent Runtime).
-// Todos usan el Envelope estándar: sourcePeerId = DID del Portal o del Navigator.
+// Mensajes que viajan por stream directo entre el Portal y el Navigator.
+// El Portal es un cliente; el Navigator es un peer FHS completo.
 
 // agent.start — Portal → Navigator
-// Inicia una sesión de agente. El sessionId correlaciona múltiples misiones del
-// mismo usuario. Enviado antes del primer chat.request de la sesión.
 message AgentStartMessage {
   string session_id = 1;  // UUID de la sesión Portal
   string scope      = 2;  // "local" | "network" | "community" | "external"
-  string model      = 3;  // Modelo LLM preferido (hint; Navigator puede ignorarlo)
+  string model      = 3;  // Modelo LLM preferido (hint)
 }
 
 // agent.status — Navigator → Portal
-// Notifica el estado actual del agente durante el procesamiento de una misión.
 message AgentStatusMessage {
   string mission_id = 1;
-  string status     = 2;  // "thinking" | "calling_star" | "calling_satellite" | "streaming" | "completed" | "error"
+  string status     = 2;  // "thinking" | "offering" | "waiting_bid" | "assigning" | "calling_star" | "calling_satellite" | "streaming" | "completed" | "error"
 }
 
 // star.selected — Navigator → Portal
-// Informa qué Star (LLM provider) fue seleccionado para procesar la misión.
 message StarSelectedMessage {
   string mission_id  = 1;
-  string provider_id = 2;  // DID del Star seleccionado (did:key:z...)
+  string provider_id = 2;  // DID del Star seleccionado
   string model       = 3;  // Modelo LLM que usará el Star
 }
 
 // tool.selected — Navigator → Portal
-// Informa qué Satellite y capability están siendo invocados.
 message ToolSelectedMessage {
   string mission_id    = 1;
-  string provider_id   = 2;  // DID del Satellite invocado (did:key:z...)
+  string provider_id   = 2;  // DID del Satellite invocado
   string capability_id = 3;  // ID de la capability del Satellite
 }
 
 // assistant.delta — Navigator → Portal (streaming)
-// Fragmento de texto de la respuesta final del agente hacia el Portal.
-// Equivalente a chat.delta pero a nivel Portal↔Navigator (incluye postprocesado del Navigator).
 message AssistantDeltaMessage {
   string mission_id = 1;
   string delta      = 2;
 }
 
 // ProvenanceInfo — trazabilidad de la misión
-// Qué Star generó la respuesta, qué Satellites se invocaron, jurisdicción, etc.
 message ProvenanceInfo {
-  string           provider_id        = 1;  // DID del Star que generó la respuesta
-  string           model              = 2;  // Modelo LLM utilizado
-  int32            completion_tokens  = 3;  // Tokens generados en la respuesta
-  repeated string  tool_provider_ids  = 4;  // DIDs de Satellites invocados
-  bool             data_exported      = 5;  // true si algún tool exportó datos fuera del nodo
-  string           jurisdiction       = 6;  // Jurisdicción legal del Star (ej. "MX")
+  string           provider_id       = 1;  // DID del Star que generó la respuesta
+  string           model             = 2;  // Modelo LLM utilizado
+  int32            completion_tokens = 3;  // Tokens generados
+  repeated string  tool_provider_ids = 4;  // DIDs de Satellites invocados
+  bool             data_exported     = 5;  // true si algún tool exportó datos fuera del nodo
+  string           jurisdiction      = 6;  // Jurisdicción legal del Star (ej. "MX")
+  float            star_reputation   = 7;  // Score de reputación del Star al momento del dispatch
 }
 
 // assistant.completed — Navigator → Portal
-// Respuesta final del agente incluyendo la provenance completa de la misión.
 message AssistantCompletedMessage {
   string         mission_id = 1;
   string         content    = 2;  // Respuesta completa del agente

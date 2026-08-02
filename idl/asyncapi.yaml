@@ -2,40 +2,69 @@ asyncapi: "3.0.0"
 
 info:
   title: FHS Wire Protocol
-  version: "0.4.0"
+  version: "0.5.0"
   description: |
     Federation of Sovereign Horizons (FHS) — protocolo de mensajería entre
-    nodos federados: Atlas (Registry), Navigator (Agent Runtime) y
-    Providers (Star, Satellite, Nova).
+    nodos federados en una red P2P descentralizada basada en libp2p.
 
-    ## Modos de transporte (DEC-0086)
+    ## Arquitectura de red (DEC-P2P-001)
 
+    La red FHS usa libp2p como capa P2P. No hay un registro central obligatorio.
+    Atlas actúa únicamente como **bootstrap peer**: ayuda a nuevos nodos a unirse
+    a la DHT Kademlia, pero no tiene autoridad sobre los demás nodos.
+
+    ## Dos planos de mensajería
+
+    ### 1. Stream directo FHS
+
+    Protocolo libp2p: `/fhs/v1/0.1.0`
     Negociación con `Sec-WebSocket-Protocol`:
 
     | Subprotocol    | Frames  | Formato                        |
     |----------------|---------|-------------------------------|
     | `fhs.v1`       | binary  | LPP + Protobuf (primario, P2P) |
-    | `fhs.v1.json`  | text    | JSON compat                    |
+    | `fhs.v1.json`  | text    | JSON compat (solo desarrollo)  |
 
     En modo `fhs.v1`, cada frame binario es `[varint-length][Envelope bytes]`.
     Ver `idl/framing.md`. En modo JSON, el campo `type` actúa como discriminador.
 
-    ## Envelope P2P (DEC-0087)
-
-    Todos los mensajes viajan dentro de un `Envelope` con campos de routing:
-    `messageId` (UUID), `sourcePeerId` (DID), `destPeerId` (DID, opcional),
+    Todos los mensajes de stream viajan dentro de un `Envelope` con campos de routing:
+    `messageId` (UUID), `sourcePeerId` (DID), `destPeerId` (DID),
     `timestamp` (anti-replay), `version`, `signature` (Ed25519 del envelope).
 
-    La autenticación es por Envelope: `sourcePeerId` identifica al emisor y
-    `signature` autentica el frame. No hay `CallerAuth` separado.
+    ### 2. GossipSub (libp2p pubsub)
 
-    ## Ciclo de vida (DEC-0087)
+    Mensajes de broadcast en tópicos de GossipSub. No son Envelopes.
+    Cada mensaje lleva su propia firma Ed25519.
+    Ver `idl/gossipsub.md` para la especificación completa de cada tópico.
 
-    Flujo 2-step: `handshake` → `handshake_ack` → `ping/pong` (cada heartbeatSeconds).
-    Reemplaza el flujo anterior de 4 pasos (hello/welcome/register/registered).
+    | Tópico                       | Mensaje               | Dirección          |
+    |------------------------------|-----------------------|--------------------|
+    | `fhs/v1/nodes/advertise`     | NodeAdvertiseMessage  | Broadcast — todos  |
+    | `fhs/v1/missions/offer`      | MissionOfferMessage   | Navigator → todos  |
+    | `fhs/v1/missions/bid`        | MissionBidMessage     | Provider → todos   |
+    | `fhs/v1/missions/assign`     | MissionAssignMessage  | Navigator → todos  |
+    | `fhs/v1/reputation/update`   | ReputationUpdateMessage | Navigator → todos |
+
+    ### 3. DHT Kademlia
+
+    Registros persistidos en la DHT. No son mensajes — son records almacenados.
+
+    | Key DHT                    | Record               | Quién publica    |
+    |----------------------------|----------------------|------------------|
+    | `{did}`                    | DhtBeaconRecord      | El nodo mismo    |
+    | `reputation/{did}`         | DhtReputationRecord  | Navigators       |
+
+    Ver `idl/gossipsub.md` y `protocol/p2p.md` para detalles completos.
+
+    ## Identidad y autenticación
+
+    Cada nodo tiene un DID `did:key:z...` (Ed25519). La clave pública está embebida
+    en el DID — verificación sin PKI externa. Todo mensaje (Envelope, GossipSub, DHT)
+    lleva firma Ed25519 del emisor.
 
     Versión de referencia: @rafex/galaxia-fhs-protocol
-    Repositorio de tipos: https://github.com/rafex/galaxIA-SDK
+    Repositorio: https://github.com/rafex/galaxIA-SDK
     Framing spec: idl/framing.md
 
   license:
@@ -46,16 +75,20 @@ info:
 
 defaultContentType: application/json
 
+# ── Canales de stream directo FHS ────────────────────────────────────────────
+# Los streams directos se establecen entre CUALQUIER par de nodos FHS.
+# El protocolo libp2p /fhs/v1/0.1.0 negocia la conexión; WSS la transporta.
+
 channels:
-  # ── WebSocket: Portal → Navigator (misiones de chat + control de agente) ─
+  # ── Stream: Portal ↔ Navigator ───────────────────────────────────────────
   /chat:
     address: wss://{navigator}/chat
     description: |
-      Canal principal Portal↔Navigator. El Portal envía agent.start para iniciar
-      la sesión, chat.request / chat.cancel para misiones, y tool.result /
-      tool.list.response para respuestas a tool calls del Star.
+      Stream directo Portal↔Navigator para misiones de chat y control de agente.
+      El Portal inicia con agent.start, envía chat.request / chat.cancel.
       Navigator responde con agent.status, star.selected, tool.selected,
-      assistant.delta, assistant.completed, chat.error, tool.call y tool.list.
+      assistant.delta, assistant.completed, chat.error.
+      Todos los mensajes viajan en Envelope (sourcePeerId = DID del emisor).
     messages:
       agentStart:
         $ref: "#/components/messages/AgentStartMessage"
@@ -63,27 +96,6 @@ channels:
         $ref: "#/components/messages/ChatRequestMessage"
       chatCancel:
         $ref: "#/components/messages/ChatCancelMessage"
-      toolCallResult:
-        $ref: "#/components/messages/ToolCallResultMessage"
-      toolCallError:
-        $ref: "#/components/messages/ToolCallErrorMessage"
-      toolListResponse:
-        $ref: "#/components/messages/ToolListResponseMessage"
-    bindings:
-      ws:
-        method: GET
-        headers:
-          type: object
-          properties:
-            Sec-WebSocket-Protocol:
-              type: string
-              enum: [fhs.v1, fhs.v1.json]
-              description: "fhs.v1: binario LPP+Protobuf (P2P). fhs.v1.json: texto JSON (compat)."
-
-  # ── WebSocket: Navigator → Portal (respuestas de agente + misión) ────────
-  /chat/stream:
-    address: wss://{navigator}/chat
-    messages:
       agentStatus:
         $ref: "#/components/messages/AgentStatusMessage"
       starSelected:
@@ -94,31 +106,103 @@ channels:
         $ref: "#/components/messages/AssistantDeltaMessage"
       assistantCompleted:
         $ref: "#/components/messages/AssistantCompletedMessage"
+      chatError:
+        $ref: "#/components/messages/ChatErrorMessage"
+      error:
+        $ref: "#/components/messages/ErrorMessage"
+    bindings:
+      ws:
+        method: GET
+        headers:
+          type: object
+          properties:
+            Sec-WebSocket-Protocol:
+              type: string
+              enum: [fhs.v1, fhs.v1.json]
+
+  # ── Stream: Navigator ↔ Star (stream directo, post-assign) ───────────────
+  /mission/chat:
+    address: wss://{star}/mission/chat
+    description: |
+      Stream directo Navigator↔Star para ejecución de Mission de chat.
+      Abierto DESPUÉS de que el Star gana un MissionBid via GossipSub.
+      Navigator envía chat.request; Star responde con chat.delta / chat.completed.
+      El Star puede emitir tool.call hacia Navigator si necesita Satellites.
+      Todos los mensajes viajan en Envelope firmado.
+    messages:
+      chatRequest:
+        $ref: "#/components/messages/ChatRequestMessage"
+      chatCancel:
+        $ref: "#/components/messages/ChatCancelMessage"
       chatDelta:
         $ref: "#/components/messages/ChatDeltaMessage"
       chatCompleted:
         $ref: "#/components/messages/ChatCompletedMessage"
       chatError:
         $ref: "#/components/messages/ChatErrorMessage"
+      dispatchAck:
+        $ref: "#/components/messages/DispatchAckMessage"
       toolCallRequest:
         $ref: "#/components/messages/ToolCallRequestMessage"
       toolListRequest:
         $ref: "#/components/messages/ToolListRequestMessage"
+      error:
+        $ref: "#/components/messages/ErrorMessage"
+    bindings:
+      ws:
+        method: GET
+        headers:
+          type: object
+          properties:
+            Sec-WebSocket-Protocol:
+              type: string
+              enum: [fhs.v1, fhs.v1.json]
 
-  # ── WebSocket: Provider ↔ Atlas (ciclo de vida P2P) ───────────────────────
-  /register:
-    address: wss://{atlas}/register
+  # ── Stream: Navigator ↔ Satellite (stream directo, post-assign) ──────────
+  /mission/tool:
+    address: wss://{satellite}/mission/tool
     description: |
-      Canal de ciclo de vida de un nodo con Atlas (DEC-0087).
-      Cualquier nodo (Provider, Navigator, Ephemeral Satellite) usa este canal.
-      Flujo 2-step: handshake → handshake_ack → ping/pong (cada heartbeatSeconds).
-      Una vez en Orbit: dispatch.ack, tool.cancel, mission.feedback.
-      Para Ephemeral Satellites (SPEC-EPHSAT-0001): el HandshakeMessage incluye
-      un DelegationToken. Si la validación falla, Atlas responde con error
-      (DELEGATION_INVALID / DELEGATION_EXPIRED) y cierra la conexión.
-      Navigator también usa este canal para enviar mission.feedback tras
-      completar Missions con Ephemeral Satellites.
-      Todos los mensajes viajan en un Envelope firmado.
+      Stream directo Navigator↔Satellite para ejecución de tool.call.
+      Abierto DESPUÉS de que el Satellite gana un MissionBid via GossipSub.
+      Navigator envía tool.call / tool.cancel; Satellite responde con
+      tool.result / tool.error.
+      Los mensajes viajan en Envelope firmado.
+    messages:
+      toolCallRequest:
+        $ref: "#/components/messages/ToolCallRequestMessage"
+      toolCancel:
+        $ref: "#/components/messages/ToolCancelMessage"
+      toolCallResult:
+        $ref: "#/components/messages/ToolCallResultMessage"
+      toolCallError:
+        $ref: "#/components/messages/ToolCallErrorMessage"
+      toolListRequest:
+        $ref: "#/components/messages/ToolListRequestMessage"
+      toolListResponse:
+        $ref: "#/components/messages/ToolListResponseMessage"
+      dispatchAck:
+        $ref: "#/components/messages/DispatchAckMessage"
+      error:
+        $ref: "#/components/messages/ErrorMessage"
+    bindings:
+      ws:
+        method: GET
+        headers:
+          type: object
+          properties:
+            Sec-WebSocket-Protocol:
+              type: string
+              enum: [fhs.v1, fhs.v1.json]
+
+  # ── Stream: Handshake (cualquier par de nodos FHS) ───────────────────────
+  /fhs:
+    address: wss://{peer}/fhs
+    description: |
+      Handshake de establecimiento de stream FHS entre CUALQUIER par de nodos.
+      Primer mensaje al abrir un stream libp2p /fhs/v1/0.1.0.
+      El iniciador se presenta con su Beacon y multiaddrs.
+      El receptor responde con handshake_ack y parámetros de sesión.
+      Después del handshake: ping/pong para mantener el stream activo.
     messages:
       handshake:
         $ref: "#/components/messages/HandshakeMessage"
@@ -130,12 +214,6 @@ channels:
         $ref: "#/components/messages/PongMessage"
       error:
         $ref: "#/components/messages/ErrorMessage"
-      dispatchAck:
-        $ref: "#/components/messages/DispatchAckMessage"
-      toolCancel:
-        $ref: "#/components/messages/ToolCancelMessage"
-      missionFeedback:
-        $ref: "#/components/messages/MissionFeedbackMessage"
     bindings:
       ws:
         method: GET
@@ -145,130 +223,78 @@ channels:
             Sec-WebSocket-Protocol:
               type: string
               enum: [fhs.v1, fhs.v1.json]
-              description: "fhs.v1: binario LPP+Protobuf (P2P). fhs.v1.json: texto JSON (compat)."
 
-  # ── WebSocket: Atlas → Navigator (notificaciones de topología) ───────────
-  /atlas/nodes:
-    address: wss://{atlas}/nodes
+  # ── GossipSub: fhs/v1/nodes/advertise ────────────────────────────────────
+  /gossipsub/nodes/advertise:
+    address: "fhs/v1/nodes/advertise"
     description: |
-      Notificaciones internas que Atlas emite hacia Navigator cuando
-      un provider entra en Orbit (node.online) o pierde su lease (node.lost).
+      Tópico GossipSub: presencia de nodos.
+      Cada nodo publica NodeAdvertiseMessage periódicamente (según ttl_seconds).
+      Reemplaza el modelo node.online / node.lost centralizado en Atlas.
+      Un nodo que deja de anunciar se considera offline (TTL expirado).
+      Todos los nodos se suscriben a este tópico para mantener una vista
+      local del ecosistema de peers disponibles.
     messages:
-      nodeOnline:
-        $ref: "#/components/messages/NodeOnlineMessage"
-      nodeLost:
-        $ref: "#/components/messages/NodeLostMessage"
-    bindings:
-      ws:
-        method: GET
-        headers:
-          type: object
-          properties:
-            Sec-WebSocket-Protocol:
-              type: string
-              enum: [fhs.v1, fhs.v1.json]
-              description: "fhs.v1: binario LPP+Protobuf (P2P). fhs.v1.json: texto JSON (compat)."
+      nodeAdvertise:
+        $ref: "#/components/messages/NodeAdvertiseMessage"
 
-  # ── WebSocket: Atlas ↔ Atlas (gossip P2P, DEC-0086) ───────────────────────
-  /atlas/gossip:
-    address: wss://{atlas}/gossip
+  # ── GossipSub: fhs/v1/missions/offer ─────────────────────────────────────
+  /gossipsub/missions/offer:
+    address: "fhs/v1/missions/offer"
     description: |
-      Canal de gossip entre instancias Atlas. Permite que múltiples Atlas sincronicen
-      sus routing tables sin coordinator central, formando una malla federada P2P.
-      El Atlas iniciador envía atlas.announce; el receptor responde con atlas.sync.
-      sourcePeerId en el Envelope identifica al Atlas emisor.
+      Tópico GossipSub: oferta de Mission por un Navigator.
+      Navigator publica MissionOfferMessage cuando necesita un provider.
+      Los providers elegibles (que tienen las capabilities requeridas y
+      están disponibles) responden con MissionBidMessage en el tópico bid.
     messages:
-      atlasAnnounce:
-        $ref: "#/components/messages/AtlasAnnounceMessage"
-      atlasSync:
-        $ref: "#/components/messages/AtlasSyncMessage"
-    bindings:
-      ws:
-        method: GET
-        headers:
-          type: object
-          properties:
-            Sec-WebSocket-Protocol:
-              type: string
-              enum: [fhs.v1, fhs.v1.json]
-              description: "fhs.v1: binario LPP+Protobuf (P2P). fhs.v1.json: texto JSON (compat)."
+      missionOffer:
+        $ref: "#/components/messages/MissionOfferMessage"
+
+  # ── GossipSub: fhs/v1/missions/bid ───────────────────────────────────────
+  /gossipsub/missions/bid:
+    address: "fhs/v1/missions/bid"
+    description: |
+      Tópico GossipSub: bids de providers en respuesta a una MissionOffer.
+      Navigator recoge los bids hasta bid_deadline_ms y selecciona el mejor
+      según: trust_level > reputation_score > estimated_latency_ms.
+    messages:
+      missionBid:
+        $ref: "#/components/messages/MissionBidMessage"
+
+  # ── GossipSub: fhs/v1/missions/assign ────────────────────────────────────
+  /gossipsub/missions/assign:
+    address: "fhs/v1/missions/assign"
+    description: |
+      Tópico GossipSub: Navigator confirma la asignación de una Mission.
+      El provider ganador abre o acepta el stream directo del Navigator.
+      Los demás providers que hicieron bid pueden liberar recursos reservados.
+    messages:
+      missionAssign:
+        $ref: "#/components/messages/MissionAssignMessage"
+
+  # ── GossipSub: fhs/v1/reputation/update ──────────────────────────────────
+  /gossipsub/reputation/update:
+    address: "fhs/v1/reputation/update"
+    description: |
+      Tópico GossipSub: actualización de reputación post-Mission.
+      Navigator publica ReputationUpdateMessage al completar una Mission.
+      Todos los nodos suscritos actualizan su caché local de reputación.
+      Los nodos que mantienen DhtReputationRecord también usan este feed
+      para actualizar el registro en la DHT.
+    messages:
+      reputationUpdate:
+        $ref: "#/components/messages/ReputationUpdateMessage"
 
 components:
   messages:
-    # ── Portal ↔ Navigator (interfaz de agente, IDL-007) ─────────────────────
-    AgentStartMessage:
-      name: agent.start
-      title: Inicio de sesión de agente
-      summary: |
-        Portal → Navigator. Inicia una sesión de agente. El sessionId correlaciona
-        múltiples misiones dentro de la misma sesión del usuario.
-      payload:
-        $ref: "#/components/schemas/AgentStartMessage"
-
-    AgentStatusMessage:
-      name: agent.status
-      title: Estado del agente
-      summary: |
-        Navigator → Portal. Notificación del estado actual del agente durante el
-        procesamiento de una misión (thinking, calling_star, calling_satellite, etc.)
-      payload:
-        $ref: "#/components/schemas/AgentStatusMessage"
-
-    StarSelectedMessage:
-      name: star.selected
-      title: Star seleccionado para la misión
-      summary: |
-        Navigator → Portal. Informa al Portal qué Star (LLM provider) fue
-        seleccionado para procesar la misión.
-      payload:
-        $ref: "#/components/schemas/StarSelectedMessage"
-
-    ToolSelectedMessage:
-      name: tool.selected
-      title: Satellite y capability seleccionados
-      summary: |
-        Navigator → Portal. Informa al Portal qué Satellite y capability están
-        siendo invocados durante la misión.
-      payload:
-        $ref: "#/components/schemas/ToolSelectedMessage"
-
-    AssistantDeltaMessage:
-      name: assistant.delta
-      title: Fragmento de respuesta del agente (streaming)
-      summary: |
-        Navigator → Portal. Fragmento de texto en streaming de la respuesta final
-        del agente al Portal (equivalente a chat.delta pero a nivel Portal↔Navigator).
-      payload:
-        $ref: "#/components/schemas/AssistantDeltaMessage"
-
-    AssistantCompletedMessage:
-      name: assistant.completed
-      title: Respuesta completa del agente con provenance
-      summary: |
-        Navigator → Portal. Respuesta final del agente incluyendo la provenance
-        de la misión: qué Star generó la respuesta, qué Satellites se invocaron,
-        jurisdicción, si se exportaron datos, etc.
-      payload:
-        $ref: "#/components/schemas/AssistantCompletedMessage"
-
-    # ── Ephemeral Satellite (SPEC-EPHSAT-0001) ───────────────────────────────
-    MissionFeedbackMessage:
-      name: mission.feedback
-      title: Retroalimentación de misión de Ephemeral Satellite
-      summary: |
-        Navigator → Atlas (canal /register). Reporta la calidad de una Mission
-        completada por un Ephemeral Satellite. Atlas actualiza la reputación del
-        Satellite y el contador de delegaciones exitosas del Nodo Host.
-      payload:
-        $ref: "#/components/schemas/MissionFeedbackMessage"
-
-    # ── Ciclo de vida P2P (Provider ↔ Atlas, DEC-0087) ───────────────────────
+    # ── Handshake (stream directo) ────────────────────────────────────────────
     HandshakeMessage:
       name: handshake
-      title: Handshake del provider con Atlas
+      title: Handshake de establecimiento de stream FHS
       summary: |
-        Provider → Atlas. Primer mensaje tras abrir el WebSocket. Lleva el Beacon
-        firmado y los multiaddrs P2P del nodo. Reemplaza hello+register.
+        Nodo A → Nodo B. Primer mensaje al abrir stream /fhs/v1/0.1.0.
+        El iniciador se presenta con Beacon y multiaddrs.
+        En Ephemeral Satellites incluye DelegationToken.
       payload:
         $ref: "#/components/schemas/HandshakeMessage"
 
@@ -276,48 +302,77 @@ components:
       name: handshake_ack
       title: Confirmación de handshake
       summary: |
-        Atlas → Provider. El provider está en Orbit. Lleva parámetros de lease.
-        Reemplaza welcome+registered.
+        Nodo B → Nodo A. Stream establecido. Devuelve parámetros de sesión.
       payload:
         $ref: "#/components/schemas/HandshakeAckMessage"
 
     PingMessage:
       name: ping
-      title: Heartbeat (Pulse) del provider
-      summary: Provider → Atlas. Enviado cada heartbeatSeconds para renovar el lease.
+      title: Heartbeat (Pulse)
+      summary: Emitido cada heartbeatSeconds para mantener el stream activo.
       payload:
         $ref: "#/components/schemas/PingMessage"
 
     PongMessage:
       name: pong
       title: Respuesta al Pulse
-      summary: Atlas → Provider. Responde a ping con el server_timestamp para calcular RTT.
+      summary: Responde a ping con server_timestamp para calcular RTT.
       payload:
         $ref: "#/components/schemas/PongMessage"
 
     ErrorMessage:
       name: error
-      title: Error estandarizado
-      summary: Cualquier nodo → cualquier nodo. Código de error semántico FHS.
+      title: Error estandarizado FHS
+      summary: Cualquier nodo → cualquier nodo. Código de error semántico.
       payload:
         $ref: "#/components/schemas/ErrorMessage"
 
-    # ── Gossip P2P (Atlas ↔ Atlas, DEC-0086) ─────────────────────────────────
-    AtlasAnnounceMessage:
-      name: atlas.announce
-      title: Anuncio de providers en Orbit
-      summary: Atlas → Atlas. Anuncia los providers en Orbit para sincronizar routing tables.
+    # ── Portal ↔ Navigator ────────────────────────────────────────────────────
+    AgentStartMessage:
+      name: agent.start
+      title: Inicio de sesión de agente
+      summary: Portal → Navigator. Inicia una sesión de agente con scope y modelo preferido.
       payload:
-        $ref: "#/components/schemas/AtlasAnnounceMessage"
+        $ref: "#/components/schemas/AgentStartMessage"
 
-    AtlasSyncMessage:
-      name: atlas.sync
-      title: Respuesta de sincronización entre Atlas
-      summary: Atlas → Atlas. Devuelve el estado completo de providers en respuesta a atlas.announce.
+    AgentStatusMessage:
+      name: agent.status
+      title: Estado del agente
+      summary: |
+        Navigator → Portal. Estado del agente durante procesamiento.
+        Incluye estados nuevos del ciclo GossipSub: offering, waiting_bid, assigning.
       payload:
-        $ref: "#/components/schemas/AtlasSyncMessage"
+        $ref: "#/components/schemas/AgentStatusMessage"
 
-    # ── Mensajes de Chat ──────────────────────────────────────────────────────
+    StarSelectedMessage:
+      name: star.selected
+      title: Star seleccionado
+      summary: Navigator → Portal. Informa qué Star ganó el bid para la Mission.
+      payload:
+        $ref: "#/components/schemas/StarSelectedMessage"
+
+    ToolSelectedMessage:
+      name: tool.selected
+      title: Satellite y capability seleccionados
+      summary: Navigator → Portal. Informa qué Satellite está siendo invocado.
+      payload:
+        $ref: "#/components/schemas/ToolSelectedMessage"
+
+    AssistantDeltaMessage:
+      name: assistant.delta
+      title: Fragmento de respuesta (streaming)
+      summary: Navigator → Portal. Fragmento de texto del agente en streaming.
+      payload:
+        $ref: "#/components/schemas/AssistantDeltaMessage"
+
+    AssistantCompletedMessage:
+      name: assistant.completed
+      title: Respuesta completa con provenance
+      summary: Navigator → Portal. Respuesta final con provenance de la Mission.
+      payload:
+        $ref: "#/components/schemas/AssistantCompletedMessage"
+
+    # ── Chat (stream directo Navigator ↔ Star) ────────────────────────────────
     ChatRequestMessage:
       name: chat.request
       title: Solicitud de chat
@@ -326,7 +381,7 @@ components:
 
     ChatCancelMessage:
       name: chat.cancel
-      title: Cancelación de chat en curso
+      title: Cancelación de chat
       payload:
         $ref: "#/components/schemas/ChatCancelMessage"
 
@@ -338,50 +393,50 @@ components:
 
     ChatCompletedMessage:
       name: chat.completed
-      title: Respuesta de chat completa
+      title: Respuesta completa
       payload:
         $ref: "#/components/schemas/ChatCompletedMessage"
 
     ChatErrorMessage:
       name: chat.error
-      title: Error en el procesamiento del chat
+      title: Error en chat
       payload:
         $ref: "#/components/schemas/ChatErrorMessage"
 
     DispatchAckMessage:
       name: dispatch.ack
-      title: Confirmación de dispatch a un provider
+      title: Confirmación de recepción de Mission
       payload:
         $ref: "#/components/schemas/DispatchAckMessage"
 
-    # ── Mensajes de Tool ──────────────────────────────────────────────────────
+    # ── Tool (stream directo Navigator ↔ Satellite) ───────────────────────────
     ToolCallRequestMessage:
       name: tool.call
-      title: Solicitud de ejecución de tool
+      title: Solicitud de tool
       payload:
         $ref: "#/components/schemas/ToolCallRequestMessage"
 
     ToolCancelMessage:
       name: tool.cancel
-      title: Cancelación de tool en ejecución
+      title: Cancelación de tool
       payload:
         $ref: "#/components/schemas/ToolCancelMessage"
 
     ToolCallResultMessage:
       name: tool.result
-      title: Resultado de ejecución de tool
+      title: Resultado de tool
       payload:
         $ref: "#/components/schemas/ToolCallResultMessage"
 
     ToolCallErrorMessage:
       name: tool.error
-      title: Error en la ejecución de tool
+      title: Error en tool
       payload:
         $ref: "#/components/schemas/ToolCallErrorMessage"
 
     ToolListRequestMessage:
       name: tool.list
-      title: Solicitud de lista de tools disponibles
+      title: Solicitud de lista de tools
       payload:
         $ref: "#/components/schemas/ToolListRequestMessage"
 
@@ -391,229 +446,68 @@ components:
       payload:
         $ref: "#/components/schemas/ToolListResponseMessage"
 
-    # ── Notificaciones internas ───────────────────────────────────────────────
-    NodeOnlineMessage:
-      name: node.online
-      title: Notificación de provider conectado
-      summary: Atlas → Navigator. Un provider entró en Orbit tras handshake exitoso.
+    # ── GossipSub — Presencia ─────────────────────────────────────────────────
+    NodeAdvertiseMessage:
+      name: node.advertise
+      title: Anuncio de presencia de nodo
+      summary: |
+        Tópico fhs/v1/nodes/advertise. Publicado periódicamente por cada nodo.
+        Reemplaza node.online / node.lost del modelo centralizado en Atlas.
+        TTL basado en ttl_seconds: si deja de publicar → offline.
       payload:
-        $ref: "#/components/schemas/NodeOnlineMessage"
+        $ref: "#/components/schemas/NodeAdvertiseMessage"
 
-    NodeLostMessage:
-      name: node.lost
-      title: Notificación de provider perdido
-      summary: Atlas → Navigator. Un provider perdió su lease o cerró la conexión.
+    # ── GossipSub — Dispatch de Missions ──────────────────────────────────────
+    MissionOfferMessage:
+      name: mission.offer
+      title: Oferta de Mission
+      summary: |
+        Tópico fhs/v1/missions/offer. Navigator publica qué capabilities necesita.
+        Parte del flujo de dispatch descentralizado (DEC-P2P-001).
       payload:
-        $ref: "#/components/schemas/NodeLostMessage"
+        $ref: "#/components/schemas/MissionOfferMessage"
+
+    MissionBidMessage:
+      name: mission.bid
+      title: Bid de provider para una Mission
+      summary: |
+        Tópico fhs/v1/missions/bid. Provider responde a una MissionOffer que puede satisfacer.
+        Incluye reputación, latencia estimada y capabilities ofrecidas.
+      payload:
+        $ref: "#/components/schemas/MissionBidMessage"
+
+    MissionAssignMessage:
+      name: mission.assign
+      title: Asignación de Mission a provider
+      summary: |
+        Tópico fhs/v1/missions/assign. Navigator confirma el bid ganador.
+        Tras esto, Navigator abre stream directo con el provider asignado.
+      payload:
+        $ref: "#/components/schemas/MissionAssignMessage"
+
+    # ── GossipSub — Reputación ────────────────────────────────────────────────
+    ReputationUpdateMessage:
+      name: reputation.update
+      title: Actualización de reputación post-Mission
+      summary: |
+        Tópico fhs/v1/reputation/update. Navigator publica evaluación al completar Mission.
+        Reemplaza el mission.feedback punto-a-punto con Atlas.
+      payload:
+        $ref: "#/components/schemas/ReputationUpdateMessage"
+
+    # ── Ephemeral Satellite ───────────────────────────────────────────────────
+    MissionFeedbackMessage:
+      name: mission.feedback
+      title: Feedback de Mission (stream directo, Ephemeral Satellite)
+      summary: |
+        Usado en stream directo cuando GossipSub no está disponible
+        (ej. Ephemeral Satellite reportando directamente al Nodo Host).
+        En GossipSub se usa ReputationUpdateMessage.
+      payload:
+        $ref: "#/components/schemas/MissionFeedbackMessage"
 
   schemas:
-    # ── Ephemeral Satellite (SPEC-EPHSAT-0001) ────────────────────────────────
-    DelegationToken:
-      type: object
-      description: |
-        Credencial firmada por el Nodo Host que autoriza a un Ephemeral Satellite
-        a operar en su nombre. Viaja en HandshakeMessage.delegationToken (proto field 4).
-        La firma cubre los campos issuer, subject, capabilities, wasmHash, expiresAt
-        en serialización proto canónica (determinista). Atlas verifica con la clave
-        pública Ed25519 derivada del DID issuer (did:key embeds pubkey — sin PKI externa).
-      required: [issuer, subject, capabilities, wasmHash, expiresAt, signature]
-      properties:
-        issuer:
-          type: string
-          pattern: "^did:key:z"
-          description: DID del Nodo Host firmante
-        subject:
-          type: string
-          pattern: "^did:key:z"
-          description: DID del Ephemeral Satellite; debe coincidir con Envelope.sourcePeerId
-        capabilities:
-          type: array
-          items:
-            type: string
-          description: Capability IDs que el Host delega (subconjunto de los suyos)
-        wasmHash:
-          type: string
-          pattern: "^sha256:[0-9a-f]{64}$"
-          description: Hash SHA-256 del bundle WASM que el Ephemeral Satellite ejecutará
-        expiresAt:
-          type: integer
-          format: int64
-          description: Unix ms de expiración del token
-        signature:
-          type: string
-          description: Firma Ed25519 en bytes base64 sobre los campos 1-5 en proto canónico
-
-    MissionFeedbackMessage:
-      allOf:
-        - $ref: "#/components/schemas/Envelope"
-        - type: object
-          required: [missionId, satelliteDid, latencyMs, success]
-          properties:
-            type:
-              type: string
-              enum: [mission.feedback]
-            missionId:
-              type: string
-              format: uuid
-              description: UUID de la Mission completada
-            satelliteDid:
-              type: string
-              description: DID del Ephemeral Satellite evaluado
-            latencyMs:
-              type: number
-              description: Latencia real de la Mission en milisegundos
-            success:
-              type: boolean
-              description: true si la Mission completó sin error
-            errorCode:
-              type: string
-              description: FhsErrorCode como string; vacío si success es true
-            delegatedBy:
-              type: string
-              description: DID del Nodo Host; vacío si TrustLevel es UNVERIFIED
-
-    # ── Portal ↔ Navigator — Canal de agente (IDL-007) ────────────────────────
-    AgentStartMessage:
-      allOf:
-        - $ref: "#/components/schemas/Envelope"
-        - type: object
-          required: [sessionId]
-          properties:
-            type:
-              type: string
-              enum: [agent.start]
-            sessionId:
-              type: string
-              format: uuid
-              description: UUID de la sesión Portal. Correlaciona múltiples misiones.
-            scope:
-              type: string
-              enum: [local, network, community, external]
-              description: |
-                Alcance de descubrimiento de providers.
-                local: solo providers del mismo host.
-                network: providers en la red local.
-                community: providers visibles a grupos autorizados.
-                external: cualquier provider público de la federación.
-            model:
-              type: string
-              description: Modelo LLM preferido (hint, Navigator puede ignorarlo si no está disponible).
-
-    AgentStatusMessage:
-      allOf:
-        - $ref: "#/components/schemas/Envelope"
-        - type: object
-          required: [missionId, status]
-          properties:
-            type:
-              type: string
-              enum: [agent.status]
-            missionId:
-              type: string
-            status:
-              type: string
-              enum: [thinking, calling_star, calling_satellite, streaming, completed, error]
-              description: Estado actual del agente durante el procesamiento de la misión.
-
-    StarSelectedMessage:
-      allOf:
-        - $ref: "#/components/schemas/Envelope"
-        - type: object
-          required: [missionId, providerId, model]
-          properties:
-            type:
-              type: string
-              enum: [star.selected]
-            missionId:
-              type: string
-            providerId:
-              type: string
-              description: DID del Star seleccionado (did:key:z...)
-            model:
-              type: string
-              description: Modelo LLM que usará el Star para esta misión
-
-    ToolSelectedMessage:
-      allOf:
-        - $ref: "#/components/schemas/Envelope"
-        - type: object
-          required: [missionId, providerId, capabilityId]
-          properties:
-            type:
-              type: string
-              enum: [tool.selected]
-            missionId:
-              type: string
-            providerId:
-              type: string
-              description: DID del Satellite invocado (did:key:z...)
-            capabilityId:
-              type: string
-              description: ID de la capability del Satellite que se está ejecutando
-
-    AssistantDeltaMessage:
-      allOf:
-        - $ref: "#/components/schemas/Envelope"
-        - type: object
-          required: [missionId, delta]
-          properties:
-            type:
-              type: string
-              enum: [assistant.delta]
-            missionId:
-              type: string
-            delta:
-              type: string
-              description: Fragmento de texto de la respuesta del agente (streaming hacia el Portal)
-
-    ProvenanceInfo:
-      type: object
-      description: |
-        Trazabilidad de la misión: quién generó la respuesta, qué herramientas se usaron,
-        si se exportaron datos, y la jurisdicción legal del Star.
-      required: [providerId, model]
-      properties:
-        providerId:
-          type: string
-          description: DID del Star que generó la respuesta (did:key:z...)
-        model:
-          type: string
-          description: Modelo LLM utilizado (ej. "llama3.2:3b")
-        completionTokens:
-          type: integer
-          description: Tokens generados en la respuesta
-        toolProviderIds:
-          type: array
-          items:
-            type: string
-          description: DIDs de los Satellites invocados durante la misión
-        dataExported:
-          type: boolean
-          description: true si algún tool exportó datos fuera del nodo local
-        jurisdiction:
-          type: string
-          description: Jurisdicción legal del Star (ej. "MX", "EU", "US")
-
-    AssistantCompletedMessage:
-      allOf:
-        - $ref: "#/components/schemas/Envelope"
-        - type: object
-          required: [missionId, content]
-          properties:
-            type:
-              type: string
-              enum: [assistant.completed]
-            missionId:
-              type: string
-            content:
-              type: string
-              description: Respuesta completa del agente
-            provenance:
-              $ref: "#/components/schemas/ProvenanceInfo"
-
-    # ── Envelope (frame raíz del protocolo, DEC-0087) ─────────────────────────
-    # En modo JSON, los campos del Envelope van al nivel raíz del objeto
-    # junto con los campos del payload y el discriminador `type`.
+    # ── Envelope (frame raíz del stream directo, DEC-0087) ────────────────────
     Envelope:
       type: object
       required: [messageId, sourcePeerId, timestamp, version, signature, type]
@@ -627,7 +521,7 @@ components:
           description: DID del nodo emisor (did:key:z...)
         destPeerId:
           type: string
-          description: DID del destino; ausente o vacío = broadcast / cualquier Atlas
+          description: DID del destino; vacío solo en handshake inicial
         timestamp:
           type: integer
           format: int64
@@ -635,15 +529,14 @@ components:
         version:
           type: string
           enum: ["1"]
-          description: Versión del protocolo FHS
         signature:
           type: string
           description: Ed25519 base64 de sha256(messageId:source:dest:timestamp:payload_bytes_hex)
         type:
           type: string
-          description: Discriminador del payload en modo JSON (ej. "handshake", "chat.request")
+          description: Discriminador del payload en modo JSON
 
-    # ── Ciclo de vida P2P (DEC-0087) ─────────────────────────────────────────
+    # ── Handshake ─────────────────────────────────────────────────────────────
     HandshakeMessage:
       allOf:
         - $ref: "#/components/schemas/Envelope"
@@ -655,20 +548,17 @@ components:
               enum: [handshake]
             fhsVersion:
               type: string
-              description: Versión del protocolo FHS que soporta este nodo (ej. "1")
             listenAddrs:
               type: array
               items:
                 type: string
-              description: Multiaddrs P2P del nodo (ej. /ip4/1.2.3.4/tcp/8081/ws)
+              description: Multiaddrs P2P con TLS — /ip4/.../tcp/.../tls/ws
             beacon:
               type: object
-              description: Beacon (manifiesto completo del nodo). Ver schemas/beacon-*.schema.json
+              description: Beacon completo del nodo. Ver schemas/beacon-*.schema.json
             delegationToken:
               $ref: "#/components/schemas/DelegationToken"
-              description: |
-                Solo presente en Ephemeral Satellites (beacon.provider.ephemeral == true).
-                Credencial firmada por el Nodo Host. Atlas la valida antes de emitir handshake_ack.
+              description: Solo para Ephemeral Satellites (SPEC-EPHSAT-0001)
 
     HandshakeAckMessage:
       allOf:
@@ -681,28 +571,20 @@ components:
               enum: [handshake_ack]
             fhsVersion:
               type: string
-              description: Versión del protocolo acordada para esta sesión
             leaseSeconds:
               type: integer
-              description: Duración del lease en segundos (default 30)
+              description: Duración del lease del stream en segundos (default 30)
             heartbeatSeconds:
               type: integer
-              description: Intervalo de ping recomendado en segundos (default 10)
+              description: Intervalo de ping recomendado (default 10)
             leaseExpires:
               type: integer
               format: int64
-              description: Unix ms cuando vence el lease actual
             acceptedServices:
               type: integer
-              description: Número de capabilities aceptadas del Beacon
             trustLevel:
               type: string
               enum: [standard, delegated, community, unverified]
-              description: |
-                Nivel de confianza asignado por Atlas (SPEC-EPHSAT-0001).
-                standard: nodo regular (no efímero). delegated: Ephemeral Satellite con
-                DelegationToken válido. community: Host conocido pero WASM de terceros.
-                unverified: sin DelegationToken (desarrollo local).
 
     PingMessage:
       allOf:
@@ -712,7 +594,6 @@ components:
             type:
               type: string
               enum: [ping]
-          description: Heartbeat (Pulse). El provider lo emite cada heartbeatSeconds.
 
     PongMessage:
       allOf:
@@ -726,7 +607,6 @@ components:
             serverTimestamp:
               type: integer
               format: int64
-              description: Unix ms cuando Atlas procesa el ping (para calcular RTT)
 
     FhsErrorCode:
       type: string
@@ -746,11 +626,10 @@ components:
         - DELEGATION_INVALID
         - DELEGATION_EXPIRED
         - WASM_HASH_MISMATCH
-      description: |
-        Código semántico de error FHS. Quien consume puede tomar decisiones solo con el código.
-        DELEGATION_INVALID: DelegationToken con firma inválida, Host no en Orbit, o campos mal formados.
-        DELEGATION_EXPIRED: DelegationToken.expiresAt vencido o Nodo Host salió del Orbit.
-        WASM_HASH_MISMATCH: hash SHA-256 del bundle WASM no coincide con DelegationToken.wasmHash (SPEC-EPHSAT-0001).
+        - PEER_UNREACHABLE
+        - DHT_RECORD_INVALID
+        - BID_TIMEOUT
+        - BID_REJECTED
 
     ErrorMessage:
       allOf:
@@ -765,41 +644,134 @@ components:
               $ref: "#/components/schemas/FhsErrorCode"
             message:
               type: string
-              description: Descripción legible del error (opcional)
 
-    # ── Gossip P2P (Atlas ↔ Atlas, DEC-0086) ─────────────────────────────────
-    # atlasId viene de Envelope.sourcePeerId; timestamp y signature del Envelope.
-    AtlasAnnounceMessage:
+    # ── Portal ↔ Navigator ────────────────────────────────────────────────────
+    AgentStartMessage:
       allOf:
         - $ref: "#/components/schemas/Envelope"
         - type: object
-          required: [providerIds]
+          required: [sessionId]
           properties:
             type:
               type: string
-              enum: [atlas.announce]
-            providerIds:
-              type: array
-              items:
-                type: string
-              description: DIDs de providers actualmente en Orbit en este Atlas
+              enum: [agent.start]
+            sessionId:
+              type: string
+              format: uuid
+            scope:
+              type: string
+              enum: [local, network, community, external]
+            model:
+              type: string
 
-    AtlasSyncMessage:
+    AgentStatusMessage:
       allOf:
         - $ref: "#/components/schemas/Envelope"
         - type: object
-          required: [providers]
+          required: [missionId, status]
           properties:
             type:
               type: string
-              enum: [atlas.sync]
-            providers:
-              type: array
-              items:
-                $ref: "#/components/schemas/NodeOnlineMessage"
-              description: Estado completo de cada provider en Orbit
+              enum: [agent.status]
+            missionId:
+              type: string
+            status:
+              type: string
+              enum: [thinking, offering, waiting_bid, assigning, calling_star, calling_satellite, streaming, completed, error]
+              description: |
+                thinking: agente procesando.
+                offering: publicando MissionOffer en GossipSub.
+                waiting_bid: esperando bids antes de bid_deadline_ms.
+                assigning: seleccionando bid ganador y publicando MissionAssign.
+                calling_star / calling_satellite: stream directo abierto.
+                streaming / completed / error: estados finales.
 
-    # ── Tipos base ────────────────────────────────────────────────────────────
+    StarSelectedMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, providerId, model]
+          properties:
+            type:
+              type: string
+              enum: [star.selected]
+            missionId:
+              type: string
+            providerId:
+              type: string
+              description: DID del Star que ganó el bid
+            model:
+              type: string
+
+    ToolSelectedMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, providerId, capabilityId]
+          properties:
+            type:
+              type: string
+              enum: [tool.selected]
+            missionId:
+              type: string
+            providerId:
+              type: string
+            capabilityId:
+              type: string
+
+    AssistantDeltaMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, delta]
+          properties:
+            type:
+              type: string
+              enum: [assistant.delta]
+            missionId:
+              type: string
+            delta:
+              type: string
+
+    ProvenanceInfo:
+      type: object
+      required: [providerId, model]
+      properties:
+        providerId:
+          type: string
+        model:
+          type: string
+        completionTokens:
+          type: integer
+        toolProviderIds:
+          type: array
+          items:
+            type: string
+        dataExported:
+          type: boolean
+        jurisdiction:
+          type: string
+        starReputation:
+          type: number
+          description: Score de reputación del Star al momento del dispatch (0.0 - 1.0)
+
+    AssistantCompletedMessage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          required: [missionId, content]
+          properties:
+            type:
+              type: string
+              enum: [assistant.completed]
+            missionId:
+              type: string
+            content:
+              type: string
+            provenance:
+              $ref: "#/components/schemas/ProvenanceInfo"
+
+    # ── Chat ──────────────────────────────────────────────────────────────────
     ToolDefinition:
       type: object
       required: [name, description, inputSchema]
@@ -810,7 +782,6 @@ components:
           type: string
         inputSchema:
           type: object
-          description: JSON Schema del parámetro de entrada
 
     ToolCall:
       type: object
@@ -829,7 +800,6 @@ components:
               type: string
             arguments:
               type: string
-              description: JSON serializado de los argumentos
 
     Message:
       type: object
@@ -848,8 +818,6 @@ components:
           items:
             $ref: "#/components/schemas/ToolCall"
 
-    # ── Mensajes de misión — Chat ─────────────────────────────────────────────
-    # callerId = Envelope.sourcePeerId; auth = Envelope.signature; timestamp = Envelope.timestamp
     ChatRequestMessage:
       allOf:
         - $ref: "#/components/schemas/Envelope"
@@ -861,7 +829,6 @@ components:
               enum: [chat.request]
             missionId:
               type: string
-              description: UUID único de la misión de chat
             messages:
               type: array
               items:
@@ -872,7 +839,6 @@ components:
                 $ref: "#/components/schemas/ToolDefinition"
             model:
               type: string
-              description: Modelo LLM solicitado (opcional)
 
     ChatCancelMessage:
       allOf:
@@ -899,7 +865,6 @@ components:
               type: string
             delta:
               type: string
-              description: Fragmento de texto generado
 
     ChatCompletedMessage:
       allOf:
@@ -947,9 +912,8 @@ components:
             queuedAt:
               type: integer
               format: int64
-              description: Unix ms cuando la misión entró en la cola (timestamp de negocio)
 
-    # ── Mensajes de misión — Tool ─────────────────────────────────────────────
+    # ── Tool ──────────────────────────────────────────────────────────────────
     ToolCallRequestMessage:
       allOf:
         - $ref: "#/components/schemas/Envelope"
@@ -993,7 +957,6 @@ components:
               type: string
             result:
               type: string
-              description: JSON serializado del resultado
 
     ToolCallErrorMessage:
       allOf:
@@ -1039,67 +1002,265 @@ components:
               items:
                 $ref: "#/components/schemas/ToolDefinition"
 
-    # ── Notificaciones internas (Atlas → Navigator) ───────────────────────────
-    NodeService:
+    # ── GossipSub — Presencia ─────────────────────────────────────────────────
+    # Estos schemas NO extienden Envelope — son mensajes GossipSub autofirmados.
+    NodeAdvertiseMessage:
       type: object
-      required: [kind, capabilities]
+      required: [did, beacon, multiaddrs, timestamp, ttlSeconds, signature]
       properties:
-        kind:
+        did:
           type: string
-          description: "Tipo de provider: star | satellite | nova | multi"
+          pattern: "^did:key:z"
+        beacon:
+          type: object
+          description: Beacon completo del nodo (JSON)
+        multiaddrs:
+          type: array
+          items:
+            type: string
+          description: Multiaddrs P2P del nodo (solo wss://)
+        timestamp:
+          type: integer
+          format: int64
+        ttlSeconds:
+          type: integer
+          description: Tiempo de vida del anuncio (default 60)
+        ephemeral:
+          type: boolean
+        delegatedBy:
+          type: string
+          description: DID del Nodo Host; solo si ephemeral = true
+        trustLevel:
+          type: string
+          enum: [standard, delegated, community, unverified]
+        signature:
+          type: string
+          description: Ed25519 base64 de (did + sha256(beacon) + timestamp + ttlSeconds)
+
+    # ── GossipSub — Dispatch ──────────────────────────────────────────────────
+    MissionOfferMessage:
+      type: object
+      required: [missionId, navigatorDid, navigatorMultiaddrs, missionType, requiredCapabilities, bidDeadlineMs, timestamp, signature]
+      properties:
+        missionId:
+          type: string
+          format: uuid
+        navigatorDid:
+          type: string
+          pattern: "^did:key:z"
+        navigatorMultiaddrs:
+          type: array
+          items:
+            type: string
+        missionType:
+          type: string
+          enum: [chat, tool_call, agent]
+        requiredCapabilities:
+          type: array
+          items:
+            type: string
+        preferredModel:
+          type: string
+        scope:
+          type: string
+          enum: [local, network, community, external]
+        bidDeadlineMs:
+          type: integer
+          format: int64
+          description: Unix ms límite para recibir bids
+        timestamp:
+          type: integer
+          format: int64
+        signature:
+          type: string
+
+    MissionBidMessage:
+      type: object
+      required: [missionId, providerDid, providerMultiaddrs, providerType, offeredCapabilities, timestamp, signature]
+      properties:
+        missionId:
+          type: string
+          format: uuid
+        providerDid:
+          type: string
+          pattern: "^did:key:z"
+        providerMultiaddrs:
+          type: array
+          items:
+            type: string
+        providerType:
+          type: string
+          enum: [star, satellite, nova]
+        offeredCapabilities:
+          type: array
+          items:
+            type: string
+        offeredModel:
+          type: string
+        reputationScore:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Score de reputación del provider (0.0 - 1.0)
+        estimatedLatencyMs:
+          type: integer
+          description: Latencia estimada basada en carga actual
+        trustLevel:
+          type: string
+          enum: [standard, delegated, community, unverified]
+        timestamp:
+          type: integer
+          format: int64
+        signature:
+          type: string
+
+    MissionAssignMessage:
+      type: object
+      required: [missionId, navigatorDid, assignedProvider, timestamp, signature]
+      properties:
+        missionId:
+          type: string
+          format: uuid
+        navigatorDid:
+          type: string
+          pattern: "^did:key:z"
+        assignedProvider:
+          type: string
+          pattern: "^did:key:z"
+          description: DID del provider ganador del bid
+        timestamp:
+          type: integer
+          format: int64
+        signature:
+          type: string
+
+    # ── GossipSub — Reputación ────────────────────────────────────────────────
+    ReputationUpdateMessage:
+      type: object
+      required: [missionId, providerDid, navigatorDid, latencyMs, success, timestamp, signature]
+      properties:
+        missionId:
+          type: string
+          format: uuid
+        providerDid:
+          type: string
+          pattern: "^did:key:z"
+        navigatorDid:
+          type: string
+          pattern: "^did:key:z"
+        latencyMs:
+          type: number
+        success:
+          type: boolean
+        errorCode:
+          type: string
+          description: FhsErrorCode como string; vacío si success = true
+        delegatedBy:
+          type: string
+          description: DID del Nodo Host; solo para Ephemeral Satellites
+        timestamp:
+          type: integer
+          format: int64
+        signature:
+          type: string
+
+    # ── DHT Records ───────────────────────────────────────────────────────────
+    DhtBeaconRecord:
+      type: object
+      required: [did, beacon, multiaddrs, publishedAt, expiresAt, fhsVersion, signature]
+      properties:
+        did:
+          type: string
+          pattern: "^did:key:z"
+        beacon:
+          type: object
+        multiaddrs:
+          type: array
+          items:
+            type: string
+        publishedAt:
+          type: integer
+          format: int64
+        expiresAt:
+          type: integer
+          format: int64
+        fhsVersion:
+          type: string
+        signature:
+          type: string
+
+    DhtReputationRecord:
+      type: object
+      required: [providerDid, evaluatorDid, score, lastUpdated, signature]
+      properties:
+        providerDid:
+          type: string
+          pattern: "^did:key:z"
+        evaluatorDid:
+          type: string
+          pattern: "^did:key:z"
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+        missionsSuccess:
+          type: integer
+        missionsFailed:
+          type: integer
+        avgLatencyMs:
+          type: number
+        lastUpdated:
+          type: integer
+          format: int64
+        signature:
+          type: string
+
+    # ── Ephemeral Satellite ───────────────────────────────────────────────────
+    DelegationToken:
+      type: object
+      required: [issuer, subject, capabilities, wasmHash, expiresAt, signature]
+      properties:
+        issuer:
+          type: string
+          pattern: "^did:key:z"
+        subject:
+          type: string
+          pattern: "^did:key:z"
         capabilities:
           type: array
           items:
             type: string
-          description: IDs de las capabilities ofrecidas
+        wasmHash:
+          type: string
+          pattern: "^sha256:[0-9a-f]{64}$"
+        expiresAt:
+          type: integer
+          format: int64
+        signature:
+          type: string
 
-    NodeOnlineMessage:
+    MissionFeedbackMessage:
       allOf:
         - $ref: "#/components/schemas/Envelope"
         - type: object
-          required: [providerId, providerName, services]
+          required: [missionId, providerDid, latencyMs, success]
           properties:
             type:
               type: string
-              enum: [node.online]
-            providerId:
+              enum: [mission.feedback]
+            missionId:
               type: string
-              description: DID del provider que entró en Orbit
-            providerName:
+              format: uuid
+            providerDid:
               type: string
-            services:
-              type: array
-              items:
-                $ref: "#/components/schemas/NodeService"
-            ephemeral:
+            latencyMs:
+              type: number
+            success:
               type: boolean
-              description: true si es un Ephemeral Satellite (SPEC-EPHSAT-0001)
-            trustLevel:
+            errorCode:
               type: string
-              enum: [standard, delegated, community, unverified]
-              description: Nivel de confianza asignado por Atlas. Navigator lo propaga a Portal en ProvenanceInfo.
             delegatedBy:
               type: string
-              description: DID del Nodo Host; vacío si no es Ephemeral Satellite
-
-    NodeLostMessage:
-      allOf:
-        - $ref: "#/components/schemas/Envelope"
-        - type: object
-          required: [providerId, providerName, services]
-          properties:
-            type:
-              type: string
-              enum: [node.lost]
-            providerId:
-              type: string
-              description: DID del provider que perdió su lease
-            providerName:
-              type: string
-            services:
-              type: array
-              items:
-                $ref: "#/components/schemas/NodeService"
 
   servers:
     navigator:
@@ -1108,13 +1269,25 @@ components:
       description: Navigator — Agent Runtime
       variables:
         navigator:
-          default: "localhost:8090"
-          description: Host y puerto del Navigator
+          default: "localhost:8444"
     atlas:
       host: "{atlas}"
       protocol: wss
-      description: Atlas — Registry / Bootstrap Peer
+      description: Atlas — Bootstrap Peer (no es registro central)
       variables:
         atlas:
-          default: "localhost:8081"
-          description: Host y puerto de Atlas
+          default: "localhost:8443"
+    star:
+      host: "{star}"
+      protocol: wss
+      description: Star — LLM Provider
+      variables:
+        star:
+          default: "localhost:43111"
+    satellite:
+      host: "{satellite}"
+      protocol: wss
+      description: Satellite — Tool Provider
+      variables:
+        satellite:
+          default: "localhost:43112"

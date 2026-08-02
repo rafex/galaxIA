@@ -1,21 +1,54 @@
-# FHS Protocol IDL
+# FHS Protocol IDL — Red P2P libp2p
 
 Definiciones formales del protocolo de mensajería de **Federation of Sovereign Horizons (FHS)**.
+La red es P2P descentralizada: DHT Kademlia para descubrimiento, GossipSub para dispatch,
+streams directos para ejecución. **No hay registro central.** Atlas = bootstrap peer.
+
+Ver `protocol/p2p.md` para el modelo de red completo.
 
 ---
 
-## Qué hay aquí y por qué 4 formatos
-
-El protocolo FHS tiene capas distintas que cada formato IDL describe mejor:
+## Archivos IDL
 
 | Archivo | Formato | Autoritativo para |
 |---------|---------|-------------------|
-| [`fhs-protocol.proto`](fhs-protocol.proto) | Protobuf proto3 | Definición binaria canónica de todos los mensajes. Genera código en cualquier lenguaje con `protoc`. |
-| [`asyncapi.yaml`](asyncapi.yaml) | AsyncAPI 3.0 | Canales WebSocket, direcciones de mensajes, framing y negociación de subprotocolo. |
-| [`openapi.yaml`](openapi.yaml) | OpenAPI 3.1 | Endpoints REST de Atlas y Navigator (health, discovery, métricas). |
-| [`framing.md`](framing.md) | Markdown | Especificación del framing LPP (Length-Prefix Protocol) para el modo binario. |
-| [`flows.md`](flows.md) | Markdown + Mermaid | Diagramas de secuencia de los 5 flujos principales del protocolo. |
-| [`../schemas/`](../schemas/) | JSON Schema draft-07 | Schemas de los manifiestos Beacon por tipo de nodo. |
+| [`fhs-protocol.proto`](fhs-protocol.proto) | Protobuf proto3 | Definición binaria canónica de todos los mensajes (stream directo + GossipSub + DHT records). |
+| [`asyncapi.yaml`](asyncapi.yaml) | AsyncAPI 3.0 | Canales de stream directo WSS y tópicos GossipSub. |
+| [`gossipsub.md`](gossipsub.md) | Markdown | Especificación de cada tópico GossipSub: campos, verificación, criterios de selección. |
+| [`openapi.yaml`](openapi.yaml) | OpenAPI 3.1 | Endpoints REST de gestión (health, discovery, métricas) — plano de gestión únicamente. |
+| [`framing.md`](framing.md) | Markdown | Especificación del framing LPP (Length-Prefix Protocol) para modo binario `fhs.v1`. |
+| [`flows.md`](flows.md) | Markdown + Mermaid | Diagramas de secuencia de los flujos principales. |
+| [`../schemas/`](../schemas/) | JSON Schema draft-07 | Schemas de Beacon por tipo de nodo. |
+
+---
+
+## Dos planos de mensajería
+
+### 1. Stream directo FHS
+
+Protocolo libp2p `/fhs/v1/0.1.0` sobre WSS. Mensajes en `Envelope` Protobuf.
+
+- **Portal ↔ Navigator**: `agent.start`, `chat.request`, `assistant.delta`, `assistant.completed`
+- **Navigator ↔ Star** (post-assign): `chat.request`, `chat.delta`, `chat.completed`
+- **Navigator ↔ Satellite** (post-assign): `tool.call`, `tool.result`
+- **Cualquier par**: `handshake`, `handshake_ack`, `ping`, `pong`, `error`
+
+### 2. GossipSub (broadcast P2P)
+
+| Tópico | Mensaje | Propósito |
+|--------|---------|-----------|
+| `fhs/v1/nodes/advertise` | `NodeAdvertiseMessage` | Presencia (reemplaza node.online/lost) |
+| `fhs/v1/missions/offer` | `MissionOfferMessage` | Navigator busca provider |
+| `fhs/v1/missions/bid` | `MissionBidMessage` | Provider responde con disponibilidad |
+| `fhs/v1/missions/assign` | `MissionAssignMessage` | Navigator confirma asignación |
+| `fhs/v1/reputation/update` | `ReputationUpdateMessage` | Post-Mission feedback |
+
+### 3. DHT Kademlia (records)
+
+| Key | Record | Publicado por |
+|-----|--------|---------------|
+| `{did}` | `DhtBeaconRecord` | El nodo mismo |
+| `reputation/{did}` | `DhtReputationRecord` | Navigators |
 
 ---
 
@@ -23,33 +56,33 @@ El protocolo FHS tiene capas distintas que cada formato IDL describe mejor:
 
 ### Implementar un provider (Star o Satellite)
 
-1. Lee [`../docs/manifiesto-llm.md`](../docs/manifiesto-llm.md) o [`../docs/manifiesto-mcp.md`](../docs/manifiesto-mcp.md) para el formato del Beacon.
-2. Valida tu Beacon contra [`../schemas/beacon-star.schema.json`](../schemas/beacon-star.schema.json) o [`../schemas/beacon-satellite.schema.json`](../schemas/beacon-satellite.schema.json).
-3. Lee el flujo de registro en [`flows.md`](flows.md) — diagrama 1 (Handshake 2-step, DEC-0087).
-4. Genera los tipos de mensaje desde [`fhs-protocol.proto`](fhs-protocol.proto) con `protoc` para tu lenguaje.
-5. Consulta [`asyncapi.yaml`](asyncapi.yaml) para el canal `/register` y el framing `fhs.v1`.
+1. Lee `protocol/p2p.md` para entender cómo te unes al swarm DHT.
+2. Genera tu DID Ed25519 (`did:key:z...`) y publica tu `DhtBeaconRecord`.
+3. Suscríbete a `fhs/v1/nodes/advertise` y `fhs/v1/missions/offer`.
+4. Publica `NodeAdvertiseMessage` periódicamente.
+5. Cuando recibes `MissionOfferMessage` que puedes satisfacer → publica `MissionBidMessage`.
+6. Si recibes `MissionAssignMessage` con tu DID → acepta el stream directo del Navigator.
+7. Valida tu Beacon contra `schemas/beacon-star.schema.json` o `beacon-satellite.schema.json`.
 
-### Implementar un cliente (Portal o herramienta de desarrollo)
+### Implementar un Navigator (Agent Runtime)
 
-1. Lee el flujo de chat en [`flows.md`](flows.md) — diagrama 2 (Misión de Chat).
-2. Los mensajes del canal Portal↔Navigator están en [`asyncapi.yaml`](asyncapi.yaml) (canales `/chat` y `/chat/stream`).
-3. Los tipos Protobuf correspondientes son `AgentStartMessage`, `AssistantDeltaMessage`, `AssistantCompletedMessage`, etc. en [`fhs-protocol.proto`](fhs-protocol.proto).
+1. Lee `protocol/p2p.md` y `idl/gossipsub.md` para el flujo completo.
+2. Suscríbete a todos los tópicos GossipSub.
+3. Mantén caché local de `NodeAdvertiseMessage` por TTL.
+4. Al recibir Mission del Portal: publica `MissionOfferMessage` → espera bids → asigna.
+5. Abre stream directo con el provider ganador: handshake → mission execution.
+6. Post-Mission: publica `ReputationUpdateMessage` y actualiza `DhtReputationRecord`.
 
-### Consultar providers disponibles (integración REST)
+### Implementar un cliente (Portal)
 
-1. Lee [`openapi.yaml`](openapi.yaml) — endpoints `GET /api/fhs/providers` y `GET /api/fhs/models`.
-2. Para bootstrap de Atlas federados: `GET /api/fhs/atlas/peers`.
+1. Abre stream WSS directo con Navigator (handshake → stream activo).
+2. Envía `AgentStartMessage` → `ChatRequestMessage`.
+3. Recibe `AssistantDeltaMessage` (streaming) y `AssistantCompletedMessage`.
 
-### Verificar un Beacon recibido
+### Consultar providers disponibles (integración REST externa)
 
-Usa uno de los 4 schemas en [`../schemas/`](../schemas/). El campo `provider.type` determina cuál usar:
-
-| `provider.type` | Schema |
-|-----------------|--------|
-| `"star"` | [`beacon-star.schema.json`](../schemas/beacon-star.schema.json) |
-| `"satellite"` | [`beacon-satellite.schema.json`](../schemas/beacon-satellite.schema.json) |
-| `"nova"` | [`beacon-nova.schema.json`](../schemas/beacon-nova.schema.json) |
-| `"multi"` | [`beacon-base.schema.json`](../schemas/beacon-base.schema.json) |
+REST es el plano de gestión únicamente — no forma parte del protocolo FHS:
+1. Lee `openapi.yaml` — endpoints `GET /api/fhs/providers`, `GET /api/fhs/models`.
 
 ---
 
@@ -73,26 +106,25 @@ El package proto es `fhs.v1`. La opción `go_package` apunta a `github.com/rafex
 
 ---
 
-## Modos de transporte
-
-El protocolo soporta dos modos negociados vía `Sec-WebSocket-Protocol`:
+## Modos de transporte (stream directo)
 
 | Modo | Header | Frames | Uso |
 |------|--------|--------|-----|
-| Binario (primario) | `fhs.v1` | binary + LPP + Protobuf | P2P, producción |
+| Binario (primario) | `fhs.v1` | binary + LPP + Protobuf | producción, P2P |
 | JSON (compat) | `fhs.v1.json` | text + JSON | desarrollo, herramientas |
 
-El framing LPP (`[varint-length][Envelope bytes]`) está especificado en [`framing.md`](framing.md).
+El framing LPP (`[varint-length][Envelope bytes]`) está especificado en `framing.md`.
 
 ---
 
 ## Versiones
 
-| Artefacto | Versión | DECs relacionadas |
-|-----------|---------|-------------------|
-| `fhs-protocol.proto` | v2 | DEC-0086, DEC-0087 |
-| `asyncapi.yaml` | 0.3.0 | DEC-0086, DEC-0087 |
-| `openapi.yaml` | 0.2.0 | DEC-0086 |
-| Beacon schemas | 1.0 | DEC-0072 (OVERLOADED) |
+| Artefacto | Versión | Cambios principales |
+|-----------|---------|---------------------|
+| `fhs-protocol.proto` | v3 | DEC-P2P-001: DHT + GossipSub + Atlas como bootstrap peer |
+| `asyncapi.yaml` | 0.5.0 | DEC-P2P-001: tópicos GossipSub, eliminado registro centralizado |
+| `gossipsub.md` | 1.0 | Nuevo: spec completa de tópicos GossipSub |
+| `openapi.yaml` | 0.2.0 | Sin cambios (solo plano de gestión) |
+| Beacon schemas | 1.0 | Sin cambios |
 
-Historial de decisiones: [`../spec-native/DECISIONS.md`](../spec-native/DECISIONS.md)
+Historial de decisiones: `spec-native/DECISIONS.md`

@@ -1,80 +1,127 @@
-# Arquitectura — Red FHS
+# Arquitectura — Red FHS P2P
 
 ## Nodos y Roles
 
 | Nodo | Rol | `provider.type` |
 | ---- | --- | --------------- |
-| **Atlas** | Registry + bootstrap peer. Mantiene el routing table de nodos en Orbit. Federa con otros Atlas. | `atlas` (especial, no en Beacon) |
+| **Atlas** | Bootstrap peer. Primer punto de entrada al swarm DHT. No es un registro central. | `atlas` (especial, no en Beacon) |
 | **Star** | Proveedor LLM. Ejecuta inferencia de lenguaje. | `star` |
 | **Satellite** | Proveedor de herramientas (tools). Expone capabilities como OCR, búsqueda, CURP, etc. | `satellite` |
 | **Nova** | Agente autónomo con loop propio. Puede coordinar Stars y Satellites. | `nova` |
-| **Navigator** | Agent Runtime. Recibe Missions del Portal y las despacha a Stars y Satellites. | — (nodo interno) |
-| **Portal** | Interfaz de chat del usuario. Inicia sesiones de agente con Navigator. | — (cliente) |
-| **Ephemeral Satellite** | Satellite efímero ejecutando WASM en un dispositivo móvil o navegador, delegado por un Nodo Host. | `satellite` + `ephemeral: true` |
+| **Navigator** | Agent Runtime. Recibe Missions del Portal, despacha via GossipSub, ejecuta por stream directo. | — (peer FHS, no en DHT Beacon) |
+| **Portal** | Interfaz de chat del usuario. Inicia sesiones de agente con Navigator. | — (cliente FHS) |
+| **Ephemeral Satellite** | Satellite efímero ejecutando WASM en browser o móvil, delegado por un Nodo Host. | `satellite` + `ephemeral: true` |
 
-## Topología de Red
+## Topología de red
+
+La red es una **malla P2P** (DHT Kademlia + GossipSub). No hay centro.
+Los streams directos solo se abren cuando hay una Mission activa.
 
 ```mermaid
 graph TB
-    subgraph "Dispositivo 1 — Bastion"
-        AT1[Atlas 1]
-        NAV[Navigator]
-        STAR[Star - LLM]
+    subgraph "Swarm DHT + GossipSub (malla P2P)"
+        AT["Atlas\n(bootstrap peer)"]
+        NAV["Navigator\n(Agent Runtime)"]
+        STAR1["Star 1\n(LLM local)"]
+        STAR2["Star 2\n(LLM remoto)"]
+        SAT["Satellite\n(OCR)"]
+        EPH["Ephemeral Satellite\n(WASM browser)"]
     end
 
-    subgraph "Dispositivo 2 — Raspi4B"
-        SAT[Satellite - OCR]
+    subgraph "Portal (cliente)"
+        PORT["Portal\n(Chat UI)"]
     end
 
-    subgraph "Dispositivo 3 — Laptop"
-        PORT[Portal - Chat UI]
+    subgraph "GossipSub tópicos"
+        G1["fhs/v1/nodes/advertise"]
+        G2["fhs/v1/missions/offer + bid + assign"]
+        G3["fhs/v1/reputation/update"]
     end
 
-    subgraph "Dispositivo 4 — Teléfono / Navegador"
-        EPH[Ephemeral Satellite - WASM]
+    subgraph "DHT"
+        D1["Beacons\n(did → DhtBeaconRecord)"]
+        D2["Reputación\n(reputation/did → DhtReputationRecord)"]
     end
 
-    subgraph "Federación"
-        AT2[Atlas 2]
-        STAR2[Star - LLM remoto]
-    end
+    %% GossipSub broadcast
+    AT --- G1
+    NAV --- G1
+    STAR1 --- G1
+    STAR2 --- G1
+    SAT --- G1
+    EPH --- G1
 
-    STAR -->|handshake / ping| AT1
-    SAT -->|handshake / ping| AT1
-    EPH -->|handshake + DelegationToken / ping| AT1
-    NAV -->|handshake / mission.feedback| AT1
-    PORT -->|agent.start / chat.request| NAV
-    NAV -->|tool.call| SAT
-    NAV -->|tool.call| EPH
-    NAV -->|chat.request| STAR
+    NAV --- G2
+    STAR1 --- G2
+    STAR2 --- G2
+    SAT --- G2
 
-    AT1 <-->|atlas.announce / atlas.sync| AT2
-    AT2 --- STAR2
+    NAV --- G3
+
+    %% DHT
+    AT --- D1
+    STAR1 --- D1
+    STAR2 --- D1
+    SAT --- D1
+    EPH --- D1
+    AT --- D2
+    NAV --- D2
+
+    %% Stream directo (solo durante misiones activas)
+    PORT -->|"WSS stream directo\nchat.request / agent.start"| NAV
+    NAV -.->|"stream directo post-assign\nchat.request"| STAR1
+    NAV -.->|"stream directo post-assign\ntool.call"| SAT
+    NAV -.->|"stream directo post-assign\ntool.call"| EPH
+
+    %% Bootstrap (solo al unirse)
+    STAR1 -.->|"bootstrap (solo 1 vez)"| AT
 ```
 
-## Modelo de Federación
+**Leyenda:**
+- `---` conexión GossipSub o DHT (permanente, broadcast)
+- `-->` stream directo siempre activo (Portal↔Navigator)
+- `-.->` stream directo temporal (solo durante Mission activa, post-assign)
 
-Atlas actúa como Registry local. Múltiples Atlas se federan entre sí mediante gossip P2P:
-- `atlas.announce` — un Atlas notifica a sus pares los DIDs en Orbit
-- `atlas.sync` — el receptor devuelve su estado completo
+## Cómo se forma el swarm
 
-Cada Atlas tiene su propio `did:key:z...`. La autenticación entre Atlas usa el mismo mecanismo de Envelope signature que cualquier otro par FHS.
+```mermaid
+sequenceDiagram
+    participant N as Nodo nuevo (Star/Satellite/Nova)
+    participant A as Atlas (bootstrap peer)
+    participant S as Swarm DHT existente
+
+    N->>A: Conectar a bootstrap peer (multiaddr conocido)
+    A->>N: Lista de peers del swarm DHT
+
+    N->>S: Unirse al DHT (Kademlia join)
+    N->>S: Publicar DhtBeaconRecord { did, beacon, multiaddrs }
+
+    N->>S: Suscribirse a GossipSub topics (fhs/v1/*)
+    N->>S: NodeAdvertiseMessage (fhs/v1/nodes/advertise)
+
+    Note over N,S: Nodo operativo.<br/>Ya no depende de Atlas para comunicarse.
+```
 
 ## Principio de Diseño
 
-**Navigator no sabe a priori qué nodos existen.** Atlas empuja `node.online` / `node.lost` cuando la topología cambia. Navigator reacciona actualizando su routing table local — no hace polling REST a Atlas.
+**Navigator nunca consulta a Atlas para despachar Missions.**
+Navigator escucha los `NodeAdvertiseMessage` del tópico GossipSub `fhs/v1/nodes/advertise`
+y mantiene una vista local de los peers disponibles.
 
-## Orbit
+Cuando llega una Mission, Navigator:
+1. Publica `MissionOfferMessage` en GossipSub.
+2. Recoge bids y selecciona el mejor.
+3. Abre un stream directo con el provider ganador.
+4. Ejecuta la Mission.
 
-Un nodo está en **Orbit** cuando:
-1. Completó el handshake de 2 pasos con Atlas (`handshake` → `handshake_ack`).
-2. Mantiene Pulse activo (ping/pong dentro del `heartbeatSeconds` acordado).
-3. Su lease no ha vencido (`leaseExpires`).
+Atlas solo interviene cuando un nodo nuevo quiere unirse al swarm por primera vez.
 
-Un nodo sale del Orbit cuando:
-- El Pulse cae (timeout > `leaseSeconds`)
-- El nodo cierra la conexión WebSocket
-- Atlas revoca el lease (ej. firma inválida detectada post-handshake)
-- Para Ephemeral Satellites: su Nodo Host sale del Orbit
+## Discovery vs Routing
 
-Al salir del Orbit, Atlas emite `node.lost` a todos los Navigators conectados.
+| Función | Mecanismo |
+| ------- | --------- |
+| Descubrir un nodo por DID | DHT lookup (`did` → `DhtBeaconRecord`) |
+| Saber qué nodos están activos ahora | GossipSub `fhs/v1/nodes/advertise` (TTL cache) |
+| Asignar una Mission | GossipSub offer/bid/assign |
+| Ejecutar una Mission | Stream directo `/fhs/v1/0.1.0` |
+| Consultar reputación | DHT `reputation/{did}` + GossipSub reputation cache |
