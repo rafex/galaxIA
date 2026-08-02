@@ -38,6 +38,51 @@
     "spec-backlog-add": {
       "description": "Capture a backlog request as a task or triaged intake idea",
       "template": "Use the specnative MCP server. First call list_specs() and board() to find the relevant initiative and avoid duplicates. If the request has an existing spec plus explicit close criteria and validation, call capture_backlog_item() with initiative. Otherwise call capture_backlog_item() without initiative to record a triaged idea in spec-native/intake/IDEAS.md. Never edit a generated Markdown or Mermaid board. Do not invent acceptance criteria or validation."
+    },
+    "spec-backlog": {
+      "description": "Muestra el tablero o captura una solicitud como tarea o idea.",
+      "prompt": "Argumentos: $ARGUMENTS\n\nUsa el MCP de SpecNative. Si no hay argumentos, llama board() y muestra el tablero derivado. Si hay una solicitud, llama list_specs() y board(); usa capture_backlog_item() con iniciativa solo si existe una spec y se proporcionan criterio de cierre y validación. En otro caso registra una idea en intake. No edites tableros generados.",
+      "template": "Argumentos: la solicitud del desarrollador\n\nUsa el MCP de SpecNative. Si no hay argumentos, llama board() y muestra el tablero derivado. Si hay una solicitud, llama list_specs() y board(); usa capture_backlog_item() con iniciativa solo si existe una spec y se proporcionan criterio de cierre y validación. En otro caso registra una idea en intake. No edites tableros generados."
+    },
+    "spec-decision": {
+      "description": "Registra una decisión persistente revisada.",
+      "prompt": "Solicitud: $ARGUMENTS\n\nUsa el MCP de SpecNative. Consulta list_decisions() y el contexto de arquitectura relacionado para evitar duplicados o contradicciones. Obtén contexto, decisión, consecuencias, tags y relaciones. Presenta un borrador y, tras confirmación, usa log_decision(). No registres detalles temporales de implementación.",
+      "template": "Solicitud: la solicitud del desarrollador\n\nUsa el MCP de SpecNative. Consulta list_decisions() y el contexto de arquitectura relacionado para evitar duplicados o contradicciones. Obtén contexto, decisión, consecuencias, tags y relaciones. Presenta un borrador y, tras confirmación, usa log_decision(). No registres detalles temporales de implementación."
+    },
+    "spec-plan": {
+      "description": "Convierte una spec aprobada en tareas verificables.",
+      "prompt": "Iniciativa: $ARGUMENTS\n\nUsa el prompt MCP plan_tasks para la iniciativa indicada. Lee la spec, decisiones y arquitectura; presenta las tareas con dependencias, criterio de cierre y validación antes de guardarlas.",
+      "template": "Iniciativa: la solicitud del desarrollador\n\nUsa el prompt MCP plan_tasks para la iniciativa indicada. Lee la spec, decisiones y arquitectura; presenta las tareas con dependencias, criterio de cierre y validación antes de guardarlas."
+    },
+    "spec-implement": {
+      "description": "Implementa una tarea con contexto y evidencia de cierre.",
+      "prompt": "Tarea solicitada: $ARGUMENTS\n\nUsa el prompt MCP implement_task para la iniciativa y tarea indicadas. Carga solo el contexto relevante, cambia el estado a in_progress, ejecuta la validación y solo marca done mediante update_task() incluyendo completion_evidence con el comando y resultado observado. Si aparece un trade-off persistente, registra una decisión.",
+      "template": "Tarea solicitada: la solicitud del desarrollador\n\nUsa el prompt MCP implement_task para la iniciativa y tarea indicadas. Carga solo el contexto relevante, cambia el estado a in_progress, ejecuta la validación y solo marca done mediante update_task() incluyendo completion_evidence con el comando y resultado observado. Si aparece un trade-off persistente, registra una decisión."
+    },
+    "spec-review": {
+      "description": "Revisa una iniciativa contra sus criterios de aceptación.",
+      "prompt": "Iniciativa: $ARGUMENTS\n\nUsa el prompt MCP review_against_spec. Comprueba cada criterio de aceptación contra evidencia y tareas, informa criterios cumplidos y no cumplidos, y recomienda aprobar, pedir cambios o bloquear.",
+      "template": "Iniciativa: la solicitud del desarrollador\n\nUsa el prompt MCP review_against_spec. Comprueba cada criterio de aceptación contra evidencia y tareas, informa criterios cumplidos y no cumplidos, y recomienda aprobar, pedir cambios o bloquear."
+    },
+    "spec-close": {
+      "description": "Cierra una iniciativa con trazabilidad y validación.",
+      "prompt": "Iniciativa: $ARGUMENTS\n\nUsa el prompt MCP close_initiative. No cierres la spec hasta revisar criterios de aceptación, estado de tareas y evidencia. Actualiza trazabilidad, roadmap y sesión únicamente si corresponde.",
+      "template": "Iniciativa: la solicitud del desarrollador\n\nUsa el prompt MCP close_initiative. No cierres la spec hasta revisar criterios de aceptación, estado de tareas y evidencia. Actualiza trazabilidad, roadmap y sesión únicamente si corresponde."
+    },
+    "spec-context": {
+      "description": "Carga contexto mínimo por tag o ID de artefacto.",
+      "prompt": "Consulta: $ARGUMENTS\n\nUsa el MCP de SpecNative. Si se proporcionó un ID DEC-, ARCH- o CONV-, usa read_context_artifact(). Si se proporcionó un tag, consulta list_decisions(), list_architecture() y list_conventions() con ese tag, y lee solo los artefactos necesarios. Resume restricciones aplicables.",
+      "template": "Consulta: la solicitud del desarrollador\n\nUsa el MCP de SpecNative. Si se proporcionó un ID DEC-, ARCH- o CONV-, usa read_context_artifact(). Si se proporcionó un tag, consulta list_decisions(), list_architecture() y list_conventions() con ese tag, y lee solo los artefactos necesarios. Resume restricciones aplicables."
+    },
+    "spec-architecture": {
+      "description": "Registra un artefacto de arquitectura canónico.",
+      "prompt": "Solicitud: $ARGUMENTS\n\nUsa el MCP de SpecNative. Consulta list_architecture(), decisiones y specs relacionadas. Obtén contexto, diseño, consecuencias, tags y relaciones; presenta un borrador y, tras confirmación, usa log_architecture(). No edites ARCHITECTURE.md directamente.",
+      "template": "Solicitud: la solicitud del desarrollador\n\nUsa el MCP de SpecNative. Consulta list_architecture(), decisiones y specs relacionadas. Obtén contexto, diseño, consecuencias, tags y relaciones; presenta un borrador y, tras confirmación, usa log_architecture(). No edites ARCHITECTURE.md directamente."
+    },
+    "spec-convention": {
+      "description": "Registra una convención persistente y relacionable.",
+      "prompt": "Solicitud: $ARGUMENTS\n\nUsa el MCP de SpecNative. Consulta list_conventions() y artefactos relacionados. Obtén justificación, regla, consecuencias, tags y relaciones; presenta un borrador y, tras confirmación, usa log_convention(). No edites CONVENTIONS.md directamente.",
+      "template": "Solicitud: la solicitud del desarrollador\n\nUsa el MCP de SpecNative. Consulta list_conventions() y artefactos relacionados. Obtén justificación, regla, consecuencias, tags y relaciones; presenta un borrador y, tras confirmación, usa log_convention(). No edites CONVENTIONS.md directamente."
     }
   }
 }
