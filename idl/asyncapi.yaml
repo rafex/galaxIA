@@ -1,0 +1,425 @@
+asyncapi: "3.0.0"
+
+info:
+  title: FHS Wire Protocol
+  version: "0.1.23"
+  description: |
+    Federation of Sovereign Horizons (FHS) — protocolo de mensajería entre
+    nodos federados: Atlas (Registry), Navigator (Agent Runtime) y
+    Satellites/Stars (Providers de LLM, tools, OCR, RAG, KB).
+
+    Los mensajes viajan por WebSocket (ws://navigator/chat) y por HTTP SSE
+    (GET /chat stream desde Navigator hacia Atlas).
+
+    Versión de referencia: @rafex/galaxia-fhs-protocol@0.1.23
+    Repositorio de tipos: https://github.com/rafex/galaxIA-SDK
+
+  license:
+    name: MIT
+  contact:
+    name: galaxIA
+    url: https://github.com/rafex/galaxIA
+
+defaultContentType: application/json
+
+channels:
+  # ── WebSocket: Cliente → Navigator ───────────────────────────────────────
+  /chat:
+    address: ws://{navigator}/chat
+    messages:
+      chatRequest:
+        $ref: "#/components/messages/ChatRequestMessage"
+      chatCancel:
+        $ref: "#/components/messages/ChatCancelMessage"
+      toolCallResult:
+        $ref: "#/components/messages/ToolCallResultMessage"
+      toolCallError:
+        $ref: "#/components/messages/ToolCallErrorMessage"
+      toolListResponse:
+        $ref: "#/components/messages/ToolListResponseMessage"
+
+    bindings:
+      ws:
+        method: GET
+
+  # ── WebSocket: Navigator → Cliente ───────────────────────────────────────
+  /chat/stream:
+    address: ws://{navigator}/chat
+    messages:
+      chatDelta:
+        $ref: "#/components/messages/ChatDeltaMessage"
+      chatCompleted:
+        $ref: "#/components/messages/ChatCompletedMessage"
+      chatError:
+        $ref: "#/components/messages/ChatErrorMessage"
+      toolCallRequest:
+        $ref: "#/components/messages/ToolCallRequestMessage"
+      toolListRequest:
+        $ref: "#/components/messages/ToolListRequestMessage"
+
+  # ── WebSocket: Provider → Atlas (registro inicial) ───────────────────────
+  /register:
+    address: ws://{atlas}/register
+    messages:
+      dispatchAck:
+        $ref: "#/components/messages/DispatchAckMessage"
+      toolCancel:
+        $ref: "#/components/messages/ToolCancelMessage"
+
+components:
+  messages:
+    # ── Mensajes de Chat ──────────────────────────────────────────────────
+    ChatRequestMessage:
+      name: chat.request
+      title: Solicitud de chat
+      payload:
+        $ref: "#/components/schemas/ChatRequestMessage"
+
+    ChatCancelMessage:
+      name: chat.cancel
+      title: Cancelación de chat en curso
+      payload:
+        $ref: "#/components/schemas/ChatCancelMessage"
+
+    ChatDeltaMessage:
+      name: chat.delta
+      title: Fragmento de respuesta en streaming
+      payload:
+        $ref: "#/components/schemas/ChatDeltaMessage"
+
+    ChatCompletedMessage:
+      name: chat.completed
+      title: Respuesta de chat completa
+      payload:
+        $ref: "#/components/schemas/ChatCompletedMessage"
+
+    ChatErrorMessage:
+      name: chat.error
+      title: Error en el procesamiento del chat
+      payload:
+        $ref: "#/components/schemas/ChatErrorMessage"
+
+    DispatchAckMessage:
+      name: dispatch.ack
+      title: Confirmación de dispatch a un provider
+      payload:
+        $ref: "#/components/schemas/DispatchAckMessage"
+
+    ToolCallRequestMessage:
+      name: tool.call
+      title: Solicitud de ejecución de tool
+      payload:
+        $ref: "#/components/schemas/ToolCallRequestMessage"
+
+    ToolCancelMessage:
+      name: tool.cancel
+      title: Cancelación de tool en ejecución
+      payload:
+        $ref: "#/components/schemas/ToolCancelMessage"
+
+    ToolCallResultMessage:
+      name: tool.result
+      title: Resultado de ejecución de tool
+      payload:
+        $ref: "#/components/schemas/ToolCallResultMessage"
+
+    ToolCallErrorMessage:
+      name: tool.error
+      title: Error en la ejecución de tool
+      payload:
+        $ref: "#/components/schemas/ToolCallErrorMessage"
+
+    ToolListRequestMessage:
+      name: tool.list
+      title: Solicitud de lista de tools disponibles
+      payload:
+        $ref: "#/components/schemas/ToolListRequestMessage"
+
+    ToolListResponseMessage:
+      name: tool.list.response
+      title: Lista de tools disponibles
+      payload:
+        $ref: "#/components/schemas/ToolListResponseMessage"
+
+  schemas:
+    # ── Tipos base ────────────────────────────────────────────────────────
+    CallerAuth:
+      type: object
+      required: [callerId, signature, timestamp]
+      properties:
+        callerId:
+          type: string
+          description: DID del nodo que origina la solicitud (did:key:...)
+        signature:
+          type: string
+          description: Firma Ed25519 en base64 de `callerId:missionId:timestamp`
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix ms del momento de firma
+
+    ToolDefinition:
+      type: object
+      required: [name, description, inputSchema]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        inputSchema:
+          type: object
+          description: JSON Schema del parámetro de entrada
+
+    ToolCall:
+      type: object
+      required: [id, type, function]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [function]
+        function:
+          type: object
+          required: [name, arguments]
+          properties:
+            name:
+              type: string
+            arguments:
+              type: string
+              description: JSON serializado de los argumentos
+
+    Message:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant, system, tool]
+        content:
+          type: string
+          nullable: true
+        toolCallId:
+          type: string
+        toolCalls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolCall"
+
+    # ── Mensajes del protocolo FHS ────────────────────────────────────────
+    ChatRequestMessage:
+      type: object
+      required: [type, missionId, messages, timestamp, auth]
+      properties:
+        type:
+          type: string
+          enum: [chat.request]
+        missionId:
+          type: string
+          description: UUID único de la misión/sesión de chat
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolDefinition"
+        model:
+          type: string
+          description: Modelo LLM solicitado (opcional, el provider decide si lo acepta)
+        timestamp:
+          type: integer
+          format: int64
+        auth:
+          $ref: "#/components/schemas/CallerAuth"
+
+    ChatCancelMessage:
+      type: object
+      required: [type, missionId, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [chat.cancel]
+        missionId:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+
+    ChatDeltaMessage:
+      type: object
+      required: [type, missionId, delta, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [chat.delta]
+        missionId:
+          type: string
+        delta:
+          type: string
+          description: Fragmento de texto generado
+        timestamp:
+          type: integer
+          format: int64
+
+    ChatCompletedMessage:
+      type: object
+      required: [type, missionId, content, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [chat.completed]
+        missionId:
+          type: string
+        content:
+          type: string
+          description: Respuesta completa generada
+        toolCalls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolCall"
+        timestamp:
+          type: integer
+          format: int64
+
+    ChatErrorMessage:
+      type: object
+      required: [type, missionId, error, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [chat.error]
+        missionId:
+          type: string
+        error:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+
+    DispatchAckMessage:
+      type: object
+      required: [type, missionId, queuedAt]
+      properties:
+        type:
+          type: string
+          enum: [dispatch.ack]
+        missionId:
+          type: string
+        queuedAt:
+          type: integer
+          format: int64
+
+    ToolCallRequestMessage:
+      type: object
+      required: [type, missionId, toolCalls, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [tool.call]
+        missionId:
+          type: string
+        toolCalls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolCall"
+        timestamp:
+          type: integer
+          format: int64
+
+    ToolCancelMessage:
+      type: object
+      required: [type, missionId, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [tool.cancel]
+        missionId:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+
+    ToolCallResultMessage:
+      type: object
+      required: [type, missionId, toolCallId, result, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [tool.result]
+        missionId:
+          type: string
+        toolCallId:
+          type: string
+        result:
+          type: string
+          description: JSON serializado del resultado
+        timestamp:
+          type: integer
+          format: int64
+
+    ToolCallErrorMessage:
+      type: object
+      required: [type, missionId, toolCallId, error, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [tool.error]
+        missionId:
+          type: string
+        toolCallId:
+          type: string
+        error:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+
+    ToolListRequestMessage:
+      type: object
+      required: [type, missionId, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [tool.list]
+        missionId:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+
+    ToolListResponseMessage:
+      type: object
+      required: [type, missionId, tools, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [tool.list.response]
+        missionId:
+          type: string
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolDefinition"
+        timestamp:
+          type: integer
+          format: int64
+
+  servers:
+    navigator:
+      host: "{navigator}"
+      protocol: ws
+      description: Navigator — Agent Runtime
+      variables:
+        navigator:
+          default: "localhost:8090"
+          description: Host y puerto del Navigator
+    atlas:
+      host: "{atlas}"
+      protocol: ws
+      description: Atlas — Registry
+      variables:
+        atlas:
+          default: "localhost:8081"
+          description: Host y puerto de Atlas
