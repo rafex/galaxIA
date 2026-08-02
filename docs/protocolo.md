@@ -236,7 +236,7 @@ Cuando un nodo se conecta o se cae, el Registry notifica a los agentes:
 El frontend se conecta a:
 
 ```
-ws://<host>:8081/api/chat/ws
+wss://<host>:8443/api/chat/ws
 ```
 
 Envía:

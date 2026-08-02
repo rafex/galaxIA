@@ -1,32 +1,39 @@
-# Transporte — P2P + Protobuf
+# Transporte — WSS + Protobuf (obligatorio)
 
 ## Principio
 
-> **El transporte canónico de FHS es WebSocket P2P con Protobuf binario.**
-> Toda comunicación de protocolo va por esta vía por defecto.
-> Usar WSS (TLS) o REST requiere justificación explícita documentada a continuación.
+> **WSS (WebSocket Secure, TLS obligatorio) + Protobuf binario es el único transporte
+> permitido en el protocolo FHS.**
+> `ws://` sin cifrado **no es válido** y Atlas rechaza el handshake de cualquier nodo
+> que lo declare en su Beacon con el error `INVALID_MANIFEST`.
 
-Este principio está establecido en **DEC-0086** y reforzado en **DEC-0087**.
+La coherencia del sistema lo exige: si el Portal (chat web) sirve por HTTPS y el usuario
+espera privacidad en sus conversaciones, la capa de red entre nodos debe cifrar igualmente.
+No tendría sentido proteger el último tramo (browser↔servidor) y dejar sin cifrar la
+comunicación inter-nodo donde viajan los mismos datos.
 
-## Capa de Transporte Primaria
+## Capa de Transporte
 
 ```
-WebSocket (ws://)
+WSS (WebSocket Secure — TLS sobre TCP)
   └── Subprotocol: Sec-WebSocket-Protocol: fhs.v1
         └── Frames binarios
               └── LPP framing: [varint: longitud][Envelope bytes]
                     └── Envelope (Protobuf 3) → payload oneof
 ```
 
-- **Conexión**: WebSocket estándar, persistente, bidireccional.
+- **Conexión**: `wss://` siempre. Sin excepciones.
+- **TLS**: mínimo TLS 1.2; recomendado TLS 1.3.
+- **Certificados**: Let's Encrypt para producción; autofirmados aceptados con validación explícita en clientes.
 - **Encoding**: Protocol Buffers 3 (binario), serialización determinista para firmas.
 - **Framing**: Length-Prefixed Protobuf (LPP) — ver `idl/framing.md`.
-- **Autenticación**: firma Ed25519 en cada Envelope (`signature` field). No hay sesión HTTP, no hay token de sesión, no hay header de auth.
+- **Autenticación**: firma Ed25519 en cada Envelope. TLS cifra el canal; Ed25519 autentica el emisor. Ambas capas son complementarias, no alternativas.
 
 ## Negociación de Subprotocolo
 
 ```
 GET /register HTTP/1.1
+Host: atlas.ejemplo.com
 Upgrade: websocket
 Sec-WebSocket-Protocol: fhs.v1, fhs.v1.json
 ```
@@ -34,66 +41,70 @@ Sec-WebSocket-Protocol: fhs.v1, fhs.v1.json
 | Subprotocol | Frames | Uso |
 | ----------- | ------ | --- |
 | `fhs.v1` | Binario (Protobuf + LPP) | **Primario — producción, P2P** |
-| `fhs.v1.json` | Texto (JSON) | Depuración, herramientas de desarrollo, compatibilidad con clientes que no tienen Protobuf |
+| `fhs.v1.json` | Texto (JSON) | Depuración y herramientas de desarrollo únicamente |
 
-Si el servidor acepta `fhs.v1`, la sesión **debe** ser binaria. `fhs.v1.json` es un modo compat — no una alternativa de producción.
+`fhs.v1.json` existe para facilitar el desarrollo con herramientas como `wscat` o Postman.
+No es un modo de producción — ambos modos requieren WSS de igual forma.
 
-## Cuándo usar WSS (WebSocket Secure / TLS)
+## Multiaddr P2P
 
-WSS (`wss://`) es WebSocket sobre TLS. **No cambia el protocolo FHS** — los Envelopes proto viajan igual, la autenticación sigue siendo Ed25519 por Envelope. Solo añade cifrado de capa de transporte.
+Para conexiones directas nodo-a-nodo (libp2p, DEC-0086), el multiaddr usa TLS:
 
-Se justifica WSS cuando:
+```
+/ip4/1.2.3.4/tcp/8443/tls/ws
+```
 
-| Escenario | Justificación |
-| --------- | ------------- |
-| Conexión a través de internet público | TLS es necesario para confidencialidad contra eavesdropping pasivo |
-| Ephemeral Satellite desde un navegador web | Los navegadores requieren WSS cuando la página es HTTPS (`Mixed Content` bloqueado) |
-| NAT traversal con TURN relay | Los servidores TURN suelen exponer solo WSS |
-| Cluster con TLS interno obligatorio por política | Política de seguridad corporativa o compliance |
+**No** se usa `/ip4/1.2.3.4/tcp/8081/ws` (sin `/tls/`). Atlas rechaza `listen_addrs`
+que no incluyan `/tls/` o `/wss`.
 
-**En LAN local, cluster Docker/Podman, o red privada de confianza**: `ws://` (sin TLS) es aceptable — el cifrado de transporte es redundante con la autenticación por Envelope Ed25519.
+## Aplicación en el Beacon
 
-## Cuándo está justificado REST
+El campo `endpoint.url` del Beacon (`schemas/beacon-base.schema.json`) tiene la restricción:
 
-REST (HTTP request/response) **no es parte del protocolo FHS de mensajería**. Solo existe como **plano de gestión** para herramientas externas (scripts de monitoreo, dashboards, integraciones no-FHS). Definido en `idl/openapi.yaml`.
+```json
+"url": {
+  "type": "string",
+  "format": "uri",
+  "pattern": "^wss://",
+  "description": "WebSocket Secure URL del nodo. Obligatoriamente wss://."
+}
+```
 
-| Endpoint REST | Justificación |
-| ------------- | ------------- |
-| `GET /api/fhs/providers` | Consulta externa desde herramientas de monitoreo (sin WS persistente) |
-| `GET /api/fhs/models` | Discovery de modelos disponibles desde UIs no-FHS |
-| `POST /api/fhs/metrics/sample` | Ingestión de métricas desde agentes externos (Prometheus, etc.) |
+Atlas evalúa el Beacon contra el schema en el momento del handshake. Un `endpoint.url`
+que empiece por `ws://` (sin `s`) produce `INVALID_MANIFEST` y el handshake es rechazado.
 
-**Regla**: si el cliente puede mantener una conexión WebSocket persistente y hablar FHS, **debe** usar el canal WS proto, no REST. La excepción es para integraciones con sistemas que no implementan el protocolo FHS (herramientas de terceros, CI/CD, dashboards).
+## Cuándo NO usar WebSocket
 
-## Diagrama de Decisión de Transporte
+WebSocket (WSS o no) no es para todo:
+
+| Caso | Alternativa |
+| ---- | ----------- |
+| Herramientas de monitoreo externas (Prometheus, dashboards) | REST — plano de gestión (`idl/openapi.yaml`) |
+| Integraciones con sistemas sin soporte WebSocket | REST — plano de gestión |
+| Descarga del bundle WASM por Ephemeral Satellites | HTTPS estático (distribución, no protocolo FHS) |
+
+**REST es solo plano de gestión**, no protocolo FHS. Cualquier comunicación que sea
+parte del protocolo (registro, Missions, heartbeat, feedback) va por WSS+Proto.
+
+## Diagrama de Transporte
 
 ```mermaid
 flowchart TD
-    A[¿El cliente puede abrir WebSocket?] -->|Sí| B[¿Puede serializar Protobuf?]
-    A -->|No| Z[REST — plano de gestión únicamente]
-    B -->|Sí| C[ws:// + fhs.v1 binario]
-    B -->|No| D[ws:// + fhs.v1.json — modo compat]
-    C --> E{¿Conexión a través de internet / \nbrowser HTTPS / TURN?}
-    D --> E
-    E -->|Sí| F[wss:// con TLS]
-    E -->|No| G[ws:// sin TLS — LAN o red privada]
+    A[¿El cliente habla protocolo FHS?] -->|Sí| B[WSS + fhs.v1 binario]
+    A -->|No — herramienta externa| Z[REST — plano de gestión únicamente]
+    B --> C{¿Puede serializar Protobuf?}
+    C -->|Sí| D[WSS + fhs.v1 binario — producción]
+    C -->|No — solo desarrollo/debug| E[WSS + fhs.v1.json — modo compat]
 ```
 
-## LPP Framing (modo binario)
+## Configuración de TLS
 
-Cada frame binario en modo `fhs.v1` tiene la estructura:
+Para infraestructura propia, ver `docs/tls-autofirmado.md`.
 
+Variables de entorno relevantes (todos los nodos):
+
+```bash
+TLS_CERT_PATH=/etc/fhs/tls/cert.pem   # Certificado TLS del servidor
+TLS_KEY_PATH=/etc/fhs/tls/key.pem     # Clave privada TLS (≠ clave FHS Ed25519)
+ATLAS_URL=wss://atlas.ejemplo.com:8443/fhs/v1/ws  # Siempre wss://
 ```
-[varint: N bytes del Envelope][N bytes del Envelope serializado en proto]
-```
-
-El varint usa la codificación estándar de Protobuf (base-128, little-endian de 7 bits). Ver `idl/framing.md` para la especificación completa y ejemplos de código.
-
-## Por Qué No UDP ni QUIC (todavía)
-
-FHS v1 usa WebSocket (TCP) porque:
-1. Disponible en navegadores sin permisos especiales (Ephemeral Satellites en browser).
-2. Confiable y ordenado por TCP — simplifica la correlación de `missionId`.
-3. Compatible con proxies HTTP (necesario para NAT traversal básico).
-
-QUIC/WebTransport queda para una versión futura cuando la penetración de navegadores sea suficiente y el caso de latencia ultra-baja justifique la complejidad (DEC pendiente).

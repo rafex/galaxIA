@@ -17,7 +17,7 @@ El orden refleja qué tan probable es que la comunidad aporte ese tipo de nodo p
 
 Sin importar el lenguaje, para ser compatible con FHS v0.1 hay que implementar:
 
-1. **Cliente WebSocket** contra el Registry (`ws://<registry-host>/fhs/v1/ws`).
+1. **Cliente WebSocket** contra el Registry (`wss://<atlas-host>/fhs/v1/ws`).
 2. **Serialización/deserialización JSON** de los mensajes del protocolo (ver `packages/fhs-protocol/src/messages.ts` como fuente de verdad de los tipos, y `docs/protocolo.md` para la especificación en prosa).
 3. **Ciclo de vida de registro**: `hello` → `welcome` → `register` → `registered` → `ping`/`pong` cada 10s (ver regla 3 de `docs/protocolo.md`).
 4. **Manifiesto** válido según el tipo de proveedor: `llm` (`docs/manifiesto-llm.md`) o `mcp` (`docs/manifiesto-mcp.md`).
@@ -38,7 +38,7 @@ import json
 import websockets
 
 async def register():
-    async with websockets.connect("ws://localhost:8083/fhs/v1/ws") as ws:
+    async with websockets.connect("wss://atlas:8443/fhs/v1/ws") as ws:
         await ws.send(json.dumps({
             "type": "hello",
             "providerId": "did:key:mi-nodo-python",
@@ -58,7 +58,7 @@ Caso de uso natural: providers que envuelven modelos de Python (Whisper para tra
 use tokio_tungstenite::connect_async;
 use serde_json::json;
 
-let (mut ws_stream, _) = connect_async("ws://localhost:8083/fhs/v1/ws").await?;
+let (mut ws_stream, _) = connect_async("wss://atlas:8443/fhs/v1/ws").await?;
 let hello = json!({
     "type": "hello",
     "providerId": "did:key:mi-nodo-rust",

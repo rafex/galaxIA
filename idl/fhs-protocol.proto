@@ -92,7 +92,7 @@ message Envelope {
 // Si es un Ephemeral Satellite (beacon.provider.ephemeral == true), incluye delegation_token.
 message HandshakeMessage {
   string          fhs_version      = 1;  // Versión del protocolo FHS que soporta este nodo
-  repeated string listen_addrs     = 2;  // Multiaddrs P2P (ej. /ip4/1.2.3.4/tcp/8081/ws)
+  repeated string listen_addrs     = 2;  // Multiaddrs P2P con TLS obligatorio (ej. /ip4/1.2.3.4/tcp/8443/tls/ws)
   string          beacon           = 3;  // Beacon JSON serializado (manifiesto completo del nodo)
   DelegationToken delegation_token = 4;  // Solo presente en Ephemeral Satellites (SPEC-EPHSAT-0001)
 }

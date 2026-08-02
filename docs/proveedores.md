@@ -27,7 +27,7 @@ Un nodo FHS que envuelve un motor de inferencia (llama.cpp). Corre en Node.js, s
 
 ### Cómo funciona
 
-1. **Registro**: se conecta a Atlas (`ws://atlas:8081/fhs/v1/ws`) y envía `hello` + `register` con un manifiesto `StarBeacon`
+1. **Registro**: se conecta a Atlas (`wss://atlas:8443/fhs/v1/ws`) y envía `hello` + `register` con un manifiesto `StarBeacon`
 2. **Chat FHS**: expone un servidor WebSocket en `:43111`. Cuando el Agent Server se conecta:
    - Recibe `chat.request` con el `GenerateRequest` (modelo, mensajes, tools)
    - Llama a llama.cpp vía `curl` (child_process, evita bug de Undici + ws en Node.js)
@@ -41,7 +41,7 @@ Un nodo FHS que envuelve un motor de inferencia (llama.cpp). Corre en Node.js, s
 {
   "fhsVersion": "0.1",
   "provider": { "id": "did:key:macmini-raul", "type": "llm", "visibility": "community" },
-  "endpoint": { "protocol": "fhs", "url": "ws://star:43111/fhs/v1/chat" },
+  "endpoint": { "protocol": "fhs", "url": "wss://star:43111/fhs/v1/chat" },
   "models": [{ "id": "qwen2.5-coder-3b-instruct", "capabilities": ["chat", "tool.calling"], "contextWindow": 4096, "toolCalling": { "supported": true } }]
 }
 ```
@@ -61,7 +61,7 @@ const stdout = await this.curlPost("http://llama:43110/v1/chat/completions", bod
 |---|---|---|
 | `LLM_PROVIDER_PORT` | `43111` | Puerto del WebSocket FHS de chat |
 | `LLM_PROVIDER_HOST` | `localhost` | Hostname para el manifiesto (en contenedores: `star`) |
-| `REGISTRY_URL` | `ws://localhost:8081/fhs/v1/ws` | URL del Registry |
+| `REGISTRY_URL` | `wss://atlas:8443/fhs/v1/ws` | URL del Registry |
 | `LLAMA_CPP_URL` | `http://localhost:43110/v1` | URL del servidor llama.cpp (en el bastion: `:8080`, ver `docs/despliegue.md`) |
 | `PROVIDER_ID` | `did:key:macmini-raul` | Identidad del proveedor |
 | `MODEL_ID` | `qwen2.5-coder-3b-instruct` | ID del modelo publicado en el manifiesto (DEC-0019) |
@@ -124,7 +124,7 @@ Usa `curl` con `multipart/form-data` hacia la API REST de ether-ocr (`POST /api/
 |---|---|---|
 | `OCR_PROVIDER_PORT` | `43112` | Puerto del WebSocket FHS de tools |
 | `OCR_PROVIDER_HOST` | `localhost` | Hostname para el manifiesto (en contenedores: `satellite-ocr`) |
-| `REGISTRY_URL` | `ws://localhost:8081/fhs/v1/ws` | URL del Registry |
+| `REGISTRY_URL` | `wss://atlas:8443/fhs/v1/ws` | URL del Registry |
 | `OCR_SERVICE_URL` | `http://ether-ocr-api:8000` | URL base de la API REST de OCR |
 | `OCR_API_KEY` | `dev-key-ether-ocr` | API key para autenticación |
 | `PROVIDER_ID` | `did:key:satellite-ocr-01` | Identidad del proveedor |
@@ -158,7 +158,7 @@ Un nodo FHS de tipo `mcp` que indexa y recupera fragmentos de un documento por c
 |---|---|---|
 | `RAG_PROVIDER_PORT` | `43113` | Puerto del WebSocket FHS de tools |
 | `RAG_PROVIDER_HOST` | `localhost` | Hostname para el manifiesto (en contenedores: `rag-provider`) |
-| `REGISTRY_URL` | `ws://localhost:8081/fhs/v1/ws` | URL de Atlas |
+| `REGISTRY_URL` | `wss://atlas:8443/fhs/v1/ws` | URL de Atlas |
 | `PROVIDER_ID` | `did:key:rag-provider-01` | Identidad del proveedor |
 
 ---
@@ -195,7 +195,7 @@ El modo "mágico" (recomendar sin pedir confirmación) queda documentado en DEC-
 | `KB_CONTENT_DIR` | `./content` (relativo al módulo, no a `cwd`) | Carpeta con archivos `.txt` a cargar al arrancar |
 | `KB_DESCRIPTION` | Constitución Política... (texto de ejemplo) | Descripción usada por el modo recomendado para el matching |
 | `KB_TAGS` | `constitucion,mexico,derechos humanos,ley` | Tags autodeclarados (DEC-0028), separados por coma |
-| `REGISTRY_URL` | `ws://localhost:8081/fhs/v1/ws` | URL de Atlas |
+| `REGISTRY_URL` | `wss://atlas:8443/fhs/v1/ws` | URL de Atlas |
 | `PROVIDER_ID` | `did:key:kb-provider-01` | Identidad del proveedor |
 
 ---

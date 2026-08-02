@@ -119,7 +119,7 @@ Nótese que el diagrama ya no nombra un motor de embeddings específico dentro d
   },
   "endpoint": {
     "protocol": "fhs",
-    "url": "ws://rag-provider:43113/fhs/v1/tools"
+    "url": "wss://rag-provider:43113/fhs/v1/tools"
   },
   "capabilities": [
     {

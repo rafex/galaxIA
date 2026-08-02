@@ -49,7 +49,7 @@ defaultContentType: application/json
 channels:
   # ── WebSocket: Portal → Navigator (misiones de chat + control de agente) ─
   /chat:
-    address: ws://{navigator}/chat
+    address: wss://{navigator}/chat
     description: |
       Canal principal Portal↔Navigator. El Portal envía agent.start para iniciar
       la sesión, chat.request / chat.cancel para misiones, y tool.result /
@@ -82,7 +82,7 @@ channels:
 
   # ── WebSocket: Navigator → Portal (respuestas de agente + misión) ────────
   /chat/stream:
-    address: ws://{navigator}/chat
+    address: wss://{navigator}/chat
     messages:
       agentStatus:
         $ref: "#/components/messages/AgentStatusMessage"
@@ -107,7 +107,7 @@ channels:
 
   # ── WebSocket: Provider ↔ Atlas (ciclo de vida P2P) ───────────────────────
   /register:
-    address: ws://{atlas}/register
+    address: wss://{atlas}/register
     description: |
       Canal de ciclo de vida de un nodo con Atlas (DEC-0087).
       Cualquier nodo (Provider, Navigator, Ephemeral Satellite) usa este canal.
@@ -149,7 +149,7 @@ channels:
 
   # ── WebSocket: Atlas → Navigator (notificaciones de topología) ───────────
   /atlas/nodes:
-    address: ws://{atlas}/nodes
+    address: wss://{atlas}/nodes
     description: |
       Notificaciones internas que Atlas emite hacia Navigator cuando
       un provider entra en Orbit (node.online) o pierde su lease (node.lost).
@@ -171,7 +171,7 @@ channels:
 
   # ── WebSocket: Atlas ↔ Atlas (gossip P2P, DEC-0086) ───────────────────────
   /atlas/gossip:
-    address: ws://{atlas}/gossip
+    address: wss://{atlas}/gossip
     description: |
       Canal de gossip entre instancias Atlas. Permite que múltiples Atlas sincronicen
       sus routing tables sin coordinator central, formando una malla federada P2P.
@@ -1104,7 +1104,7 @@ components:
   servers:
     navigator:
       host: "{navigator}"
-      protocol: ws
+      protocol: wss
       description: Navigator — Agent Runtime
       variables:
         navigator:
@@ -1112,7 +1112,7 @@ components:
           description: Host y puerto del Navigator
     atlas:
       host: "{atlas}"
-      protocol: ws
+      protocol: wss
       description: Atlas — Registry / Bootstrap Peer
       variables:
         atlas:

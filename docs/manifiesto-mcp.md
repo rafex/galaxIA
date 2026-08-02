@@ -16,7 +16,7 @@ puede invocar durante una misión. Se registra ante el Atlas enviando su Beacon 
     "visibility": "community"
   },
   "endpoint": {
-    "url": "ws://192.168.3.173:8082/register",
+    "url": "wss://192.168.3.173:8082/register",
     "multiaddr": "/ip4/192.168.3.173/tcp/8082/ws"
   },
   "capabilities": [
@@ -52,7 +52,7 @@ El schema completo está en `schemas/beacon-satellite.schema.json`.
 El Satellite conecta al Atlas por WebSocket y envía un `handshake`:
 
 ```
-WebSocket: ws://atlas-host:8081/register
+WebSocket: wss://atlas-host:8081/register
 Sec-WebSocket-Protocol: fhs.v1
 ```
 

@@ -11,7 +11,7 @@ sequenceDiagram
     participant N as Nodo<br/>(Star/Satellite/Nova/Navigator)
     participant A as Atlas
 
-    N->>A: WS CONNECT ws://atlas/register<br/>Sec-WebSocket-Protocol: fhs.v1
+    N->>A: WS CONNECT wss://atlas/register<br/>Sec-WebSocket-Protocol: fhs.v1
 
     note over N,A: Handshake 2-step (DEC-0087)
 
@@ -47,7 +47,7 @@ sequenceDiagram
 
     note over B,A: Handshake con delegación
 
-    B->>A: WS CONNECT ws://atlas/register<br/>Sec-WebSocket-Protocol: fhs.v1
+    B->>A: WS CONNECT wss://atlas/register<br/>Sec-WebSocket-Protocol: fhs.v1
 
     B->>A: Envelope { handshake: HandshakeMessage }<br/>beacon { provider.ephemeral:true, provider.delegatedBy: hostDID }<br/>delegation_token { issuer:hostDID, subject:ephDID,<br/>capabilities, wasmHash, expiresAt, signature }
 

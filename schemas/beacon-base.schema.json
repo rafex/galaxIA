@@ -98,7 +98,8 @@
         "url": {
           "type": "string",
           "format": "uri",
-          "description": "WebSocket URL del nodo (ws:// o wss://)."
+          "pattern": "^wss://",
+          "description": "WebSocket Secure URL del nodo. Obligatoriamente wss:// — el protocolo FHS no permite ws:// sin cifrado TLS. Atlas rechaza el handshake con INVALID_MANIFEST si el esquema no es wss://."
         },
         "multiaddr": {
           "type": "string",

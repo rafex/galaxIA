@@ -152,7 +152,7 @@ sequenceDiagram
     MDNS-->>SAT: { ip, port, tls }
 
     alt Se encontró exactamente un Registry
-        SAT->>SAT: arma wss://ip:port/fhs/v1/ws (o ws:// si tls=false)
+        SAT->>SAT: arma wss://ip:port/fhs/v1/ws
         SAT->>AS: hello (protocolo FHS normal, sin cambios)
     else Ninguno encontrado o más de uno
         SAT->>SAT: error claro: "no se pudo autodescubrir el Registry, define REGISTRY_URL"

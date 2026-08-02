@@ -16,7 +16,7 @@ enviando su Beacon (manifiesto JSON) dentro del mensaje `handshake` del protocol
     "region": "mx-cdmx"
   },
   "endpoint": {
-    "url": "ws://192.168.3.173:8081/register",
+    "url": "wss://192.168.3.173:8081/register",
     "multiaddr": "/ip4/192.168.3.173/tcp/8081/ws"
   },
   "models": [
@@ -60,7 +60,7 @@ El schema completo está en `schemas/beacon-star.schema.json`.
 El registro ocurre por WebSocket, no por HTTP. El Star conecta al Atlas y envía un `handshake`:
 
 ```
-WebSocket: ws://atlas-host:8081/register
+WebSocket: wss://atlas-host:8081/register
 Sec-WebSocket-Protocol: fhs.v1
 ```
 

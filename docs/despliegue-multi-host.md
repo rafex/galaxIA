@@ -46,7 +46,7 @@ flowchart TB
 
 | Antes (todo en bastion) | Ahora (laptop + bastion) |
 |---|---|
-| Providers se registran vía Docker DNS (`ws://atlas:8081/...`) | Providers se registran vía IP LAN de la laptop (`ws://<ip-laptop>:8081/...`) |
+| Providers se registran vía Docker DNS (`wss://atlas:8443/...`) | Providers se registran vía IP LAN de la laptop (`wss://<ip-laptop>:8443/...`) |
 | Providers anuncian su endpoint con nombre Docker (`star`, `satellite-ocr`) | Providers anuncian su endpoint con la IP LAN del bastion |
 | Un solo `docker network fhs` conecta todo | No hay red Docker compartida entre hosts — todo pasa por puertos publicados en cada host y la LAN real |
 | `llama-server`/`ether-ocr-api` alcanzables solo desde el mismo host | Siguen siendo solo-locales al bastion — los providers FHS siguen siendo el único punto de entrada externo |
@@ -57,7 +57,7 @@ flowchart TB
 
 ```yaml
 - LLM_PROVIDER_HOST=${LLM_PROVIDER_HOST:-star}
-- REGISTRY_URL=${PROVIDER_REGISTRY_URL:-ws://atlas:8081/fhs/v1/ws}
+- REGISTRY_URL=${PROVIDER_REGISTRY_URL:-wss://atlas:8443/fhs/v1/ws}
 ```
 
 Los defaults preservan el comportamiento de un solo host sin tocar nada. Para multi-host, se sobreescriben por variable de entorno del shell (tiene precedencia sobre `.env`) al momento de levantar los providers en el bastion.
@@ -110,14 +110,14 @@ sequenceDiagram
 
     Note over LP,REG: Ambos providers corren en el bastion,<br/>Atlas corre en la laptop, misma LAN
 
-    LP->>REG: hello (ws://<ip-laptop>:8081/fhs/v1/ws)
+    LP->>REG: hello (wss://<ip-laptop>:8443/fhs/v1/ws)
     REG-->>LP: welcome (lease: 30s)
-    LP->>REG: register (manifest con endpoint ws://<ip-bastion>:43111/...)
+    LP->>REG: register (manifest con endpoint wss://<ip-bastion>:43111/...)
     REG-->>LP: registered
 
     OP->>REG: hello
     REG-->>OP: welcome
-    OP->>REG: register (manifest con endpoint ws://<ip-bastion>:43112/...)
+    OP->>REG: register (manifest con endpoint wss://<ip-bastion>:43112/...)
     REG-->>OP: registered
 
     loop cada 10s
@@ -201,7 +201,7 @@ curl http://<ip-laptop>:8081/health
 cd galaxIA
 
 # Apuntar los providers al Registry de la laptop
-export PROVIDER_REGISTRY_URL="ws://<ip-laptop>:8081/fhs/v1/ws"
+export PROVIDER_REGISTRY_URL="wss://<ip-laptop>:8443/fhs/v1/ws"
 export LLM_PROVIDER_HOST="<ip-bastion>"
 export OCR_PROVIDER_HOST="<ip-bastion>"
 
@@ -256,7 +256,7 @@ ya dentro de esa sesión.
 | Atlas (laptop) escucha solo en `127.0.0.1` | Alto — los providers del bastion nunca logran conectar | Confirmar `HOST=0.0.0.0` (ya es el default en `containers/compose.yaml`); en dev sin contenedores, exportar `HOST=0.0.0.0` antes de `just dev-atlas` |
 | Firewall de la laptop bloquea el puerto de Atlas | Alto | Abrir el puerto correspondiente solo a la LAN, no a internet — la laptop no debería exponer Atlas públicamente |
 | La laptop se apaga o pierde red — Atlas desaparece | Alto | Es un único punto de fallo (antes el Registry vivía en el bastion, la máquina "siempre encendida"); documentar como riesgo operativo, no resuelto en esta iteración — ver `spec-native/ROADMAP.md` |
-| `PROVIDER_REGISTRY_URL` mal escrito silenciosamente cae al default de Docker DNS (`ws://atlas:8081`), que no existe en el bastion | Medio | El provider lo intentará y nunca conectará — revisar logs (`podman logs fhs-star`) buscando "Conectado al Registry" ausente, no asumir que "sin error visible" significa que funcionó (misma lección de `docs/protocolo-provider.md`, "Lecciones de integración") |
+| `PROVIDER_REGISTRY_URL` mal escrito silenciosamente cae al default de Docker DNS (`wss://atlas:8443`), que no existe en el bastion | Medio | El provider lo intentará y nunca conectará — revisar logs (`podman logs fhs-star`) buscando "Conectado al Registry" ausente, no asumir que "sin error visible" significa que funcionó (misma lección de `docs/protocolo-provider.md`, "Lecciones de integración") |
 | `ATLAS_URL` de Navigator mal escrito o Atlas caído | Medio | Navigator no puede resolver providers — falla visible al primer intento de chat (no silencioso), ver logs de Navigator |
 | Latencia extra por ida-vuelta en la LAN (mínima, pero real) sumada a la latencia ya alta del modelo en el bastion | Bajo | No debería ser perceptible en LAN local; medir con las mismas pruebas end-to-end que se usaron para OCR determinístico si hay dudas |
 
