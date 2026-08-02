@@ -2,7 +2,7 @@
 
 `galaxIA` combina "Galaxy" (galaxia) + "IA" — el vocabulario de producto sigue esa metáfora. Este documento es la referencia única: cualquier otro documento que necesite nombrar estos conceptos debe citar esta tabla, no reinventarla.
 
-> Este vocabulario es de **documentación, interfaz y comunicación** — no cambia el protocolo FHS ni el código. `provider`, `providerId`, `capability`, `manifest`, `Registry`, `missionId` y el resto de identificadores técnicos siguen exactamente igual (ver `spec-native/specs/vocabulario-espacial/SPEC.md`, SPEC-VOCAB-0001, y `spec-native/DECISIONS.md` DEC-0024). Cuando un documento técnico necesita ser preciso a nivel de protocolo, usa el término técnico; cuando habla de cara a la comunidad o a un usuario, usa el término de esta tabla.
+> Este vocabulario es de **documentación, interfaz y comunicación** — no cambia el protocolo FHS ni el código. `provider`, `providerId`, `capability`, `manifest`, `Registry`, `requestId` y el resto de identificadores técnicos siguen exactamente igual (ver `spec-native/specs/vocabulario-espacial/SPEC.md`, SPEC-VOCAB-0001, y `spec-native/DECISIONS.md` DEC-0024). Cuando un documento técnico necesita ser preciso a nivel de protocolo, usa el término técnico; cuando habla de cara a la comunidad o a un usuario, usa el término de esta tabla.
 
 ## Tabla canónica
 

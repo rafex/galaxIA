@@ -1,15 +1,59 @@
+# SpecNative — venv is generated; do not commit
+.specnative/.venv/
+
+# Dependencias
+node_modules/
+
+# Artefactos de build
+dist/
+*.tsbuildinfo
+
+# Entorno local (contiene paths, puertos, tokens)
+.env
+.env.local
+.env.*.local
+
+# Certificados TLS autofirmados de la PoC (ver docs/tls-autofirmado.md) —
+# se generan por máquina con helpers/scripts/shell/generate-dev-cert.sh,
+# nunca se versionan (contienen la clave privada).
+/certs/
+
+# Identidad Ed25519 por nodo (DEC-0030) — se genera al primer arranque de
+# cada provider, contiene la clave privada del did:key, nunca se versiona.
+.fhs-identity*.pem
+
+# Rating de Atlas persistido en SQLite (SPEC-SATRATING-0001) — datos locales,
+# se regenera con el uso, nunca se versiona.
+apps/atlas/data/
+*.db-wal
+*.db-shm
+
+# opencode (local, no versionar)
+.opencode/sessions.db
+.opencode/sessions*db
+.opencode/sessions.db-shm
+.opencode/sessions.db-wal
+.opencode/worktrees/
+.opencode/worktrees.db
+.opencode/worktrees.log
+.opencode/node_modules/
+session-ses_*.md
+
 # Sistema
 .DS_Store
 Thumbs.db
 *.swp
 *.swo
 *~
+\#*\#
 .idea/
 .vscode/
 
-# opencode / sesiones locales
-.opencode/
-session-ses_*.md
+# Logs
+*.log
+/tmp/
 
-# SpecNative — entorno Python generado
-.specnative/.venv/
+/data/
+
+# Generado por build:schemas (fhs-protocol) — como dist/, no se versiona
+packages/fhs-protocol/schemas/

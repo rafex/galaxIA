@@ -1264,27 +1264,10 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
 - **Decisión técnica:** el `deviceId` se genera en `apps/portal-chat/src/services/device-id.ts` y se envía en cada mensaje `start` del WebSocket. El navigator lo extrae y lo almacena en el closure de la conexión WebSocket, lo pasa al `AgentRuntime` y de ahí a los `TraceContext` de todos los gateways (LLM y MCP). El campo `deviceId?` opcional queda en `TraceEntry` — aparece en las líneas de log de trazabilidad correlacionado con cada `conversationId`.
 - **Consecuencias:** `apps/portal-chat/src/services/device-id.ts` (nuevo), `apps/portal-chat/src/services/api.ts` (agrega `deviceId` al mensaje start), `apps/navigator/src/api/chat-ws.ts` (extrae y propaga `deviceId`), `apps/navigator/src/agent/runtime.ts` (recibe y pasa `deviceId`), `apps/navigator/src/providers/{llm-gateway,mcp-host}.ts` (agregan `deviceId?` a `TraceContext`), `apps/navigator/src/observability/trace.ts` (agrega `deviceId?` a `TraceEntry`). Verificado: typecheck/tests verdes.
 
-## DEC-0085 — Rename de wire protocol `requestId` → `missionId` (revierte DEC-0084 en su punto 2)
-
-- **Fecha:** 2026-08-01
-- **Estado:** `accepted` — implementado (branch `feat/satellite-capabilities`)
-- **Contexto:** DEC-0084 decidió no renombrar `requestId` → `missionId` en el wire protocol alegando que sería "puramente cosmético". Al revisar el criterio con más detalle, el argumento de "cosmético" no es sólido: el nombre `requestId` no describe lo que es (una Mission en vuelo), mientras que `missionId` sí — la semántica ya estaba adoptada en prosa/código (DEC-0024, DEC-0084 punto 1) y la falta de alineación entre el nombre del campo y el vocabulario del sistema era una fuente de confusión real. La topología de nodos es completamente propia (Bastion + Raspi4B + Laptop, sin terceros desconocidos en la LAN), por lo que un flag-day coordinado es viable sin capa de compatibilidad.
-- **Decisión:** renombrar `requestId` → `missionId` en todos los mensajes del wire protocol FHS: `chat.request`, `chat.cancel`, `chat.delta`, `chat.completed`, `chat.error`, `dispatch.ack`, `tool.call`, `tool.cancel`, `tool.result`, `tool.error`, `tool.list`, `tool.list.response`. **Rename puro, sin capa de compatibilidad** — la ventana rota se acepta durante el redeploy coordinado de los 3 nodos. Regla complementaria de DEC-0084 punto 3 sigue vigente: cuando un doc técnico necesita precisión de protocolo, usa `missionId`; cuando habla de cara al usuario, usa el término de `docs/vocabulario.md`.
-- **Alcance del cambio:**
-  - `packages/fhs-protocol/src/messages.ts` — 12 interfaces de mensaje renombradas (campo `missionId`).
-  - `packages/fhs-protocol/src/identity.ts` — parámetro `invokeSignaturePayload(callerId, missionId, timestamp)` (el valor interpolado es el mismo UUID — no rompe firmas existentes).
-  - `packages/fhs-protocol/schemas/fhs-protocol.schema.json` — regenerado con `npm run build:schemas`.
-  - `apps/navigator/src/providers/llm-gateway.ts`, `mcp-host.ts`, `apps/navigator/src/observability/trace.ts`.
-  - `scripts/e2e-smoke.ts`, `scripts/demo-failover-ocr.ts`.
-  - Docs: `docs/protocolo.md`, `docs/protocolo-provider.md`, `docs/proveedores.md`, `docs/navigator.md`, `docs/observabilidad-logs.md`, `docs/vocabulario.md` (corregida la regla de DEC-0084 que decía que `requestId` "sigue exactamente igual").
-  - `galaxIA-satellite-star`: 5 providers de referencia (`examples/*/src/index.ts`).
-- **Consecuencias:** requiere redeploy coordinado de los 3 nodos reales (Bastion, Raspi4B, Laptop) para minimizar la ventana de mensajes fallidos — no hay cero-downtime sin capa de compatibilidad, que se descartó por topología propia.
-- **Revierte:** DEC-0084 punto 2 únicamente. DEC-0084 puntos 1 y 3 siguen vigentes sin cambios.
-
 ## DEC-0084 — `missionId` no se adopta como campo del protocolo; `Mission`/`missionId` sí quedan confirmados como vocabulario de producto
 
 - **Fecha:** 2026-08-01
-- **Estado:** `reverted` — el punto 2 fue revertido por DEC-0085 (rename `requestId` → `missionId` en el wire protocol). Los puntos 1 y 3 siguen vigentes.
+- **Estado:** `accepted`
 - **Contexto:** al evaluar una propuesta externa de "Ephemeral Satellite" (nodo WASM en navegador, ver discusión de esta sesión), el documento proponía `missionId` como campo real del mensaje de una misión (`{ "missionId": "mission-4821", "capability": ..., "input": ..., "deadlineMs": ... }`). El usuario pidió revisar si `missionId` "cabe dentro del vocabulario" y adoptarlo si no chocaba con nada. Verificación real contra el código y `spec-native/DECISIONS.md`: `Mission` **ya es vocabulario de producto adoptado** desde DEC-0024 (`docs/vocabulario.md`: *"Ejecución de una tool (`tool.call`) → Mission"*), y ya se usa en prosa/comentarios (`apps/navigator/src/providers/mcp-host.ts`, `apps/navigator/src/observability/trace.ts`, `apps/navigator/src/agent/runtime.ts`, `apps/atlas/src/atlas/ws-handler.ts`, DEC-0010, DEC-0012) — no era un término nuevo, solo no se le había pedido formalizar el campo asociado.
 - **Decisión:**
   1. **`Mission`/`missionId` se confirman como vocabulario de producto** (documentación, UI, prosa, nombres de variable/comentario) — sin cambios, ya estaba aprobado por DEC-0024; esta decisión solo lo reafirma explícitamente en el contexto de "misiones enviadas a un nodo".

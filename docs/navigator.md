@@ -163,7 +163,7 @@ El OCR Provider expone tools con schema tipado:
 ```json
 {
   "type": "tool.call",
-  "missionId": "...",
+  "requestId": "...",
   "toolName": "ocr_extract",
   "arguments": { "file_base64": "...", "filename": "captura.png", "lang": "spa+eng" }
 }
@@ -174,7 +174,7 @@ Y responde:
 ```json
 {
   "type": "tool.result",
-  "missionId": "...",
+  "requestId": "...",
   "toolName": "ocr_extract",
   "content": [{ "type": "text", "text": "Hola mundo extraído de la imagen" }]
 }

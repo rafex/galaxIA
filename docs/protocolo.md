@@ -131,7 +131,7 @@ Esto solo detecta **si el socket sigue vivo** (proceso caído, red partida) — 
 
 ### Timeout configurable del lado del cliente (DEC-0010)
 
-Quien inicia una Mission o una conversación con una Star puede indicar `preferences.maxWaitMs` — cuánto tiempo está dispuesto a esperar antes de abandonar, en vez del default fijo del stack (~300s, pensado para hardware comunitario lento). Es un límite de paciencia del cliente, no una señal de salud del nodo: si se cumple, el Agent Server simplemente deja de esperar esa respuesta y libera la conversación, sin importar si el nodo sigue procesando o no. Desde la revisión 2026-07-10 el Agent Server además envía `chat.cancel`/`tool.cancel { missionId }` (best-effort) al abandonar — el nodo debería abortar el trabajo si puede (respondiendo `chat.error`/`tool.error` con código `CANCELLED`) para no seguir quemando CPU comunitaria en una petición que ya nadie espera; ignorar la cancelación no rompe el protocolo.
+Quien inicia una Mission o una conversación con una Star puede indicar `preferences.maxWaitMs` — cuánto tiempo está dispuesto a esperar antes de abandonar, en vez del default fijo del stack (~300s, pensado para hardware comunitario lento). Es un límite de paciencia del cliente, no una señal de salud del nodo: si se cumple, el Agent Server simplemente deja de esperar esa respuesta y libera la conversación, sin importar si el nodo sigue procesando o no. Desde la revisión 2026-07-10 el Agent Server además envía `chat.cancel`/`tool.cancel { requestId }` (best-effort) al abandonar — el nodo debería abortar el trabajo si puede (respondiendo `chat.error`/`tool.error` con código `CANCELLED`) para no seguir quemando CPU comunitaria en una petición que ya nadie espera; ignorar la cancelación no rompe el protocolo.
 
 **Recomendación para quien implemente UI sobre este campo:** el rango razonable de `maxWaitMs` es alto (varios minutos), no segundos — el hardware comunitario que federa esta red (equipos reutilizados, sin GPU dedicada) puede tardar minutos en una sola inferencia u OCR. Un timeout bajo (ej. 10-30s) no es una opción realista de "impaciencia legítima", es indistinguible de cancelar la petición casi siempre — cualquier control de UI para este campo debería partir de un piso cercano al default (~300s) hacia arriba, no hacia abajo.
 
@@ -280,16 +280,16 @@ sequenceDiagram
     AS-->>U: agent.status "resolving-model"
     AS-->>U: llm.selected { providerId, modelId }
 
-    AS->>LLM: chat.request { missionId, messages, tools }
-    LLM-->>AS: chat.completed { missionId, toolCalls }
+    AS->>LLM: chat.request { requestId, messages, tools }
+    LLM-->>AS: chat.completed { requestId, toolCalls }
 
     alt el LLM pide una tool
         AS-->>U: tool.selected { capability: "document.ocr" }
-        AS->>OCR: tool.call { missionId, toolName, arguments: { file_base64 } }
-        OCR-->>AS: tool.result { missionId, content }
+        AS->>OCR: tool.call { requestId, toolName, arguments: { file_base64 } }
+        OCR-->>AS: tool.result { requestId, content }
         AS-->>U: tool.completed { name, duration }
-        AS->>LLM: chat.request { missionId nuevo, messages + tool result }
-        LLM-->>AS: chat.completed { missionId, response final }
+        AS->>LLM: chat.request { requestId nuevo, messages + tool result }
+        LLM-->>AS: chat.completed { requestId, response final }
     end
 
     AS-->>U: assistant.delta { text }
@@ -301,36 +301,36 @@ sequenceDiagram
 **Chat (LLM)**
 
 ```
-Agent Server → Provider:  chat.request   { missionId, request, callerId, timestamp, signature }
-Provider → Agent Server:  dispatch.ack   { missionId, queuedAt }  (opcional, ver abajo)
-Provider → Agent Server:  chat.delta     { missionId, delta: string }
-Provider → Agent Server:  chat.completed { missionId, response: GenerateResponse }
-Provider → Agent Server:  chat.error     { missionId, code, message }
-Agent Server → Provider:  chat.cancel    { missionId }  (best-effort, ver abajo)
+Agent Server → Provider:  chat.request   { requestId, request, callerId, timestamp, signature }
+Provider → Agent Server:  dispatch.ack   { requestId, queuedAt }  (opcional, ver abajo)
+Provider → Agent Server:  chat.delta     { requestId, delta: string }
+Provider → Agent Server:  chat.completed { requestId, response: GenerateResponse }
+Provider → Agent Server:  chat.error     { requestId, code, message }
+Agent Server → Provider:  chat.cancel    { requestId }  (best-effort, ver abajo)
 ```
 
 **Tools (OCR, MCP)**
 
 ```
-Agent Server → Provider:  tool.list         { missionId, callerId, timestamp, signature }
-Provider → Agent Server:  tool.list.response  { missionId, tools: [...] }
-Agent Server → Provider:  tool.call         { missionId, toolName, arguments, callerId, timestamp, signature }
-Provider → Agent Server:  dispatch.ack      { missionId, queuedAt }  (opcional, ver abajo)
-Provider → Agent Server:  tool.result       { missionId, toolName, content: [...] }
-Provider → Agent Server:  tool.error        { missionId, toolName, code, message }
-Agent Server → Provider:  tool.cancel       { missionId }  (best-effort, ver abajo)
+Agent Server → Provider:  tool.list         { requestId, callerId, timestamp, signature }
+Provider → Agent Server:  tool.list.response  { requestId, tools: [...] }
+Agent Server → Provider:  tool.call         { requestId, toolName, arguments, callerId, timestamp, signature }
+Provider → Agent Server:  dispatch.ack      { requestId, queuedAt }  (opcional, ver abajo)
+Provider → Agent Server:  tool.result       { requestId, toolName, content: [...] }
+Provider → Agent Server:  tool.error        { requestId, toolName, code, message }
+Agent Server → Provider:  tool.cancel       { requestId }  (best-effort, ver abajo)
 ```
 
-`missionId` es obligatorio y debe repetirse igual en la respuesta — es la base de la trazabilidad operacional (ver más abajo).
+`requestId` es obligatorio y debe repetirse igual en la respuesta — es la base de la trazabilidad operacional (ver más abajo).
 
-**Autenticación del invocador (revisión 2026-07-10):** `callerId` es el did:key del Agent Server (u otro agente) y `signature` es Ed25519 base64 sobre `callerId:missionId:timestamp` (`invokeSignaturePayload`). Sin esto, cualquier peer de la LAN podía consumir el LLM/tools de un nodo gratis y de forma anónima. Los campos son opcionales por compatibilidad, pero un provider **puede exigirlos** y responder `chat.error`/`tool.error` con código `UNAUTHORIZED` a invocadores anónimos, vetados o con firma inválida — la misma ventana anti-replay de registro (`MAX_REPLAY_AGE_MS`/`MAX_CLOCK_SKEW_MS`) aplica al `timestamp` del invocador.
+**Autenticación del invocador (revisión 2026-07-10):** `callerId` es el did:key del Agent Server (u otro agente) y `signature` es Ed25519 base64 sobre `callerId:requestId:timestamp` (`invokeSignaturePayload`). Sin esto, cualquier peer de la LAN podía consumir el LLM/tools de un nodo gratis y de forma anónima. Los campos son opcionales por compatibilidad, pero un provider **puede exigirlos** y responder `chat.error`/`tool.error` con código `UNAUTHORIZED` a invocadores anónimos, vetados o con firma inválida — la misma ventana anti-replay de registro (`MAX_REPLAY_AGE_MS`/`MAX_CLOCK_SKEW_MS`) aplica al `timestamp` del invocador.
 
 **Cancelación best-effort (`chat.cancel`/`tool.cancel`, revisión 2026-07-10):** quien originó la petición avisa que dejó de esperar (timeout `maxWaitMs`, failover, usuario que cerró). El provider debería abortar el trabajo si puede y responder `chat.error`/`tool.error` con código `CANCELLED`; ignorar el mensaje no rompe el protocolo — es una optimización de cortesía para no quemar CPU comunitaria en peticiones que ya nadie espera.
 
 **`dispatch.ack` — el "mosquito" confirmando que ya tomó la petición**
 
 ```json
-{ "type": "dispatch.ack", "missionId": "...", "queuedAt": 1719700000123 }
+{ "type": "dispatch.ack", "requestId": "...", "queuedAt": 1719700000123 }
 ```
 
 Un nodo lo envía inmediatamente al encolar un `chat.request`/`tool.call` en
@@ -414,18 +414,18 @@ Esto no es telemetría opcional: es la forma en que el usuario puede auditar, de
 
 **"No retener contenido" y "no poder diagnosticar errores" no son la misma cosa.** Privacidad restringe qué se guarda; trazabilidad exige que lo que sí se guarda alcance para resolver un incidente ("mi OCR falló ayer a las 15:03", "el chat respondió con datos de otro proveedor").
 
-Regla: **todo mensaje FHS con `missionId` debe poder correlacionarse extremo a extremo — como metadata, nunca como contenido.**
+Regla: **todo mensaje FHS con `requestId` debe poder correlacionarse extremo a extremo — como metadata, nunca como contenido.**
 
 Se distinguen dos capas:
 
 | Capa | Qué incluye | Se retiene según `privacy.retention` |
 |---|---|---|
 | **Contenido** | Texto del mensaje, imagen/PDF adjunto, respuesta del modelo | Sí — sujeto a la política declarada por cada provider |
-| **Metadata de trazabilidad** | `conversationId`, `missionId`, `providerId`, `capability`/`modelId`, `timestamp`, `duration`, `success`/`error.code` | Siempre — no es negociable, no es "dato del usuario" |
+| **Metadata de trazabilidad** | `conversationId`, `requestId`, `providerId`, `capability`/`modelId`, `timestamp`, `duration`, `success`/`error.code` | Siempre — no es negociable, no es "dato del usuario" |
 
-Un provider FHS-compatible debe loggear la capa de metadata (mínimo: `missionId`, resultado, duración) en cada `chat.request`/`tool.call` que procesa, **sin loggear el contenido** salvo que su `retention` declarada lo permita explícitamente. Esto permite reconstruir la cadena `conversationId → missionId → providerId → resultado` para depurar un fallo, sin violar la promesa de privacidad.
+Un provider FHS-compatible debe loggear la capa de metadata (mínimo: `requestId`, resultado, duración) en cada `chat.request`/`tool.call` que procesa, **sin loggear el contenido** salvo que su `retention` declarada lo permita explícitamente. Esto permite reconstruir la cadena `conversationId → requestId → providerId → resultado` para depurar un fallo, sin violar la promesa de privacidad.
 
-**Cerrado del lado del Agent Server** (2026-07-05, DEC-0012): `apps/navigator/src/observability/trace.ts` expone `logTrace(entry)`, llamado en los tres puntos donde el Navigator despacha una Mission o una llamada a una Star (`mcp-host.ts`, `llm-gateway.ts`) — cubre éxito, timeout, error del nodo y cierre de conexión inesperado. Cada línea es JSON estructurado (`conversationId`, `missionId`, `providerId`, `capability`, `dispatchMs`, `totalMs`, `success`, `errorCode`), nunca contenido. Pendiente (no bloqueante): que cada provider de ejemplo (`star-example`, `satellite-ocr-example`) también loggee su propia metadata local por `missionId` — hoy solo el Agent Server lo hace.
+**Cerrado del lado del Agent Server** (2026-07-05, DEC-0012): `apps/navigator/src/observability/trace.ts` expone `logTrace(entry)`, llamado en los tres puntos donde el Navigator despacha una Mission o una llamada a una Star (`mcp-host.ts`, `llm-gateway.ts`) — cubre éxito, timeout, error del nodo y cierre de conexión inesperado. Cada línea es JSON estructurado (`conversationId`, `requestId`, `providerId`, `capability`, `dispatchMs`, `totalMs`, `success`, `errorCode`), nunca contenido. Pendiente (no bloqueante): que cada provider de ejemplo (`star-example`, `satellite-ocr-example`) también loggee su propia metadata local por `requestId` — hoy solo el Agent Server lo hace.
 
 ### Checklist de privacidad y trazabilidad para implementar un provider FHS
 
@@ -435,7 +435,7 @@ Antes de considerar un provider "listo", verifica que:
 - [ ] Si es tipo `llm`, declara `privacy.trainingUse`.
 - [ ] Respeta el `scope` recibido en cada petición — nunca procesa datos fuera del ámbito autorizado.
 - [ ] No registra ni loggea el **contenido** de las peticiones más allá de lo declarado en `retention`.
-- [ ] Sí registra la **metadata de trazabilidad** (`missionId`, éxito/error, duración) de cada petición procesada, para poder diagnosticar fallos sin exponer contenido.
+- [ ] Sí registra la **metadata de trazabilidad** (`requestId`, éxito/error, duración) de cada petición procesada, para poder diagnosticar fallos sin exponer contenido.
 - [ ] Responde con suficiente información para que el agente construya `provenance` correctamente.
 
 ## Implementaciones en otros lenguajes
