@@ -12,8 +12,8 @@
 galaxIA es ahora un repositorio IDL-only. El análisis de brecha identificó que los 3 IDL formales
 (`asyncapi.yaml`, `fhs-protocol.proto`, `openapi.yaml`) cubren solo los 12 mensajes de misión,
 pero omiten el flujo de registro/conexión completo, los schemas de manifiesto (Beacon) por tipo
-de nodo, y los endpoints REST más usados. Además hay inconsistencias de vocabulario
-(`"llm"`/`"mcp"` vs `"star"`/`"satellite"`) que deben resolverse antes de añadir más IDL.
+de nodo, el canal Portal↔Navigator, y los endpoints REST más usados. Además hay inconsistencias
+de vocabulario (`"llm"`/`"mcp"` vs `"star"`/`"satellite"`) que deben resolverse.
 
 Orden de ejecución respeta dependencias: el índice (`idl/README.md`) se escribe al final cuando
 todos los artefactos ya existen. Los schemas de Beacon dependen de la alineación de vocabulario.
@@ -25,34 +25,19 @@ todos los artefactos ya existen. Los schemas de Beacon dependen de la alineació
 ### TASK-IDL-001 — Mensajes de registro en asyncapi.yaml y fhs-protocol.proto
 
 - ID: TASK-IDL-001
-- State: `todo`
+- State: `done`
 - Owner: rafex
 - Dependencies: —
 - Expected files:
   - `idl/asyncapi.yaml` (modificado)
   - `idl/fhs-protocol.proto` (modificado)
-- Close criteria: Los mensajes `hello`, `welcome`, `register`, `registered`, `ping`, `pong` y
-  `error` aparecen definidos en ambos IDL formales con todos sus campos, canal y dirección
-  correctos. El canal `/register` de AsyncAPI tiene el flujo completo de conexión (no solo
-  `DispatchAckMessage`). El `.proto` incluye los nuevos tipos en el `oneof` de `FhsMessage`.
-- Validation: Revisar manualmente que cada campo de `docs/protocolo.md` (sección mensajes) y
-  `docs/protocolo-provider.md` (ciclo de vida obligatorio) tiene su equivalente formal en ambos
-  IDL. Ningún mensaje mencionado en la documentación en prosa debe estar ausente del IDL.
-
-Mensajes a agregar (fuente: `docs/protocolo.md` y `docs/protocolo-provider.md`):
-
-| Mensaje       | Dirección              | Descripción |
-|---------------|------------------------|-------------|
-| `hello`       | Provider → Atlas       | Identificación inicial con DID firmado |
-| `welcome`     | Atlas → Provider       | Confirmación de identidad, nonce de challenge |
-| `register`    | Provider → Atlas       | Envío del manifiesto (Beacon) |
-| `registered`  | Atlas → Provider       | Confirmación de registro con `visibility` asignada |
-| `ping`        | Provider → Atlas       | Heartbeat — Pulse (cada 10s) |
-| `pong`        | Atlas → Provider       | Respuesta a ping |
-| `error`       | Atlas → Provider       | Error estandarizado con código (`NOT_IDENTIFIED`, `INVALID_MANIFEST`, etc.) |
-
-> Nota: `dispatch.ack` ya existe en `asyncapi.yaml` y `fhs-protocol.proto`; verificar que
-> es coherente con el resto de los mensajes nuevos.
+- Close criteria: Los mensajes `hello`, `welcome`, `register`, `registered`, `ping`, `pong`,
+  `error`, `node.online` y `node.lost` aparecen definidos en ambos IDL formales con todos sus
+  campos, canal y dirección correctos. El canal `/register` de AsyncAPI tiene el flujo completo
+  de conexión. El `.proto` incluye los nuevos tipos en el `oneof` de `FhsMessage`.
+- Validation: ✅ PR #78 mergeado. Verificado campo a campo contra `docs/protocolo.md` y
+  `docs/protocolo-provider.md`. `FhsMessage.oneof` extendido a 21 campos (fields 13-21).
+  Canal `/atlas/nodes` añadido para `node.online`/`node.lost`. `enum FhsErrorCode` con 12 códigos.
 
 ---
 
@@ -64,28 +49,31 @@ Mensajes a agregar (fuente: `docs/protocolo.md` y `docs/protocolo-provider.md`):
 - Dependencies: TASK-IDL-001
 - Expected files:
   - `schemas/beacon-base.schema.json` — campos obligatorios compartidos
-  - `schemas/beacon-star.schema.json` — manifiesto LLM (Star)
-  - `schemas/beacon-satellite.schema.json` — manifiesto tool/MCP (Satellite)
-  - `schemas/beacon-nova.schema.json` — manifiesto agente con loop (Nova)
+  - `schemas/beacon-star.schema.json` — manifiesto Star (LLM provider)
+  - `schemas/beacon-satellite.schema.json` — manifiesto Satellite (tool provider)
+  - `schemas/beacon-nova.schema.json` — manifiesto Nova (agente con loop)
 - Close criteria: Los 4 schemas son JSON Schema draft-07 válidos. `beacon-star`, `beacon-satellite`
   y `beacon-nova` extienden `beacon-base` mediante `$ref` o `allOf`. El campo `provider.type`
-  usa el vocabulario canónico (`"star"` | `"satellite"` | `"nova"` | `"multi"`) — no `"llm"` ni
-  `"mcp"`. Los ejemplos de `docs/manifiesto-llm.md` y `docs/manifiesto-mcp.md` son válidos contra
-  el schema correspondiente (mentalmente, no requiere validador automático).
+  usa vocabulario canónico (`"star"` | `"satellite"` | `"nova"` | `"multi"`). Los ejemplos de
+  `docs/manifiesto-llm.md` y `docs/manifiesto-mcp.md` son válidos contra el schema correspondiente.
+  Los schemas incluyen `availability.maxConcurrentRequests` (DEC-0072, código `OVERLOADED`) y
+  `provider.region` (campo documentado en `docs/manifiesto-llm.md`).
 - Validation: Comparar campo por campo con `docs/manifiesto-llm.md`, `docs/protocolo-provider.md`
   (sección "Manifiesto — campos obligatorios sin excepción") y `docs/vocabulario.md`.
 
 Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 
-| Campo                | Tipo     | Obligatorio |
-|----------------------|----------|-------------|
-| `fhsVersion`         | string   | Sí          |
-| `provider.id`        | string (DID) | Sí      |
-| `provider.type`      | enum     | Sí          |
-| `provider.visibility`| enum     | Sí          |
-| `endpoint`           | object   | Sí          |
-| `privacy.retention`  | string   | Sí          |
-| `privacy.trainingUse`| boolean  | Sí (LLM)    |
+| Campo                        | Tipo         | Obligatorio |
+|------------------------------|--------------|-------------|
+| `fhsVersion`                 | string       | Sí          |
+| `provider.id`                | string (DID) | Sí          |
+| `provider.type`              | enum         | Sí          |
+| `provider.visibility`        | enum         | Sí          |
+| `provider.region`            | string       | No          |
+| `endpoint`                   | object       | Sí          |
+| `availability.maxConcurrentRequests` | integer | No        |
+| `privacy.retention`          | string       | Sí          |
+| `privacy.trainingUse`        | boolean      | Sí (Star)   |
 
 ---
 
@@ -109,7 +97,7 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 
 ---
 
-### TASK-IDL-004 — Endpoints REST faltantes en openapi.yaml
+### TASK-IDL-004 — Endpoints REST faltantes y correcciones en openapi.yaml
 
 - ID: TASK-IDL-004
 - State: `todo`
@@ -118,13 +106,21 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 - Expected files:
   - `idl/openapi.yaml` (modificado)
 - Close criteria: `openapi.yaml` incluye los endpoints REST usados en producción que hoy faltan:
-  - `GET /api/fhs/providers` con query params `?type=star|satellite|nova|multi`, `?scope=local|network|community|external`
-  - `GET /api/fhs/models` (modelos disponibles de todos los Stars)
+  - `GET /api/fhs/providers` con query params `?type=star|satellite|nova|multi`,
+    `?scope=local|network|community|external`
+  - `GET /api/fhs/models` (modelos disponibles de todos los Stars registrados)
   - `POST /api/fhs/metrics/sample` (fire-and-forget de métricas de latencia/éxito)
   - Respuestas `400`, `401`, `404`, `503` en todos los endpoints existentes
+  Y las correcciones de inconsistencias detectadas:
+  - `NodeManifest.did` renombrado a `providerId` (coherencia con el resto de schemas)
+  - `NodeSummary.visibility` añade el valor `"community"` (faltaba en el enum)
+  - Schema `Scope` formalizado como componente reutilizable: `enum: [local, network, community, external]`
+  - Schema `Provenance` añadido en `components/schemas`: campos `llm`, `tools`, `dataExported`,
+    `jurisdiction` — referenciado por `assistant.completed` en AsyncAPI (TASK-IDL-007)
   Todos los `provider.type` en el spec usan vocabulario canónico (star/satellite/nova/multi).
 - Validation: Comparar contra `docs/atlas.md` y el `AtlasClient` descrito en `docs/arquitectura.md`.
   Verificar que el vocabulario es coherente con `schemas/beacon-base.schema.json` de TASK-IDL-002.
+  `grep -r '"did":' idl/openapi.yaml` no debe devolver resultados en `NodeManifest`.
 
 ---
 
@@ -136,16 +132,19 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 - Dependencies: TASK-IDL-002
 - Expected files:
   - `docs/manifiesto-llm.md` (modificado)
-  - `docs/manifiesto-mcp.md` (modificado — si existe)
+  - `docs/manifiesto-mcp.md` (modificado)
   - `docs/protocolo-provider.md` (modificado — tabla de campos)
   - `idl/asyncapi.yaml` (modificado — si aún usa `"llm"`/`"mcp"`)
   - `idl/fhs-protocol.proto` (modificado — si aplica)
 - Close criteria: Ningún archivo del repo usa `"type": "llm"` o `"type": "mcp"` como valor del
-  campo `provider.type` del manifiesto. Todos usan `"star"`, `"satellite"`, `"nova"` o `"multi"`.
-  Los docs de ejemplo actualizan sus bloques JSON. `docs/manifiesto-llm.md` ya no tiene `"providerId"`
-  suelto — usa el campo correcto según el schema definido en TASK-IDL-002.
+  campo `provider.type` del manifiesto. Los docs de ejemplo actualizan sus bloques JSON al
+  vocabulario canónico. Los títulos de `docs/manifiesto-llm.md` y `docs/manifiesto-mcp.md`
+  reflejan la jerga real ("Manifiesto Star", "Manifiesto Satellite").
+  Los ejemplos de DID en ambos manifiestos usan formato real `did:key:z...` en lugar de
+  los placeholders `did:key:macmini-raul` / `did:key:raspi-ocr-01` que hoy existen.
 - Validation: `grep -r '"type": "llm"' idl/ docs/ schemas/` y
   `grep -r '"type": "mcp"' idl/ docs/ schemas/` no deben devolver resultados tras esta tarea.
+  `grep -r 'did:key:macmini' docs/` y `grep -r 'did:key:raspi' docs/` tampoco.
 
 > Esta tarea puede ejecutarse en paralelo con TASK-IDL-003 y TASK-IDL-004 una vez terminada
 > TASK-IDL-002.
@@ -157,7 +156,8 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 - ID: TASK-IDL-006
 - State: `todo`
 - Owner: rafex
-- Dependencies: TASK-IDL-001, TASK-IDL-002, TASK-IDL-003, TASK-IDL-004, TASK-IDL-005
+- Dependencies: TASK-IDL-001, TASK-IDL-002, TASK-IDL-003, TASK-IDL-004, TASK-IDL-005,
+  TASK-IDL-007, TASK-IDL-008
 - Expected files:
   - `idl/README.md` (nuevo)
 - Close criteria: El archivo explica en menos de 2 pantallas: (1) qué es el IDL de FHS y por qué
@@ -171,26 +171,80 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 
 ---
 
+### TASK-IDL-007 — Canal Portal↔Navigator en asyncapi.yaml y fhs-protocol.proto
+
+- ID: TASK-IDL-007
+- State: `todo`
+- Owner: rafex
+- Dependencies: TASK-IDL-001
+- Expected files:
+  - `idl/asyncapi.yaml` (modificado — nuevo canal `/chat` para Portal↔Navigator)
+  - `idl/fhs-protocol.proto` (modificado — nuevos tipos de mensaje)
+- Close criteria: `asyncapi.yaml` define el canal `/chat` (WebSocket Navigator) con los 6 mensajes
+  de la capa Portal↔Navigator, usando vocabulario canónico (no el viejo `llm.selected`):
+
+  | Mensaje              | Dirección             | Descripción |
+  |----------------------|-----------------------|-------------|
+  | `start`              | Portal → Navigator    | Inicia conversación con `sessionId`, `model`, `scope` |
+  | `agent.status`       | Navigator → Portal    | Estado del agente (`thinking`, `calling`, `streaming`) |
+  | `star.selected`      | Navigator → Portal    | Star elegido para la misión (`providerId`, `model`) |
+  | `tool.selected`      | Navigator → Portal    | Satellite y tool invocados (`providerId`, `capability`) |
+  | `assistant.delta`    | Navigator → Portal    | Fragmento de texto en streaming (`delta`, `missionId`) |
+  | `assistant.completed`| Navigator → Portal    | Respuesta final con `content`, `provenance`, `missionId` |
+
+  Los tipos Protobuf correspondientes se añaden al `oneof` de `FhsMessage` (fields 22-27).
+  El schema `Provenance` (definido en TASK-IDL-004 para `openapi.yaml`) es reutilizado aquí
+  como `$ref` en `assistant.completed`.
+- Validation: Verificar contra `docs/protocolo.md` (sección mensajes Portal↔Navigator) que
+  todos los campos documentados en prosa tienen su equivalente formal. Confirmar que ningún
+  mensaje usa vocabulario viejo (`llm.selected`, `llm`).
+
+---
+
+### TASK-IDL-008 — CallerAuth en tool.list y tool.call
+
+- ID: TASK-IDL-008
+- State: `todo`
+- Owner: rafex
+- Dependencies: TASK-IDL-001
+- Expected files:
+  - `idl/asyncapi.yaml` (modificado — campo `auth` en schemas `ToolListRequestMessage` y
+    `ToolCallRequestMessage`)
+  - `idl/fhs-protocol.proto` (modificado — campo `CallerAuth auth` en `ToolListRequestMessage`
+    y `ToolCallRequestMessage`)
+- Close criteria: Los mensajes `tool.list` y `tool.call` tienen el campo `auth: CallerAuth`
+  en ambos IDL (igual que `chat.request`). El campo es obligatorio en `tool.call` y
+  opcional en `tool.list` (para backward compat con implementaciones sin firma de lista).
+  El campo `CallerAuth` en proto ya existe (fields: `caller_id=1`, `signature=2`,
+  `timestamp=3`) — solo se añade como campo nuevo al final de cada mensaje.
+- Validation: Confirmar contra `docs/protocolo.md` que la especificación en prosa dice que
+  `tool.list` y `tool.call` deben incluir `callerId`/`signature`. Verificar que `tool.cancel`
+  no necesita `auth` (el cancel usa el `missionId` como autorización implícita).
+
+---
+
 ## Dependencias visuales
 
 ```
-TASK-IDL-001 (mensajes registro)
+TASK-IDL-001 (mensajes registro) ✅
     │
-    ├──► TASK-IDL-002 (schemas Beacon)
+    ├──► TASK-IDL-002 (schemas Beacon) ← availability, region
     │         │
-    │         ├──► TASK-IDL-004 (openapi.yaml completo)
-    │         │         │
-    │         └──► TASK-IDL-005 (vocabulario)   ◄──┐
-    │                   │                           │
-    ├──► TASK-IDL-003 (flows.md Mermaid)            │
-    │                                               │
-    └──────────────────────────────────────────── TASK-IDL-006 (README.md)
-                                                     ▲
-                      TASK-IDL-003 ─────────────────┘
-                      TASK-IDL-004 ─────────────────┘
-                      TASK-IDL-005 ─────────────────┘
+    │         ├──► TASK-IDL-004 (openapi.yaml) ← scope, provenance, NodeManifest.did→providerId
+    │         │
+    │         └──► TASK-IDL-005 (vocabulario) ← DID reales, star/satellite en docs
+    │
+    ├──► TASK-IDL-003 (flows.md Mermaid)
+    │
+    ├──► TASK-IDL-007 (canal Portal↔Navigator) ← star.selected, provenance
+    │
+    └──► TASK-IDL-008 (auth en tool.list/tool.call)
+    
+    Todos ──► TASK-IDL-006 (README.md) [cierra la iniciativa]
 ```
 
-TASK-IDL-001 desbloquea todo. TASK-IDL-006 cierra la iniciativa.
-TASK-IDL-003, TASK-IDL-004 y TASK-IDL-005 pueden ejecutarse en paralelo
-una vez terminadas TASK-IDL-001 y TASK-IDL-002.
+TASK-IDL-001 ✅ desbloquea todo. TASK-IDL-006 cierra la iniciativa.
+TASK-IDL-003, TASK-IDL-007 y TASK-IDL-008 pueden ejecutarse en paralelo
+una vez terminada TASK-IDL-001 (no dependen de Beacon schemas).
+TASK-IDL-004 y TASK-IDL-005 pueden ejecutarse en paralelo una vez
+terminada TASK-IDL-002.
