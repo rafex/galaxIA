@@ -5,7 +5,7 @@
 - Iniciativa: `idl-protocol-complete`
 - Spec relacionada: `spec-native/specs/fhs-mvp/SPEC.md`, `docs/protocolo.md`, `docs/protocolo-provider.md`
 - Owner: rafex
-- Estado general: `in_progress`
+- Estado general: `done`
 
 ## Contexto
 
@@ -100,7 +100,7 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 ### TASK-IDL-004 — Endpoints REST faltantes y correcciones en openapi.yaml
 
 - ID: TASK-IDL-004
-- State: `todo`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-IDL-002
 - Expected files:
@@ -127,7 +127,7 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 ### TASK-IDL-005 — Alineación de vocabulario en docs/ y IDL existente
 
 - ID: TASK-IDL-005
-- State: `todo`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-IDL-002
 - Expected files:
@@ -154,7 +154,7 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 ### TASK-IDL-006 — idl/README.md — índice de navegación
 
 - ID: TASK-IDL-006
-- State: `todo`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-IDL-001, TASK-IDL-002, TASK-IDL-003, TASK-IDL-004, TASK-IDL-005,
   TASK-IDL-007, TASK-IDL-008
@@ -231,7 +231,7 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 ### TASK-IDL-009 — Endpoint multiaddr en Beacon schemas (P2P)
 
 - ID: TASK-IDL-009
-- State: `todo`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-IDL-002
 - Expected files:
@@ -249,7 +249,7 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 ### TASK-IDL-010 — Actualizar idl/flows.md con el flujo de gossip Atlas↔Atlas
 
 - ID: TASK-IDL-010
-- State: `todo`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-IDL-003, TASK-IDL-009
 - Expected files:
@@ -267,7 +267,7 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
 ### TASK-IDL-011 — Actualizar openapi.yaml con endpoint de discovery P2P
 
 - ID: TASK-IDL-011
-- State: `todo`
+- State: `done`
 - Owner: rafex
 - Dependencies: TASK-IDL-004
 - Expected files:
