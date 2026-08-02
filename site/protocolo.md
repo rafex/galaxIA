@@ -10,23 +10,29 @@ permalink: /protocolo/
 Horizontes Soberanos). Es el protocolo que hace posible que computadoras de una
 comunidad — una Mac mini con un modelo local, una laptop con OCR, una
 Raspberry Pi con otra herramienta — se descubran entre sí y compartan
-capacidades de IA sin depender de un servidor central de terceros.
+capacidades de IA **sin ningún servidor central obligatorio**.
 
 ```mermaid
 flowchart LR
-    subgraph Comunidad
-        N1[Mac mini<br/>llama.cpp]
-        N2[Laptop<br/>OCR]
-        N3[Raspberry Pi<br/>otra tool]
+    subgraph "Swarm P2P (DHT + GossipSub)"
+        AT["Atlas\n(bootstrap)"]
+        S1["Star\nllama.cpp"]
+        S2["Satellite\nOCR"]
+        NAV["Navigator"]
     end
-    N1 -- "hello / register" --> R[(Registry<br/>Agent Backend)]
-    N2 -- "hello / register" --> R
-    N3 -- "hello / register" --> R
-    U[Usuario] -- "chat" --> W[Web]
-    W --> R
-    R -- "resuelve provider" --> N1
-    R -- "resuelve provider" --> N2
+    U["Usuario"] --> PORT["Portal"]
+    PORT --> NAV
+    NAV -->|"GossipSub: offer/bid/assign"| S1
+    NAV -->|"stream directo post-assign"| S1
+    NAV -->|"GossipSub: offer/bid/assign"| S2
+    NAV -->|"stream directo post-assign"| S2
+    AT -.->|"bootstrap (solo al unirse)"| S1
+    AT -.->|"bootstrap (solo al unirse)"| NAV
 ```
+
+No hay un Registry central que todos deban consultar. **Atlas es solo el punto
+de entrada inicial** — una vez en el swarm, los nodos operan entre sí sin
+intermediarios.
 
 ## Por qué existe
 
@@ -42,111 +48,80 @@ El objetivo concreto de este protocolo es que:
 - Cualquier persona con una computadora capaz de correr un modelo o una
   herramienta pueda **sumarla a la red** como un nodo más, sin pedirle
   permiso a un operador central.
-- El chat (o cualquier cliente) pueda **descubrir qué hay disponible** y
-  usarlo, sin necesitar saber de antemano qué máquina exacta responde.
-- Cada nodo pueda **irse o fallar** sin tumbar el resto de la red — el
-  Registry solo observa quién está disponible, no controla ni depende de
-  ningún nodo en particular.
+- El chat (o cualquier cliente) pueda **descubrir qué hay disponible** sin
+  necesitar saber de antemano qué máquina exacta responde.
+- Cada nodo pueda **irse o fallar** sin tumbar el resto de la red.
 - **La privacidad sea parte del protocolo, no un aviso legal aparte**: cada
   petición declara su ámbito (`scope`), cada proveedor declara qué hace
-  con los datos que recibe (`retention`), y cada respuesta trae su propia
+  con los datos (`retention`), y cada respuesta trae su propia
   procedencia auditable.
 
-## Las 10 reglas de FHS v0.1
+## Las 10 reglas de FHS
 
-1. **Identidad verificable** — todo nodo tiene un identificador único (`did:key:...`).
-2. **Registro por arrendamiento (lease)** — un nodo debe renovar su registro cada 30s o se considera perdido.
-3. **Pulse obligatorio** — cada nodo vivo envía un `ping` cada 10s, incluso mientras procesa otra petición; el Registry además sondea cada conexión con ping/pong nativo de WebSocket para detectar caídas de red más rápido.
-4. **Servicios declarados** — un nodo dice explícitamente qué ofrece; nadie escanea puertos ni fuerza descubrimiento.
-5. **Capacidades, no implementaciones** — se pide `document.ocr`, no "¿tienes Tesseract?"; la implementación es intercambiable.
-6. **Resolución por ámbito (scope)** — `local` / `network` / `community` / `external` acotan quién puede resolver cada petición.
-7. **Transparencia obligatoria** — cada respuesta declara qué modelo razonó, qué tool se usó y a dónde viajaron los datos.
-8. **Proveedor rechazable** — el usuario puede vetar un proveedor específico; el sistema busca alternativas.
-9. **Degradación graceful** — si no hay lo óptimo se usa lo siguiente disponible; si no hay nada, se informa. Nunca se inventa una respuesta.
-10. **Registry observable, no controlador** — el Registry solo sabe qué nodos existen y qué ofrecen; no ejecuta tools ni ve datos del usuario.
+1. **Identidad verificable** — todo nodo tiene un `did:key` Ed25519; la clave pública está embebida en el DID.
+2. **Presencia por TTL** — un nodo activo publica `NodeAdvertiseMessage` cada 30s con TTL 60s; el silencio es la señal de que se fue.
+3. **Pulse en streams directos** — mientras hay un stream activo, ping/pong cada 10s; si se interrumpe, el peer cierra el stream.
+4. **Capacidades declaradas en el Beacon** — un nodo dice explícitamente qué ofrece; nadie escanea puertos ni fuerza descubrimiento.
+5. **Capacidades, no implementaciones** — se pide `document.ocr`, no "¿tienes Tesseract?"; la implementación es privada al nodo.
+6. **Dispatch descentralizado por GossipSub** — Navigator publica `MissionOfferMessage`, recibe bids, asigna al mejor; no consulta ningún Registry.
+7. **Resolución por scope** — `local` / `network` / `community` / `external` acotan qué providers pueden responder; es un filtro del protocolo, no una preferencia.
+8. **Transparencia obligatoria** — cada `AssistantCompletedMessage` incluye `ProvenanceInfo`: qué modelo razonó, qué Satellite se usó, si los datos salieron de la comunidad.
+9. **Proveedor rechazable** — Navigator puede reemplazar un provider mid-Mission; GossipSub permite re-publicar la oferta y asignar a otro.
+10. **Reputación distribuida** — `ReputationUpdateMessage` en GossipSub y `DhtReputationRecord` en la DHT; no hay servidor central de rating.
 
-Detalle completo, con todos los mensajes JSON, en
+Detalle completo, con todos los mensajes Protobuf y schemas, en
 [`docs/protocolo.md`](https://github.com/{{ site.repository }}/blob/main/docs/protocolo.md).
 
 ## Ciclo de vida de un nodo
 
 ```mermaid
 sequenceDiagram
-    participant P as Provider
-    participant R as Registry (Agent Backend)
+    participant N as Nodo nuevo (Star/Satellite)
+    participant A as Atlas (bootstrap)
+    participant D as DHT Swarm
+    participant G as GossipSub
 
-    P->>R: hello { providerId, timestamp }
-    R-->>P: welcome { registryId, leaseSeconds: 30 }
-    P->>R: register { providerId, manifest }
-    R-->>P: registered { leaseExpires, acceptedServices }
-    R->>R: broadcast node.online a runtimes activos
+    N->>A: Conectar (multiaddr conocido)
+    A->>N: Lista de peers del swarm
 
-    loop cada 10s mientras el provider esté vivo
-        P->>R: ping
-        R-->>P: pong { timestamp }
-        R->>R: touchConnection(providerId) — renueva el lease
-    end
+    N->>D: Kademlia Join
+    N->>D: DHT.put(did, DhtBeaconRecord)
 
-    Note over R: Si no llega ping en 30s (lease vencido)
-    R->>R: markLost(providerId)
-    R->>R: broadcast node.lost a runtimes activos
+    N->>G: Suscribir a fhs/v1/*
+    N->>G: NodeAdvertiseMessage (TTL 60s)
+
+    Note over N: Operativo — ya no necesita a Atlas
 ```
 
-## Flujo de un mensaje de chat (con tool call)
-
-Cuando el usuario adjunta un documento o hace una pregunta que requiere una
-herramienta, el agente resuelve un LLM y, si hace falta, una tool federada,
-todo dentro del `scope` de privacidad de la petición:
+## Flujo de una Mission de chat
 
 ```mermaid
 sequenceDiagram
-    participant U as Usuario (Web)
-    participant AS as Agent Server
-    participant REG as Registry
-    participant LLM as LLM Provider (FHS)
-    participant OCR as OCR Provider (FHS)
+    participant Po as Portal
+    participant NAV as Navigator
+    participant G as GossipSub
+    participant S as Star
 
-    U->>AS: start { message, artifacts, preferences.scope }
-    AS->>REG: resolver LLM y tools candidatas (scope)
-    REG-->>AS: providers disponibles dentro del scope
-    AS-->>U: agent.status "resolving-model"
-    AS-->>U: llm.selected { providerId, modelId }
-
-    AS->>LLM: chat.request { requestId, messages, tools }
-    LLM-->>AS: chat.completed { requestId, toolCalls }
-
-    alt el LLM pide una tool
-        AS-->>U: tool.selected { capability: "document.ocr" }
-        AS->>OCR: tool.call { requestId, toolName, arguments: { file_base64 } }
-        OCR-->>AS: tool.result { requestId, content }
-        AS-->>U: tool.completed { name, duration }
-        AS->>LLM: chat.request { requestId nuevo, messages + tool result }
-        LLM-->>AS: chat.completed { requestId, response final }
-    end
-
-    AS-->>U: assistant.delta { text }
-    AS-->>U: assistant.completed { provenance }
+    Po->>NAV: agent.start + chat.request { missionId }
+    NAV->>G: MissionOfferMessage { missionId, scope, bidDeadlineMs }
+    S->>G: MissionBidMessage { missionId, providerDid, reputationScore }
+    NAV->>G: MissionAssignMessage { missionId, assignedProvider: star.DID }
+    NAV->>S: stream directo /fhs/v1/0.1.0 → handshake → chat.request
+    S-->>NAV: chat.delta (streaming)
+    NAV-->>Po: assistant.delta (streaming)
+    S->>NAV: chat.completed
+    NAV->>Po: assistant.completed { provenance }
+    NAV->>G: ReputationUpdateMessage
 ```
 
 ## Privacidad, en corto
 
-- **`scope`** condiciona qué proveedores puede resolver el Registry
-  (`local` < `network` < `community` < `external`) — nunca es solo una
-  preferencia, es un techo.
-- **`privacy.retention`** en el manifiesto de cada proveedor declara qué
-  hace con los datos (`"none"`, `"session"`, u otro valor documentado
-  explícitamente). El agente prefiere `"none"` cuando hay más de un
-  candidato.
-- **`provenance`** viaja en cada `assistant.completed`: qué modelo razonó,
-  qué tool se ejecutó, y a dónde fueron los datos — para que el usuario
-  pueda auditar cada respuesta.
-- **Trazabilidad ≠ retención de contenido**: todo `requestId` debe poder
-  seguirse extremo a extremo como metadata (proveedor, duración,
-  éxito/error), sin que eso implique guardar el contenido de la
-  conversación.
+- **`scope`** condiciona qué providers puede resolver Navigator — es un techo, no una preferencia.
+- **`privacy.retention`** en el Beacon declara qué hace el nodo con los datos recibidos.
+- **`ProvenanceInfo`** viaja en cada `AssistantCompletedMessage`: qué modelo razonó, qué tool se ejecutó, y a dónde fueron los datos — auditable por el usuario.
+- **Trazabilidad ≠ retención de contenido**: cada `missionId` puede seguirse de extremo a extremo como metadata sin guardar el contenido de la conversación.
 
-Detalle completo (tablas, checklist, y el gap conocido en trazabilidad —
-DEC-0012) en
+Detalle completo en
 [`docs/protocolo.md`](https://github.com/{{ site.repository }}/blob/main/docs/protocolo.md).
 
 ## Siguiente paso

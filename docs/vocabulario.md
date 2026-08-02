@@ -13,14 +13,14 @@
 | LLM provider | Star | Fuente de razonamiento/generación — central, como una estrella |
 | Tool provider | Satellite | Capacidad específica que orbita y aporta una función (OCR, búsqueda, etc.) |
 | Agent provider (loop de razonamiento propio) | Nova | Un evento de varias fases, no una sola llamada — razona en rondas antes de responder (DEC-0055) |
-| Registro (Registry) | Atlas | Mapa de nodos y capacidades |
+| Bootstrap peer (punto de entrada al swarm DHT) | Atlas | Primer contacto para unirse a la red. No es un registro central. |
 | Manifiesto (manifest) | Beacon | Lo que anuncia un nodo al conectarse |
 | Chat web | Portal | Entrada humana a la red |
 | Orquestador / Agent Runtime | Navigator | Decide rutas entre razonamiento (Star) y herramientas (Satellite) |
 | Ejecución de una tool (`tool.call`) | Mission | Una tarea enviada a un satélite |
 | Auditoría/procedencia (`provenance`) | Flight Log | Registro de qué pasó, qué nodo, qué datos |
 | Heartbeat (`ping`/`pong`) | Pulse | Señal periódica de vida |
-| Conexión activa con la red | Orbit | Estado de "conectado y registrado" |
+| Stream directo activo con lease vigente entre dos peers | Orbit | Estado de "stream activo y con lease renovado" — es per-par, no global |
 | Capacidad (`capability`) | Signal | Lo que un nodo anuncia que puede hacer |
 
 ### Subtipos de Satellite reservados (sin implementar todavía)
@@ -33,17 +33,17 @@ No hay subtipos de Star reservados todavía — un solo tipo de razonamiento por
 
 ## Star vs. Satellite vs. Nova: por qué no son sinónimos
 
-Un **Star** razona: recibe un mensaje y genera una respuesta en una sola llamada, sin estado ni loop (hoy, un LLM vía `star-example`). Un **Satellite** ejecuta una capacidad puntual y determinada: OCR, búsqueda, en el futuro RAG o una base de conocimiento. Un **Nova** (DEC-0055) también razona, pero con un loop interno de varias rondas antes de responder — se pide explícitamente cuando la tarea lo justifica, nunca reemplaza la decisión determinística de quién orquesta (Navigator) sobre cuándo invocar cada nodo. Cuando algo aplica a cualquiera de los tres por igual (el ciclo de vida de conexión, el heartbeat, el descubrimiento por mDNS), se usa **"nodo"** como término neutro — nunca "satélite" como paraguas genérico, que fue el uso inicial descartado en DEC-0024.
+Un **Star** razona: recibe un mensaje y genera una respuesta en una sola llamada, sin estado ni loop (hoy, un LLM vía `star-example`). Un **Satellite** ejecuta una capacidad puntual y determinada: OCR, búsqueda, en el futuro RAG o una base de conocimiento. Un **Nova** (DEC-0055) también razona, pero con un loop interno de varias rondas antes de responder — se pide explícitamente cuando la tarea lo justifica, nunca reemplaza la decisión determinística de quién orquesta (Navigator) sobre cuándo invocar cada nodo. Cuando algo aplica a cualquiera de los tres por igual (el ciclo de vida P2P, el Pulse, el descubrimiento por DHT), se usa **"nodo"** como término neutro — nunca "satélite" como paraguas genérico, que fue el uso inicial descartado en DEC-0024.
 
 ## Frase de posicionamiento
 
 **Español:**
 
-> GalaxIA es una galaxia soberana de IA donde equipos reutilizados se convierten en estrellas y satélites. Cada estrella aporta razonamiento; cada satélite aporta una capacidad — OCR, búsqueda, memoria o automatización. El Portal los descubre mediante Atlas y el Navegador los combina en un agente comunitario.
+> GalaxIA es una galaxia soberana de IA donde equipos reutilizados se convierten en estrellas y satélites. Cada estrella aporta razonamiento; cada satélite aporta una capacidad — OCR, búsqueda, memoria o automatización. El Navigator los descubre en la red P2P y los combina en un agente comunitario soberano.
 
 **English:**
 
-> GalaxIA is a sovereign AI galaxy where old computers become stars and satellites. Each star contributes reasoning; each satellite contributes a capability — OCR, search, memory or automation. The Portal discovers them through Atlas, and the Navigator combines them into a community agent.
+> GalaxIA is a sovereign AI galaxy where old computers become stars and satellites. Each star contributes reasoning; each satellite contributes a capability — OCR, search, memory or automation. The Navigator discovers them through a P2P mesh and combines them into a sovereign community agent.
 
 ## Enlaces relacionados
 

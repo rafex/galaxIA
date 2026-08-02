@@ -4,67 +4,62 @@ title: Documentación — galaxIA
 permalink: /docs/
 ---
 
-# Documentación
+# Documentación del protocolo FHS
 
-Esta es la documentación técnica del proyecto, mantenida junto al código en
+Esta es la documentación técnica del protocolo, mantenida junto al IDL en
 [`docs/`](https://github.com/{{ site.repository }}/tree/main/docs) del
 repositorio.
 
+> Para la documentación de las implementaciones (apps, despliegue, contenedores),
+> ver el repo [`galaxIA-Core`](https://github.com/{{ site.repository | split: '/' | first }}/galaxIA-Core).
+
 <ul class="doc-list">
   <li>
-    <a href="https://github.com/{{ site.repository }}/blob/main/docs/arquitectura.md">Arquitectura</a>
-    <p>Visión general de los componentes y cómo se relacionan.</p>
-  </li>
-  <li>
     <a href="https://github.com/{{ site.repository }}/blob/main/docs/protocolo.md">Protocolo FHS</a>
-    <p>Ciclo de vida hello/register/ping, chat y llamado a tools.</p>
+    <p>Las 10 reglas del protocolo P2P: DHT, GossipSub, dispatch de Missions, privacidad y reputación distribuida.</p>
   </li>
   <li>
     <a href="https://github.com/{{ site.repository }}/blob/main/docs/protocolo-provider.md">Protocolo para providers</a>
-    <p>Cómo implementar un provider FHS (LLM, OCR u otra capacidad).</p>
+    <p>Contrato P2P que todo provider debe cumplir: bootstrap, NodeAdvertise, bid/assign, stream directo, Pulse.</p>
   </li>
   <li>
     <a href="https://github.com/{{ site.repository }}/blob/main/docs/implementacion-multilenguaje.md">Implementación multi-lenguaje</a>
-    <p>Guía para implementar providers en Python, Rust o Java.</p>
+    <p>Cómo implementar providers FHS en Go, Python, Rust y TypeScript con libp2p.</p>
   </li>
   <li>
-    <a href="https://github.com/{{ site.repository }}/blob/main/docs/atlas.md">Atlas</a>
-    <p>El catálogo (Registry): registro de nodos y endpoints REST.</p>
+    <a href="https://github.com/{{ site.repository }}/blob/main/docs/beacon-star.md">Beacon Star (proveedor LLM)</a>
+    <p>Campos del Beacon, ejemplo completo y ciclo de vida P2P de un Star.</p>
   </li>
   <li>
-    <a href="https://github.com/{{ site.repository }}/blob/main/docs/navigator.md">Navigator</a>
-    <p>El orquestador: Agent Runtime y API de chat.</p>
+    <a href="https://github.com/{{ site.repository }}/blob/main/docs/beacon-satellite.md">Beacon Satellite (proveedor de tools)</a>
+    <p>Campos del Beacon, ejemplo completo y ciclo de vida P2P de un Satellite.</p>
   </li>
   <li>
-    <a href="https://github.com/{{ site.repository }}/blob/main/docs/proveedores.md">Proveedores</a>
-    <p>Cómo se anuncian capacidades y se descubren nodos.</p>
+    <a href="https://github.com/{{ site.repository }}/blob/main/docs/vocabulario.md">Vocabulario</a>
+    <p>Glosario del vocabulario espacial de producto: Star, Satellite, Atlas, Navigator, Portal, Mission y más.</p>
+  </li>
+</ul>
+
+## Definiciones formales (IDL)
+
+Las definiciones canónicas del protocolo viven en [`idl/`](https://github.com/{{ site.repository }}/tree/main/idl)
+y [`schemas/`](https://github.com/{{ site.repository }}/tree/main/schemas):
+
+<ul class="doc-list">
+  <li>
+    <a href="https://github.com/{{ site.repository }}/blob/main/idl/fhs-protocol.proto">fhs-protocol.proto</a>
+    <p>Definición Protobuf de todos los mensajes: GossipSub, DHT records, stream directo, handshake.</p>
   </li>
   <li>
-    <a href="https://github.com/{{ site.repository }}/blob/main/docs/manifiesto-llm.md">Manifiesto LLM</a>
-    <p>Contrato del provider de modelos de lenguaje.</p>
+    <a href="https://github.com/{{ site.repository }}/blob/main/idl/gossipsub.md">gossipsub.md</a>
+    <p>Especificación de tópicos GossipSub, schemas de mensajes y TTLs.</p>
   </li>
   <li>
-    <a href="https://github.com/{{ site.repository }}/blob/main/docs/manifiesto-mcp.md">Manifiesto MCP</a>
-    <p>Contrato de los providers de herramientas (tools).</p>
+    <a href="https://github.com/{{ site.repository }}/blob/main/idl/flows.md">flows.md</a>
+    <p>Diagramas de secuencia de los 5 flujos principales del protocolo.</p>
   </li>
   <li>
-    <a href="https://github.com/{{ site.repository }}/blob/main/docs/como-usar.md">Cómo usar</a>
-    <p>Guía práctica para levantar y usar el chat.</p>
-  </li>
-  <li>
-    <a href="https://github.com/{{ site.repository }}/blob/main/docs/contenedores.md">Contenedores</a>
-    <p>Imágenes, compose y recetas de despliegue con Podman.</p>
-  </li>
-  <li>
-    <a href="https://github.com/{{ site.repository }}/blob/main/docs/despliegue.md">Despliegue</a>
-    <p>Despliegue de un solo host.</p>
-  </li>
-  <li>
-    <a href="https://github.com/{{ site.repository }}/blob/main/docs/despliegue-multi-host.md">Despliegue multi-host</a>
-    <p>Topología real con el core en un host y los providers en otro.</p>
-  </li>
-  <li>
-    <a href="https://github.com/{{ site.repository }}/blob/main/docs/tls-autofirmado.md">TLS autofirmado</a>
-    <p>Cifrado de punta a punta del protocolo FHS con certificado autofirmado.</p>
+    <a href="https://github.com/{{ site.repository }}/blob/main/idl/asyncapi.yaml">asyncapi.yaml</a>
+    <p>Canales y bindings de la API asíncrona FHS.</p>
   </li>
 </ul>

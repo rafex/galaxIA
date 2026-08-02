@@ -1,443 +1,162 @@
-# Protocolo FHS v0.1
+# Protocolo FHS — Red P2P Descentralizada
 
-FHS significa **Federation of Sovereign Horizons** (Federación de Horizontes Soberanos). Es un protocolo para que computadoras locales se descubran entre sí y compartan recursos de inteligencia artificial.
+FHS significa **Federation of Sovereign Horizons** (Federación de Horizontes Soberanos). Es el protocolo que hace posible que computadoras de una comunidad se descubran y compartan recursos de inteligencia artificial **sin ningún servidor central obligatorio**.
 
 ## Idea central
 
 Una comunidad tiene varias computadoras:
+- Una Mac mini con llama.cpp corriendo un modelo local — un **Star**.
+- Una laptop con un servidor OCR — un **Satellite**.
+- Una Raspberry Pi con otra herramienta — otro **Satellite**.
 
-- Una Mac mini con llama.cpp corriendo un modelo local.
-- Una laptop con un servidor OCR.
-- Una Raspberry Pi con otra herramienta.
-
-Cada una de esas computadoras es un **nodo**. El protocolo FHS permite que esos nodos:
-
-1. **Se registren** en un catálogo común.
-2. **Anuncien** qué pueden hacer: generar texto, extraer texto de imágenes, etc.
-3. **Sean descubiertos** por el chat.
-4. **Sean usados** cuando el agente lo necesite.
+Cada una es un **nodo**. El protocolo FHS permite que esos nodos:
+1. **Se anuncien** en una red P2P distribuida.
+2. **Sean descubiertos** sin depender de un catálogo central.
+3. **Reciban Missions** directamente de Navigator mediante GossipSub.
+4. **Las ejecuten** por stream directo punto-a-punto.
 
 ```mermaid
 flowchart LR
-    subgraph Comunidad
-        N1[Mac mini<br/>llama.cpp]
-        N2[Laptop<br/>OCR]
-        N3[Raspberry Pi<br/>otra tool]
+    subgraph "Swarm P2P (DHT + GossipSub)"
+        AT["Atlas\n(bootstrap)"]
+        S1["Star\nllama.cpp"]
+        S2["Satellite\nOCR"]
+        NAV["Navigator"]
     end
-    N1 -- "hello / register" --> R[(Registry<br/>Agent Backend)]
-    N2 -- "hello / register" --> R
-    N3 -- "hello / register" --> R
-    U[Usuario] -- "chat" --> W[Web]
-    W --> R
-    R -- "resuelve provider" --> N1
-    R -- "resuelve provider" --> N2
+    U["Usuario"] --> PORT["Portal"]
+    PORT --> NAV
+    NAV -->|"GossipSub: offer/bid/assign"| S1
+    NAV -->|"stream directo post-assign"| S1
+    NAV -->|"GossipSub: offer/bid/assign"| S2
+    NAV -->|"stream directo post-assign"| S2
+    AT -.->|"bootstrap (solo al unirse)"| S1
+    AT -.->|"bootstrap (solo al unirse)"| NAV
 ```
 
-## Las 10 reglas de FHS v0.1
+No hay un Registry central que todos deban consultar. Atlas es solo el punto de entrada inicial — una vez en el swarm, los nodos operan entre sí sin intermediarios.
+
+---
+
+## Las 10 reglas del protocolo FHS
 
 ### 1. Identidad verificable
 
-Todo nodo se identifica con un `did:key` real (método W3C, Ed25519) — el identificador **es** la clave pública del nodo, codificada en multibase/base58:
+Todo nodo se identifica con un `did:key` (método W3C, Ed25519) — el identificador **es** la clave pública del nodo:
 
 ```
 did:key:z6MkiqnzSFKAqXxjRUNnEku2wD3Gzas28sqByzQYaqEjkZhF
 ```
 
-`hello` y `register` viajan firmados con la clave privada correspondiente; el Registry verifica la firma contra la clave pública derivada del propio `providerId`, sin necesitar un directorio de claves separado (DEC-0030, reemplaza el DID simplificado sin firma de DEC-0004). Un nodo genera su identidad una sola vez y la persiste — el nombre legible para humanos vive aparte, en `provider.name`.
+Cada Envelope y cada mensaje GossipSub van firmados con la clave privada correspondiente. Cualquier receptor verifica la firma sin PKI externa — la clave pública está embebida en el DID.
 
-### 2. Registro por arrendamiento (lease)
+### 2. Presencia por TTL, no por lease con servidor central
 
-Un nodo no se registra una sola vez y se va. Debe renovar su registro periódicamente. Si no renueva en 30 segundos, el sistema lo marca como "perdido".
+Un nodo activo publica `NodeAdvertiseMessage` en GossipSub cada 30 segundos con `ttlSeconds = 60`. Si deja de publicar, los demás lo marcan offline cuando el TTL expira. No hay servidor que "marque" a un nodo como perdido — el silencio es la señal.
 
-### 3. Heartbeat obligatorio
+### 3. Pulse en streams directos
 
-Mientras está vivo, el nodo envía un `ping` cada 10 segundos. El provider es responsable de emitirlo incluso si está ocupado procesando otra petición — ver el requisito de dispatcher concurrente en [`protocolo-provider.md`](./protocolo-provider.md).
+Cuando dos nodos tienen un stream directo activo (durante una Mission), mantienen un Pulse (`ping`/`pong`) cada 10 segundos. Si el Pulse se interrumpe antes de `leaseSeconds`, cada nodo cierra el stream localmente.
 
-### 4. Servicios declarados
+### 4. Capacidades declaradas en el Beacon
 
-Un nodo dice explícitamente qué ofrece. El sistema no escanea puertos ni fuerza descubrimiento.
+Un nodo dice explícitamente qué ofrece en su Beacon: modelos LLM, capabilities de tools, etc. Ningún nodo escanea puertos ni fuerza descubrimiento. Lo que no está en el Beacon no existe para la red.
 
 ### 5. Capacidades, no implementaciones
 
-No se pide "¿tienes Tesseract?". Se pide "¿tienes `document.ocr`?". Así se puede cambiar la implementación sin afectar al consumidor.
+Navigator pide `document.ocr`, no "¿tienes Tesseract?". La implementación detrás de una capability es privada al nodo. El protocolo solo dicta cómo se anuncia y cómo se invoca.
 
-### 6. Resolución por ámbito (scope)
+### 6. Dispatch descentralizado por GossipSub
 
-Cada petición lleva un ámbito de privacidad:
+Navigator no consulta a ningún Registry para encontrar un provider. Publica un `MissionOfferMessage` en GossipSub, recibe `MissionBidMessage` de los nodos disponibles, y asigna al mejor según `trustLevel → reputationScore → estimatedLatencyMs`.
 
-- `local` — solo mi máquina
-- `network` — solo mi red local
-- `community` — mi comunidad de confianza
-- `external` — cualquier proveedor autorizado
+### 7. Resolución por scope
 
-Detalle completo en la sección [Privacidad](#privacidad).
+El campo `scope` en el `MissionOfferMessage` acota qué providers pueden hacer bid: `local` / `network` / `community` / `external`. Ningún provider fuera del scope declarado puede responder — no es solo una preferencia, es un filtro del protocolo.
 
-### 7. Transparencia obligatoria
+### 8. Transparencia obligatoria
 
-Cada respuesta del agente incluye su procedencia: qué modelo razonó, qué tool usó, qué datos viajaron y dónde. Detalle en [Privacidad y trazabilidad](#privacidad).
+Cada `AssistantCompletedMessage` incluye `ProvenanceInfo`: qué modelo razonó, qué Satellite se usó, si los datos salieron de la comunidad. El usuario puede auditar cada respuesta.
 
-### 8. Proveedor rechazable
+### 9. Proveedor rechazable
 
-El usuario puede vetar un proveedor específico. El sistema busca alternativas automáticamente.
+Navigator puede reemplazar un provider mid-Mission si falla o el usuario lo veta. GossipSub permite publicar una nueva oferta para el mismo `missionId` y asignar a otro candidato sin interrumpir el flujo.
 
-### 9. Degradación graceful
+### 10. Reputación distribuida
 
-Si no hay lo óptimo, se usa lo siguiente. Si no hay nada, se informa. Nunca se inventa una respuesta.
+Navigator publica `ReputationUpdateMessage` en GossipSub y actualiza `DhtReputationRecord` en la DHT después de cada Mission. No hay servidor central de rating — la reputación es agregada y verificable por cualquier nodo.
 
-### 10. Registry observable, no controlador
+---
 
-El Registry solo sabe qué nodos existen y qué ofrecen. No ejecuta tools, no ve datos del usuario, no toma decisiones por el agente.
-
-## Tipos de proveedores
-
-En v0.1 hay dos tipos:
-
-- **`llm`** — modelos de lenguaje compatibles con OpenAI API.
-- **`mcp`** — servidores MCP con tools.
-
-En el futuro se planean `embedding`, `storage`, `resource` y `agent`.
-
-Todo provider, sin importar el tipo, debe seguir el mismo contrato de ciclo de vida. Ver [`protocolo-provider.md`](./protocolo-provider.md) — es lo que hace posible que un provider nuevo sea **plug and play**: el Registry y el Agent Runtime no necesitan código especial por proveedor, solo por tipo (`llm`/`mcp`).
-
-## Ciclo de vida de un nodo (registro + heartbeat)
+## Ciclo de vida de un nodo
 
 ```mermaid
 sequenceDiagram
-    participant P as Provider
-    participant R as Registry (Agent Backend)
+    participant N as Nodo nuevo (Star/Satellite)
+    participant A as Atlas (bootstrap)
+    participant D as DHT Swarm
+    participant G as GossipSub
 
-    P->>R: hello { providerId, timestamp, fhsVersion, signature }
-    R-->>P: welcome { registryId (did:key), leaseSeconds: 30, timestamp, signature }
-    P->>R: register { providerId, manifest, timestamp, signature }
-    R-->>P: registered { leaseExpires, acceptedServices }
-    R->>R: broadcast node.online a runtimes activos
+    N->>A: Conectar (multiaddr conocido)
+    A->>N: Lista de peers del swarm
 
-    loop cada 10s mientras el provider esté vivo
-        P->>R: ping
-        R-->>P: pong { timestamp }
-        R->>R: touchConnection(providerId) — renueva el lease
-    end
+    N->>D: Kademlia Join
+    N->>D: DHT.put(did, DhtBeaconRecord)
 
-    Note over R: Si no llega ping en 30s (lease vencido)
-    R->>R: markLost(providerId)
-    R->>R: broadcast node.lost a runtimes activos
+    N->>G: Suscribir a fhs/v1/*
+    N->>G: NodeAdvertiseMessage (TTL 60s)
+
+    Note over N: Operativo — ya no necesita a Atlas
 ```
 
-### Pulse de transporte (DEC-0010) — complementa, no reemplaza, el heartbeat de arriba
+---
 
-Además del heartbeat de aplicación (`ping`/`pong` JSON de arriba), el Registry envía un ping/pong **nativo de WebSocket** (RFC 6455, no un mensaje FHS) hacia cada nodo conectado, cada `HEARTBEAT_INTERVAL_SECONDS`. Si un nodo no responde durante `MISSED_PONG_THRESHOLD` ciclos seguidos (3, no 1 — para no quedar más estricto que el propio lease de 30s que complementa), el Registry cierra la conexión — más rápido que esperar el lease completo de aplicación, y sin agregar ningún mensaje ni tipo nuevo al protocolo.
-
-Esto solo detecta **si el socket sigue vivo** (proceso caído, red partida) — no dice nada sobre si el nodo está atendiendo correctamente una Mission en curso, ni distingue "atorado" de "ocupado pero progresando": si el event loop del nodo está genuinamente bloqueado, tampoco va a responder al ping nativo, así que en el peor caso converge al mismo síntoma que se buscaba evitar (aunque se detecta más rápido que antes). Resolver eso es responsabilidad exclusiva del propio nodo — el dispatcher concurrente ("mosquito", DEC-0009/`satelite-rating`) que cada nodo debe implementar garantiza que **en algún momento** se responderá una petición en curso sin bloquear el resto, pero no garantiza **cuándo** — el protocolo no ofrece ni ofrecerá una señal de "progreso" intermedia por diseño, para no aumentar la complejidad del Registry (DEC-0005).
-
-### Timeout configurable del lado del cliente (DEC-0010)
-
-Quien inicia una Mission o una conversación con una Star puede indicar `preferences.maxWaitMs` — cuánto tiempo está dispuesto a esperar antes de abandonar, en vez del default fijo del stack (~300s, pensado para hardware comunitario lento). Es un límite de paciencia del cliente, no una señal de salud del nodo: si se cumple, el Agent Server simplemente deja de esperar esa respuesta y libera la conversación, sin importar si el nodo sigue procesando o no. Desde la revisión 2026-07-10 el Agent Server además envía `chat.cancel`/`tool.cancel { missionId }` (best-effort) al abandonar — el nodo debería abortar el trabajo si puede (respondiendo `chat.error`/`tool.error` con código `CANCELLED`) para no seguir quemando CPU comunitaria en una petición que ya nadie espera; ignorar la cancelación no rompe el protocolo.
-
-**Recomendación para quien implemente UI sobre este campo:** el rango razonable de `maxWaitMs` es alto (varios minutos), no segundos — el hardware comunitario que federa esta red (equipos reutilizados, sin GPU dedicada) puede tardar minutos en una sola inferencia u OCR. Un timeout bajo (ej. 10-30s) no es una opción realista de "impaciencia legítima", es indistinguible de cancelar la petición casi siempre — cualquier control de UI para este campo debería partir de un piso cercano al default (~300s) hacia arriba, no hacia abajo.
-
-### Mensajes de registro
-
-**Registro de nodo**
-
-> **Unidades de `timestamp` — regla global:** todo `timestamp` del protocolo va en **milisegundos** desde epoch Unix (lo que devuelve `Date.now()` en JS). Antes de fijarlo (revisión 2026-07-10) la doc mezclaba segundos y milisegundos y el Registry validaba en segundos mientras los providers enviaban ms — ningún registro pasaba la ventana anti-replay. Las ventanas viven en el protocolo: `MAX_REPLAY_AGE_MS` (30 000) y `MAX_CLOCK_SKEW_MS` (5 000).
-
-```json
-{
-  "type": "hello",
-  "providerId": "did:key:z6MkiqnzSFKAqXxjRUNnEku2wD3Gzas28sqByzQYaqEjkZhF",
-  "timestamp": 1719700000123,
-  "fhsVersion": "0.1",
-  "signature": "base64(firma Ed25519 de \"providerId:timestamp\" con la clave privada del nodo)"
-}
-```
-
-Sin `signature` válida (verificable con la clave pública derivada del propio `providerId`), el Registry responde `error { code: "INVALID_SIGNATURE" }` (DEC-0030). `fhsVersion` es la negociación de versión (revisión 2026-07-10): si el Registry no habla esa versión responde `error { code: "UNSUPPORTED_VERSION" }` y cierra, en vez de fallar de formas opacas después; omitirlo se interpreta como "la versión del Registry".
-
-Respuesta:
-
-```json
-{
-  "type": "welcome",
-  "registryId": "did:key:z6Mk...RegistryDid",
-  "leaseSeconds": 30,
-  "heartbeatSeconds": 10,
-  "fhsVersion": "0.1",
-  "timestamp": 1719700000456,
-  "signature": "base64(firma Ed25519 de \"registryId:timestamp\" con la clave del Registry)"
-}
-```
-
-El `welcome` viaja **firmado por el Registry** (revisión 2026-07-10): `registryId` es el did:key propio del Atlas y la firma permite al nodo verificar que no está entregando su manifiesto a un Registry impostor en la misma LAN — misma identidad que ya firmaba el anuncio mDNS (DEC-0032).
-
-**Publicar servicios**
-
-```json
-{
-  "type": "register",
-  "providerId": "did:key:z6MkiqnzSFKAqXxjRUNnEku2wD3Gzas28sqByzQYaqEjkZhF",
-  "manifest": { /* ver manifiesto-llm.md o manifiesto-mcp.md */ },
-  "timestamp": 1719700000789,
-  "signature": "base64(firma Ed25519 de \"providerId:timestamp:sha256hex(manifiesto canónico)\")"
-}
-```
-
-La firma de `register` ancla el **contenido del manifiesto** (revisión 2026-07-10): el payload firmado incluye el SHA-256 (hex) de la serialización JSON canónica del manifiesto (llaves ordenadas recursivamente, sin espacios — ver `canonicalJson`/`registerSignaturePayload` en el paquete del protocolo). Sin el hash, un intermediario podía sustituir el manifiesto completo (endpoint incluido) conservando una firma válida. Es **obligatorio**: el payload legado `providerId:timestamp` (sin hash) ya no se acepta — el Registry responde `error { code: "INVALID_SIGNATURE" }` (DEC-0076, retirado en alpha por no tener consumidores externos que proteger).
-
-Respuesta:
-
-```json
-{
-  "type": "registered",
-  "leaseExpires": 1719700030000,
-  "acceptedServices": 2
-}
-```
-
-**Heartbeat**
-
-```json
-{ "type": "ping" }
-```
-
-Respuesta:
-
-```json
-{ "type": "pong", "timestamp": 1719700005000 }
-```
-
-**Notificaciones del Registry**
-
-Cuando un nodo se conecta o se cae, el Registry notifica a los agentes:
-
-```json
-{
-  "type": "node.online",
-  "providerId": "did:key:raspi-ocr-01",
-  "providerName": "OCR Raspberry Pi",
-  "services": [
-    { "kind": "mcp", "capabilities": ["document.ocr"] }
-  ]
-}
-```
-
-```json
-{
-  "type": "node.lost",
-  "providerId": "did:key:raspi-ocr-01",
-  "providerName": "OCR Raspberry Pi",
-  "services": [
-    { "kind": "mcp", "capabilities": ["document.ocr"] }
-  ]
-}
-```
-
-## Chat por WebSocket (frontend ↔ Agent Backend)
-
-El frontend se conecta a:
-
-```
-wss://<host>:8443/api/chat/ws
-```
-
-Envía:
-
-```json
-{
-  "type": "start",
-  "conversationId": "opcional",
-  "message": { "role": "user", "content": "Extrae el texto de esta imagen" },
-  "artifacts": ["data:image/png;base64,..."],
-  "preferences": {
-    "model": "auto",
-    "scope": "community"
-  }
-}
-```
-
-Recibe eventos en tiempo real:
-
-```json
-{ "type": "agent.status", "data": { "status": "resolving-model", "message": "Buscando modelo..." } }
-{ "type": "llm.selected", "data": { "providerId": "...", "providerName": "...", "modelId": "...", "reason": [...] } }
-{ "type": "tool.selected", "data": { "capability": "document.ocr", "providerId": "...", "providerName": "..." } }
-{ "type": "assistant.delta", "data": { "text": "El texto extraído es..." } }
-{ "type": "assistant.completed", "data": { "provenance": { ... } } }
-```
-
-## Flujo completo de un mensaje (chat + tool call)
+## Flujo de una Mission de chat
 
 ```mermaid
 sequenceDiagram
-    participant U as Usuario (Web)
-    participant AS as Agent Server
-    participant REG as Registry
-    participant LLM as LLM Provider (FHS)
-    participant OCR as OCR Provider (FHS)
+    participant Po as Portal
+    participant NAV as Navigator
+    participant G as GossipSub
+    participant S as Star
 
-    U->>AS: start { message, artifacts, preferences.scope }
-    AS->>REG: resolver LLM y tools candidatas (scope)
-    REG-->>AS: providers disponibles dentro del scope
-    AS-->>U: agent.status "resolving-model"
-    AS-->>U: llm.selected { providerId, modelId }
-
-    AS->>LLM: chat.request { missionId, messages, tools }
-    LLM-->>AS: chat.completed { missionId, toolCalls }
-
-    alt el LLM pide una tool
-        AS-->>U: tool.selected { capability: "document.ocr" }
-        AS->>OCR: tool.call { missionId, toolName, arguments: { file_base64 } }
-        OCR-->>AS: tool.result { missionId, content }
-        AS-->>U: tool.completed { name, duration }
-        AS->>LLM: chat.request { missionId nuevo, messages + tool result }
-        LLM-->>AS: chat.completed { missionId, response final }
-    end
-
-    AS-->>U: assistant.delta { text }
-    AS-->>U: assistant.completed { provenance }
+    Po->>NAV: agent.start + chat.request { missionId }
+    NAV->>G: MissionOfferMessage { missionId, scope, bidDeadlineMs }
+    S->>G: MissionBidMessage { missionId, providerDid, reputationScore }
+    NAV->>G: MissionAssignMessage { missionId, assignedProvider: star.DID }
+    NAV->>S: stream directo /fhs/v1/0.1.0 → handshake → chat.request
+    S-->>NAV: chat.delta (streaming)
+    NAV-->>Po: assistant.delta (streaming)
+    S->>NAV: chat.completed
+    NAV->>Po: assistant.completed { provenance }
+    NAV->>G: ReputationUpdateMessage
 ```
 
-### Mensajes entre Agent Server y Providers
-
-**Chat (LLM)**
-
-```
-Agent Server → Provider:  chat.request   { missionId, request, callerId, timestamp, signature }
-Provider → Agent Server:  dispatch.ack   { missionId, queuedAt }  (opcional, ver abajo)
-Provider → Agent Server:  chat.delta     { missionId, delta: string }
-Provider → Agent Server:  chat.completed { missionId, response: GenerateResponse }
-Provider → Agent Server:  chat.error     { missionId, code, message }
-Agent Server → Provider:  chat.cancel    { missionId }  (best-effort, ver abajo)
-```
-
-**Tools (OCR, MCP)**
-
-```
-Agent Server → Provider:  tool.list         { missionId, callerId, timestamp, signature }
-Provider → Agent Server:  tool.list.response  { missionId, tools: [...] }
-Agent Server → Provider:  tool.call         { missionId, toolName, arguments, callerId, timestamp, signature }
-Provider → Agent Server:  dispatch.ack      { missionId, queuedAt }  (opcional, ver abajo)
-Provider → Agent Server:  tool.result       { missionId, toolName, content: [...] }
-Provider → Agent Server:  tool.error        { missionId, toolName, code, message }
-Agent Server → Provider:  tool.cancel       { missionId }  (best-effort, ver abajo)
-```
-
-`missionId` es obligatorio y debe repetirse igual en la respuesta — es la base de la trazabilidad operacional (ver más abajo).
-
-**Autenticación del invocador (revisión 2026-07-10):** `callerId` es el did:key del Agent Server (u otro agente) y `signature` es Ed25519 base64 sobre `callerId:missionId:timestamp` (`invokeSignaturePayload`). Sin esto, cualquier peer de la LAN podía consumir el LLM/tools de un nodo gratis y de forma anónima. Los campos son opcionales por compatibilidad, pero un provider **puede exigirlos** y responder `chat.error`/`tool.error` con código `UNAUTHORIZED` a invocadores anónimos, vetados o con firma inválida — la misma ventana anti-replay de registro (`MAX_REPLAY_AGE_MS`/`MAX_CLOCK_SKEW_MS`) aplica al `timestamp` del invocador.
-
-**Cancelación best-effort (`chat.cancel`/`tool.cancel`, revisión 2026-07-10):** quien originó la petición avisa que dejó de esperar (timeout `maxWaitMs`, failover, usuario que cerró). El provider debería abortar el trabajo si puede y responder `chat.error`/`tool.error` con código `CANCELLED`; ignorar el mensaje no rompe el protocolo — es una optimización de cortesía para no quemar CPU comunitaria en peticiones que ya nadie espera.
-
-**`dispatch.ack` — el "mosquito" confirmando que ya tomó la petición**
-
-```json
-{ "type": "dispatch.ack", "missionId": "...", "queuedAt": 1719700000123 }
-```
-
-Un nodo lo envía inmediatamente al encolar un `chat.request`/`tool.call` en
-su dispatcher interno ("mosquito"), **antes** de empezar el trabajo real —
-distingue la latencia de despacho (tiempo hasta este ack) de la latencia
-de procesamiento (tiempo hasta el resultado final). Es obligatorio para
-todo nodo nuevo que implemente el contrato de
-[`protocolo-provider.md`](./protocolo-provider.md), pero **opcional para
-compatibilidad hacia atrás**: un nodo que no lo envía sigue funcionando
-igual, solo sin latencia de despacho en las métricas de fiabilidad del
-Registry (ver `spec-native/specs/satelite-rating/SPEC.md`). Si el nodo
-rechaza la petición de inmediato, no envía este ack — va directo a
-`chat.error`/`tool.error`.
-
-## Resolución por ámbito (scope) — cómo decide el Registry
-
-```mermaid
-flowchart TD
-    Start[Petición con scope] --> Check{scope?}
-    Check -->|local| Local[Solo providers en localhost]
-    Check -->|network| Network[+ providers en LAN/VPN local]
-    Check -->|community| Community["+ providers con visibility: community"]
-    Check -->|external| External{allowExternalProviders?}
-    External -->|true| ExternalYes[+ providers públicos autorizados]
-    External -->|false/ausente| ExternalNo[Se ignoran providers externos]
-    Local --> Resolve[Registry filtra candidatos]
-    Network --> Resolve
-    Community --> Resolve
-    ExternalYes --> Resolve
-    ExternalNo --> Resolve
-    Resolve --> Prefer["Entre candidatos válidos,<br/>preferir retention: none"]
-```
+---
 
 ## Privacidad
 
-FHS existe para que una comunidad tenga IA útil **sin ceder control de sus datos**. Cualquier implementación del protocolo — sin importar el lenguaje — debe respetar estas garantías. No son opcionales ni "buenas prácticas": son requisito para que un provider sea considerado FHS-compatible.
+- **`scope`** en el `MissionOfferMessage` acota qué providers pueden responder — es un filtro de protocolo, no una preferencia.
+- **`privacy.retention`** en el Beacon declara qué hace el nodo con los datos recibidos (`"none"` / `"session"` / etc.).
+- **`ProvenanceInfo`** en cada `AssistantCompletedMessage`: qué modelo razonó, qué Satellite se usó, si los datos salieron de la comunidad — auditable por el usuario.
+- **Trazabilidad ≠ retención de contenido**: cada `missionId` puede seguirse de extremo a extremo como metadata sin guardar el contenido de la conversación.
 
-### Ámbito (`scope`) — quién puede ver la petición
+---
 
-El `scope` no es metadata decorativa: **condiciona qué proveedores puede resolver el Registry** para una petición dada.
+## Cuatro planos de comunicación
 
-| Scope | Significado | Efecto en la resolución |
-|---|---|---|
-| `local` | Solo el equipo del usuario | Solo se consideran proveedores corriendo en `localhost`/mismo host |
-| `network` | Red local del usuario | Se agregan proveedores visibles en la LAN/VPN local |
-| `community` | Comunidad de confianza declarada | Se agregan proveedores con `visibility: "community"` en su manifiesto |
-| `external` | Cualquier proveedor autorizado | Se agregan proveedores públicos, solo si el usuario lo habilita explícitamente (`allowExternalProviders: true`) |
+| Plano | Para qué | Protocolo |
+|-------|----------|-----------|
+| P2P (DHT + GossipSub) | Descubrimiento, presencia, dispatch de Missions, reputación | libp2p Kademlia + GossipSub |
+| Stream directo | Ejecución de Missions (chat.request, tool.call) | libp2p `/fhs/v1/0.1.0` + Protobuf |
+| Distribución HTTPS | Descarga de WASM (Ephemeral Satellite) | HTTPS |
+| Gestión REST | Health, métricas, discovery externo | HTTP/REST |
 
-Una petición con `scope: "local"` **nunca** debe resolver a un proveedor `external`, sin importar si ese proveedor es "mejor" (más rápido, más capaz). El scope es un techo, no una preferencia.
+---
 
-### Retención (`privacy.retention` en el manifiesto)
+## Referencias
 
-Todo proveedor declara qué hace con los datos que recibe:
-
-- `"none"` — no persiste nada, procesa y descarta.
-- `"session"` — conserva mientras dura la conversación, luego borra.
-- Cualquier otro valor debe documentarse explícitamente en el manifiesto del proveedor (no asumir significado implícito).
-
-El agente **debe preferir proveedores con `retention: "none"`** cuando hay más de un candidato para la misma capacidad, salvo que el usuario indique lo contrario.
-
-### Uso para entrenamiento (`privacy.trainingUse`)
-
-Booleano obligatorio en el manifiesto de todo proveedor `llm`. Si `trainingUse: true`, el Registry debe exponerlo de forma visible al usuario antes de resolver ese proveedor — nunca en silencio.
-
-### Procedencia (`provenance`) — trazabilidad orientada al usuario
-
-Cada respuesta del agente (`assistant.completed`) incluye:
-
-```json
-{
-  "llm": { "providerId": "...", "providerName": "...", "model": "..." },
-  "tools": [{ "capability": "document.ocr", "providerId": "...", "providerName": "..." }],
-  "dataExported": "Datos enviados a tools federadas",
-  "jurisdiction": "red local comunitaria"
-}
-```
-
-Esto no es telemetría opcional: es la forma en que el usuario puede auditar, después de cada respuesta, exactamente qué modelo razonó, qué herramienta se ejecutó y a dónde viajaron sus datos. Cualquier SDK o implementación del protocolo, en cualquier lenguaje, debe propagar este objeto sin omitir campos.
-
-### Trazabilidad operacional — privacidad no significa "sin rastro"
-
-**"No retener contenido" y "no poder diagnosticar errores" no son la misma cosa.** Privacidad restringe qué se guarda; trazabilidad exige que lo que sí se guarda alcance para resolver un incidente ("mi OCR falló ayer a las 15:03", "el chat respondió con datos de otro proveedor").
-
-Regla: **todo mensaje FHS con `missionId` debe poder correlacionarse extremo a extremo — como metadata, nunca como contenido.**
-
-Se distinguen dos capas:
-
-| Capa | Qué incluye | Se retiene según `privacy.retention` |
-|---|---|---|
-| **Contenido** | Texto del mensaje, imagen/PDF adjunto, respuesta del modelo | Sí — sujeto a la política declarada por cada provider |
-| **Metadata de trazabilidad** | `conversationId`, `missionId`, `providerId`, `capability`/`modelId`, `timestamp`, `duration`, `success`/`error.code` | Siempre — no es negociable, no es "dato del usuario" |
-
-Un provider FHS-compatible debe loggear la capa de metadata (mínimo: `missionId`, resultado, duración) en cada `chat.request`/`tool.call` que procesa, **sin loggear el contenido** salvo que su `retention` declarada lo permita explícitamente. Esto permite reconstruir la cadena `conversationId → missionId → providerId → resultado` para depurar un fallo, sin violar la promesa de privacidad.
-
-**Cerrado del lado del Agent Server** (2026-07-05, DEC-0012): `apps/navigator/src/observability/trace.ts` expone `logTrace(entry)`, llamado en los tres puntos donde el Navigator despacha una Mission o una llamada a una Star (`mcp-host.ts`, `llm-gateway.ts`) — cubre éxito, timeout, error del nodo y cierre de conexión inesperado. Cada línea es JSON estructurado (`conversationId`, `missionId`, `providerId`, `capability`, `dispatchMs`, `totalMs`, `success`, `errorCode`), nunca contenido. Pendiente (no bloqueante): que cada provider de ejemplo (`star-example`, `satellite-ocr-example`) también loggee su propia metadata local por `missionId` — hoy solo el Agent Server lo hace.
-
-### Checklist de privacidad y trazabilidad para implementar un provider FHS
-
-Antes de considerar un provider "listo", verifica que:
-
-- [ ] Declara `privacy.retention` en su manifiesto (nunca lo omite).
-- [ ] Si es tipo `llm`, declara `privacy.trainingUse`.
-- [ ] Respeta el `scope` recibido en cada petición — nunca procesa datos fuera del ámbito autorizado.
-- [ ] No registra ni loggea el **contenido** de las peticiones más allá de lo declarado en `retention`.
-- [ ] Sí registra la **metadata de trazabilidad** (`missionId`, éxito/error, duración) de cada petición procesada, para poder diagnosticar fallos sin exponer contenido.
-- [ ] Responde con suficiente información para que el agente construya `provenance` correctamente.
-
-## Implementaciones en otros lenguajes
-
-FHS es JSON sobre WebSocket — no depende de TypeScript ni de Node.js. Cualquier lenguaje con soporte de WebSocket y JSON puede implementar un provider o un cliente FHS. Ver [`implementacion-multilenguaje.md`](./implementacion-multilenguaje.md) para la guía de soporte en **Python, Rust, Java y TypeScript/JavaScript** (los primeros lenguajes soportados oficialmente) y [`protocolo-provider.md`](./protocolo-provider.md) para el contrato exacto que cualquier provider, en cualquier lenguaje, debe cumplir para ser plug-and-play.
+- [`idl/fhs-protocol.proto`](../idl/fhs-protocol.proto) — definición completa de todos los mensajes
+- [`idl/gossipsub.md`](../idl/gossipsub.md) — especificación de tópicos GossipSub
+- [`protocol/p2p.md`](../protocol/p2p.md) — modelo de red P2P completo
+- [`protocol/trust.md`](../protocol/trust.md) — confianza y reputación
+- [`docs/protocolo-provider.md`](./protocolo-provider.md) — contrato que todo provider debe cumplir

@@ -1,107 +1,156 @@
 # Implementar FHS en otros lenguajes
 
-FHS no es una librería, es un **protocolo de mensajes JSON sobre WebSocket**. La implementación de referencia (`packages/fhs-protocol`, `examples/star-example`, `examples/satellite-ocr-example`) está en TypeScript/Node.js porque es el stack del MVP (ver `spec-native/STACK.md` y `spec-native/DECISIONS.md` DEC-0002), pero **nada en el protocolo depende de TypeScript**. Cualquier lenguaje con cliente WebSocket y serialización JSON puede implementar un provider o un cliente FHS.
+FHS es un protocolo P2P descentralizado basado en **libp2p** (DHT + GossipSub + streams directos). La implementación de referencia está en TypeScript/Node.js, pero **nada en el protocolo depende de TypeScript**. Cualquier lenguaje con librería libp2p o cliente WebSocket puede implementar un provider o cliente FHS.
 
-## Lenguajes soportados (orden de prioridad)
+## Lenguajes soportados
 
 | # | Lenguaje | Estado | Caso de uso típico |
-|---|---|---|---|
-| 1 | **TypeScript / JavaScript** | ✅ Implementación de referencia | Providers en Node.js, frontend web |
-| 2 | **Python** | 📋 Planeado | Providers de ML/IA (Tesseract, Whisper, modelos HuggingFace) |
-| 3 | **Rust** | 📋 Planeado | Providers en hardware limitado (Raspberry Pi, edge) |
-| 4 | **Java** | 📋 Planeado | Integración con sistemas empresariales/comunitarios existentes |
+|---|----------|--------|--------------------|
+| 1 | **TypeScript / JavaScript** | ✅ Referencia | Provider Node.js, frontend web, WASM browser |
+| 2 | **Go** | 📋 Planeado | Provider de alto rendimiento, relay, bootstrap node |
+| 3 | **Python** | 📋 Planeado | Providers de ML/IA (Whisper, HuggingFace, Tesseract) |
+| 4 | **Rust** | 📋 Planeado | Providers en hardware limitado (Raspberry Pi, edge) |
+| 5 | **Java** | 📋 Planeado | Integración con sistemas empresariales/comunitarios |
 
-El orden refleja qué tan probable es que la comunidad aporte ese tipo de nodo primero (scripts Python de IA, hardware embebido en Rust, sistemas ya escritos en Java). No es una limitación técnica: el protocolo es igual de válido en cualquier lenguaje desde el día uno.
+## Qué debe implementar cualquier provider FHS
 
-## Qué debe implementar cualquier cliente/provider FHS
+Sin importar el lenguaje, para ser compatible con FHS (DEC-P2P-001):
 
-Sin importar el lenguaje, para ser compatible con FHS v0.1 hay que implementar:
+1. **Identidad Ed25519** — generar o cargar un par de claves persistente. DID = `did:key:z<base58btc(pubkey)>`. PeerId libp2p derivado de la misma clave.
 
-1. **Cliente WebSocket** contra el Registry (`wss://<atlas-host>/fhs/v1/ws`).
-2. **Serialización/deserialización JSON** de los mensajes del protocolo (ver `packages/fhs-protocol/src/messages.ts` como fuente de verdad de los tipos, y `docs/protocolo.md` para la especificación en prosa).
-3. **Ciclo de vida de registro**: `hello` → `welcome` → `register` → `registered` → `ping`/`pong` cada 10s (ver regla 3 de `docs/protocolo.md`).
-4. **Manifiesto** válido según el tipo de proveedor: `llm` (`docs/manifiesto-llm.md`) o `mcp` (`docs/manifiesto-mcp.md`).
-5. **Los campos de privacidad obligatorios** — `privacy.retention`, `privacy.trainingUse` (si aplica) — y respetar el `scope` de cada petición. Ver la sección "Privacidad" en `docs/protocolo.md`. Esto no es opcional en ningún lenguaje: un provider que no declare o no respete estos campos no es FHS-compatible, aunque hable el protocolo correctamente a nivel de mensajes.
-6. **Degradación graceful**: si algo falla, responder con un mensaje de error tipado (`chat.error`, `tool.error`), nunca inventar una respuesta ni cerrar la conexión en silencio.
+2. **libp2p o stack compatible** — con soporte para:
+   - Kademlia DHT (descubrimiento y publicación de `DhtBeaconRecord`)
+   - GossipSub (presencia, dispatch de Missions, reputación)
+   - Streams directos sobre WSS con protocolo `/fhs/v1/0.1.0`
+   - Noise/TLS (seguridad del transporte)
+   - yamux/mplex (multiplexor)
+
+3. **Beacon válido** según el schema correspondiente (`beacon-star.schema.json` o `beacon-satellite.schema.json`). Ver `docs/beacon-star.md` y `docs/beacon-satellite.md`.
+
+4. **Ciclo de vida P2P**:
+   - Bootstrap → Kademlia Join → publicar `DhtBeaconRecord` (TTL 24h)
+   - Publicar `NodeAdvertiseMessage` en GossipSub cada 30s (TTL 60s)
+   - Responder `MissionBidMessage` cuando se puede satisfacer una oferta
+   - Aceptar stream directo post-assign y ejecutar la Mission
+
+5. **Campos de privacidad obligatorios** — `privacy.retention` en el Beacon, respeto al `scope` de cada `MissionOfferMessage`. Un provider que no declare o no respete estos campos no es FHS-compatible aunque hable el protocolo correctamente a nivel de mensajes.
+
+6. **Degradación graceful** — responder con error tipado (`chat.error`, `tool.error`) ante cualquier fallo, nunca cerrar el stream en silencio.
+
+## Alternativa sin libp2p completo: WebSocket directo
+
+Si la librería libp2p en el lenguaje objetivo está incompleta o no existe, se puede implementar un subset mínimo usando WebSocket directo:
+
+```
+Sin DHT/GossipSub:
+- El nodo NO puede recibir Missions vía el ciclo GossipSub offer/bid/assign
+- Requiere que Navigator lo tenga pre-configurado con su multiaddr
+- Útil para desarrollo y pruebas, no para producción P2P real
+
+Con solo stream directo:
+- Implementar la negociación de subprotocolo: fhs.v1 (binario) o fhs.v1.json
+- Implementar HandshakeMessage / HandshakeAckMessage
+- Implementar los mensajes de Mission (chat.request / tool.call / etc.)
+- Implementar Pulse (ping/pong)
+```
 
 ## Librerías recomendadas por lenguaje
 
-Estas son sugerencias de punto de partida, no una decisión cerrada — cualquier librería WebSocket + JSON estándar del lenguaje sirve.
+### Go
+
+```go
+// libp2p oficial en Go — el más maduro fuera de TypeScript/JS
+// github.com/libp2p/go-libp2p
+// github.com/libp2p/go-libp2p-kad-dht
+// github.com/libp2p/go-libp2p-pubsub (GossipSub)
+
+import (
+    libp2p "github.com/libp2p/go-libp2p"
+    dht "github.com/libp2p/go-libp2p-kad-dht"
+    pubsub "github.com/libp2p/go-libp2p-pubsub"
+)
+// Ver idl/fhs-protocol.proto para generar los tipos Go con protoc --go_out=.
+```
 
 ### Python
 
 ```python
-# WebSocket: websockets (asyncio) o websocket-client (sync)
-# JSON: json (stdlib)
-import asyncio
-import json
+# libp2p en Python: py-libp2p (en desarrollo)
+# Alternativa para desarrollo: WebSocket directo
+import asyncio, json
 import websockets
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-async def register():
-    async with websockets.connect("wss://atlas:8443/fhs/v1/ws") as ws:
-        await ws.send(json.dumps({
-            "type": "hello",
-            "providerId": "did:key:mi-nodo-python",
-            "timestamp": int(time.time()),
-        }))
-        welcome = json.loads(await ws.recv())
-        # enviar "register" con el manifiesto, luego "ping" cada 10s
+# Para producción P2P completa, Go o Rust es más maduro que Python hoy
+# Para un Satellite simple con WebSocket directo:
+async def connect_and_handshake(uri, beacon_json, private_key):
+    async with websockets.connect(
+        uri,
+        additional_headers={"Sec-WebSocket-Protocol": "fhs.v1.json"}
+    ) as ws:
+        envelope = {
+            "type": "handshake",
+            "fhsVersion": "1",
+            "listenAddrs": [],
+            "beacon": beacon_json
+        }
+        await ws.send(json.dumps(envelope))
+        ack = json.loads(await ws.recv())
+        return ack.get("trustLevel")
 ```
-
-Caso de uso natural: providers que envuelven modelos de Python (Whisper para transcripción, HuggingFace Transformers, Tesseract vía `pytesseract`) — el mismo patrón que hoy usa `examples/satellite-ocr-example` en Node.js, pero hablando FHS desde Python en vez de traducir a Node.
 
 ### Rust
 
 ```rust
-// WebSocket: tokio-tungstenite
-// JSON: serde + serde_json
-use tokio_tungstenite::connect_async;
-use serde_json::json;
+// libp2p en Rust: rust-libp2p (el más maduro de todos)
+// [dependencies]
+// libp2p = { version = "0.54", features = ["kad", "gossipsub", "noise", "yamux", "websocket"] }
 
-let (mut ws_stream, _) = connect_async("wss://atlas:8443/fhs/v1/ws").await?;
-let hello = json!({
-    "type": "hello",
-    "providerId": "did:key:mi-nodo-rust",
-    "timestamp": now_unix()
-});
-ws_stream.send(Message::Text(hello.to_string())).await?;
+use libp2p::{kad, gossipsub, noise, yamux, websocket};
+// Ver idl/fhs-protocol.proto para generar tipos Rust con tonic-build
+// tonic-build = "0.12" en build.rs:
+// tonic_build::compile_protos("idl/fhs-protocol.proto")?;
 ```
 
-Caso de uso natural: providers en hardware con recursos limitados (Raspberry Pi, microcontroladores con Linux) donde el footprint de Node.js es demasiado grande.
+### TypeScript / Node.js
 
-### Java
-
-```java
-// WebSocket: Java-WebSocket o el cliente WebSocket de Jakarta EE (jakarta.websocket)
-// JSON: Jackson o Gson
-import org.java_websocket.client.WebSocketClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-ObjectMapper mapper = new ObjectMapper();
-Map<String, Object> hello = Map.of(
-    "type", "hello",
-    "providerId", "did:key:mi-nodo-java",
-    "timestamp", Instant.now().getEpochSecond()
-);
-client.send(mapper.writeValueAsString(hello));
+```typescript
+// @libp2p/libp2p — implementación de referencia
+// @libp2p/kad-dht, @chainsafe/libp2p-gossipsub
+import { createLibp2p } from 'libp2p'
+import { kadDHT } from '@libp2p/kad-dht'
+import { gossipsub } from '@chainsafe/libp2p-gossipsub'
+// Ver galaxIA-SDK: @rafex/galaxia-fhs-protocol para los tipos TypeScript
 ```
 
-Caso de uso natural: integrar FHS con sistemas ya existentes en organizaciones/comunidades que corren stacks Java (bibliotecas públicas, cooperativas, universidades).
+## Serialización de mensajes
 
-### TypeScript / JavaScript (referencia)
+Los mensajes de stream directo y DHT records usan **Protobuf** (binario). Los mensajes GossipSub también usan Protobuf.
 
-Ver implementación completa en `examples/star-example/src/` y `examples/satellite-ocr-example/src/`. Usa `ws` para el cliente WebSocket y los tipos de `packages/fhs-protocol` para los mensajes.
+Fuente de verdad: `idl/fhs-protocol.proto` — generar código en el lenguaje objetivo:
 
-## Qué NO cambia entre lenguajes
+```bash
+# Go
+protoc --go_out=. idl/fhs-protocol.proto
 
-- El **formato de los mensajes** (`hello`, `register`, `ping`/`pong`, `chat.request`, `tool.call`, etc.) es idéntico en todos los lenguajes — es JSON, no un binding específico de un runtime.
-- Los **campos de privacidad** (`scope`, `retention`, `trainingUse`, `provenance`) son obligatorios en todos los lenguajes por igual.
-- El **Registry** (hoy embebido en `apps/navigator`, TypeScript) no necesita saber en qué lenguaje está escrito un provider — solo ve mensajes JSON por WebSocket.
+# Python
+protoc --python_out=. idl/fhs-protocol.proto
 
-## Cómo proponer un nuevo provider en otro lenguaje
+# Rust (en build.rs)
+tonic_build::compile_protos("idl/fhs-protocol.proto")?;
 
-1. Revisar `docs/proveedores.md` para entender la estructura esperada (registro, manifiesto, ciclo de vida de una tool call o chat).
-2. Confirmar que el manifiesto declara correctamente `privacy.retention` (y `trainingUse` si es `llm`).
-3. Implementar el ciclo `hello`/`register`/`ping` y el manejo de la capability o modelo que se quiere exponer.
-4. Documentar el provider siguiendo el mismo formato que `docs/proveedores.md` (qué es, cómo funciona, variables de entorno, tools/modelos expuestos).
-5. Si el provider vive fuera de este repositorio (caso típico para providers comunitarios), enlazarlo desde `docs/proveedores.md` en vez de copiar el código aquí.
+# TypeScript
+protoc --plugin=protoc-gen-ts_proto --ts_proto_out=. idl/fhs-protocol.proto
+```
+
+Para desarrollo o pruebas, el modo JSON (`Sec-WebSocket-Protocol: fhs.v1.json`) permite inspeccionar mensajes sin Protobuf.
+
+## Referencia completa del protocolo
+
+- [`idl/fhs-protocol.proto`](../idl/fhs-protocol.proto) — definición canónica de todos los mensajes
+- [`idl/asyncapi.yaml`](../idl/asyncapi.yaml) — canales y bindings
+- [`idl/gossipsub.md`](../idl/gossipsub.md) — especificación de tópicos GossipSub
+- [`protocol/p2p.md`](../protocol/p2p.md) — modelo de red P2P con stack libp2p
+- [`docs/protocolo-provider.md`](./protocolo-provider.md) — contrato que todo provider debe cumplir
+- [`docs/beacon-star.md`](./beacon-star.md) — Beacon de Star
+- [`docs/beacon-satellite.md`](./beacon-satellite.md) — Beacon de Satellite
