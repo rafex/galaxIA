@@ -4,7 +4,7 @@ Definiciones formales del protocolo de mensajería de **Federation of Sovereign 
 La red es P2P descentralizada: DHT Kademlia para descubrimiento, GossipSub para dispatch,
 streams directos para ejecución. **No hay registro central.** Atlas = bootstrap peer.
 
-Ver `protocol/p2p.md` para el modelo de red completo.
+Ver `docs/p2p.md` para el modelo de red completo.
 
 ---
 
@@ -56,7 +56,7 @@ Protocolo libp2p `/fhs/v1/0.1.0` sobre WSS. Mensajes en `Envelope` Protobuf.
 
 ### Implementar un provider (Star o Satellite)
 
-1. Lee `protocol/p2p.md` para entender cómo te unes al swarm DHT.
+1. Lee `docs/p2p.md` para entender cómo te unes al swarm DHT.
 2. Genera tu DID Ed25519 (`did:key:z...`) y publica tu `DhtBeaconRecord`.
 3. Suscríbete a `fhs/v1/nodes/advertise` y `fhs/v1/missions/offer`.
 4. Publica `NodeAdvertiseMessage` periódicamente.
@@ -66,7 +66,7 @@ Protocolo libp2p `/fhs/v1/0.1.0` sobre WSS. Mensajes en `Envelope` Protobuf.
 
 ### Implementar un Navigator (Agent Runtime)
 
-1. Lee `protocol/p2p.md` y `idl/gossipsub.md` para el flujo completo.
+1. Lee `docs/p2p.md` y `idl/gossipsub.md` para el flujo completo.
 2. Suscríbete a todos los tópicos GossipSub.
 3. Mantén caché local de `NodeAdvertiseMessage` por TTL.
 4. Al recibir Mission del Portal: publica `MissionOfferMessage` → espera bids → asigna.

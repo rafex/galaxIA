@@ -4,7 +4,7 @@ title: galaxIA — IA federada y soberana
 ---
 
 <section class="hero">
-  <span class="eyebrow">● Alpha — protocolo FHS P2P (DEC-P2P-001)</span>
+  <span class="eyebrow">● Alpha pública — protocolo FHS P2P (DEC-P2P-001)</span>
   <h1>Inteligencia artificial federada y soberana</h1>
   <p class="tagline">
     galaxIA conecta el hardware que tu comunidad ya tiene — una Mac mini con
@@ -43,6 +43,40 @@ title: galaxIA — IA federada y soberana
     fallar sin tumbar el resto, y donde la privacidad — quién ve qué, qué se
     retiene, a dónde viajan los datos — es parte del protocolo desde el
     diseño, no un aviso legal que se agrega después.
+  </p>
+</section>
+
+<section>
+  <h2>Visión, objetivo y destino</h2>
+
+  <h3>Visión</h3>
+  <p>
+    Una galaxia de IA soberana: cualquier comunidad — una escuela, un equipo,
+    un grupo de activistas, un vecindario — puede construir su propio asistente
+    de IA con el hardware que ya tiene, sin pedir permiso a nadie y sin ceder
+    control de sus datos.
+  </p>
+
+  <h3>Objetivo</h3>
+  <p>
+    Diseñar e implementar el protocolo FHS: el conjunto de reglas que permite
+    que nodos heterogéneos (modelos LLM locales, herramientas especializadas,
+    agentes autónomos) se descubran, confíen entre sí y cooperen en responder
+    peticiones de usuarios reales, sobre hardware modesto, sin un intermediario
+    central.
+  </p>
+
+  <h3>Destino</h3>
+  <p>
+    Un teléfono viejo en un cajón se convierte en un Satellite de la red. Una
+    Mac mini de 2014 se convierte en una Star. Una Raspberry Pi con un
+    sensor se convierte en un Satellite con capacidades propias. El chat
+    del vecindario no depende de si OpenAI está de acuerdo — depende de si
+    alguien en la comunidad quiere aportar su hardware.
+  </p>
+  <p>
+    Ese es el destino: IA distribuida, soberana y comunitaria. galaxIA es la
+    demostración de que es posible.
   </p>
 </section>
 
@@ -113,6 +147,11 @@ title: galaxIA — IA federada y soberana
       <h3><a href="{{ '/contribuir/' | relative_url }}">Contribuye al protocolo</a></h3>
       <p>Hay SDKs por escribir en Python, Rust y Go, y features abiertas en el roadmap.</p>
     </div>
+    <div class="card">
+      <span class="tag">Contacto directo</span>
+      <h3><a href="mailto:rafex@rafex.dev">rafex@rafex.dev</a></h3>
+      <p>Escribe si tienes preguntas, propuestas o simplemente quieres decir que el proyecto te parece interesante.</p>
+    </div>
   </div>
 </section>
 
@@ -133,7 +172,7 @@ title: galaxIA — IA federada y soberana
     </div>
     <div class="card">
       <h3><a href="{{ '/pendientes/' | relative_url }}">Pendientes</a></h3>
-      <p>Qué falta, qué está en spec sin iniciar, y dónde ayudar.</p>
+      <p>Estado actual, TODOs del SDK, y dónde ayudar.</p>
     </div>
   </div>
 </section>
@@ -164,7 +203,11 @@ title: galaxIA — IA federada y soberana
   <h2>Empezar</h2>
   <pre><code>git clone https://github.com/{{ site.repository }}.git
 cd galaxIA
-# Ver idl/, protocol/, docs/ para el protocolo completo
+# Ver idl/ y docs/ para el protocolo completo
 # Para las apps e implementación, ver galaxIA-Core</code></pre>
-  <p>Documentación del protocolo en <a href="{{ '/docs/' | relative_url }}">Documentación</a>. Implementación de apps en <a href="https://github.com/{{ site.repository | split: '/' | first }}/galaxIA-Core">galaxIA-Core</a>.</p>
+  <p>
+    Documentación del protocolo en <a href="{{ '/docs/' | relative_url }}">Documentación</a>.
+    Implementación de apps en <a href="https://github.com/{{ site.repository | split: '/' | first }}/galaxIA-Core">galaxIA-Core</a>.
+    ¿Preguntas? <a href="mailto:rafex@rafex.dev">rafex@rafex.dev</a>.
+  </p>
 </section>

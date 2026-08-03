@@ -8,7 +8,7 @@ El **handshake** establece un **stream directo** `/fhs/v1/0.1.0` entre cualquier
 - **Navigator → Star**: post-`MissionAssignMessage` en GossipSub.
 - **Navigator → Satellite**: post-`MissionAssignMessage` para una Tool Mission.
 
-El handshake **no** sustituye el descubrimiento de nodos — eso ocurre antes mediante DHT y GossipSub (ver `protocol/p2p.md`).
+El handshake **no** sustituye el descubrimiento de nodos — eso ocurre antes mediante DHT y GossipSub (ver `docs/p2p.md`).
 
 ## Handshake de Stream Directo
 

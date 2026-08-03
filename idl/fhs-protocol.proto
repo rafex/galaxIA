@@ -30,7 +30,7 @@ syntax = "proto3";
 //      fhs/v1/missions/bid        — MissionBidMessage
 //      fhs/v1/missions/assign     — MissionAssignMessage
 //      fhs/v1/reputation/update   — ReputationUpdateMessage
-//    Ver idl/gossipsub.md y protocol/p2p.md para la spec completa.
+//    Ver idl/gossipsub.md y ../docs/p2p.md para la spec completa.
 
 package fhs.v1;
 

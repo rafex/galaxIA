@@ -182,7 +182,7 @@ Tu provider puede participar sin configuración especial en Navigator si:
 
 ## Referencias
 
-- [`protocol/p2p.md`](../protocol/p2p.md) — modelo de red P2P completo
+- [`docs/p2p.md`](./p2p.md) — modelo de red P2P completo
 - [`idl/gossipsub.md`](../idl/gossipsub.md) — especificación de tópicos GossipSub
 - [`idl/flows.md`](../idl/flows.md) — diagramas de secuencia de los flujos principales
 - [`docs/beacon-star.md`](./beacon-star.md) — Beacon de Star con ejemplo completo

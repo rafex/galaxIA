@@ -150,7 +150,7 @@ Para desarrollo o pruebas, el modo JSON (`Sec-WebSocket-Protocol: fhs.v1.json`) 
 - [`idl/fhs-protocol.proto`](../idl/fhs-protocol.proto) — definición canónica de todos los mensajes
 - [`idl/asyncapi.yaml`](../idl/asyncapi.yaml) — canales y bindings
 - [`idl/gossipsub.md`](../idl/gossipsub.md) — especificación de tópicos GossipSub
-- [`protocol/p2p.md`](../protocol/p2p.md) — modelo de red P2P con stack libp2p
+- [`docs/p2p.md`](./p2p.md) — modelo de red P2P con stack libp2p
 - [`docs/protocolo-provider.md`](./protocolo-provider.md) — contrato que todo provider debe cumplir
 - [`docs/beacon-star.md`](./beacon-star.md) — Beacon de Star
 - [`docs/beacon-satellite.md`](./beacon-satellite.md) — Beacon de Satellite

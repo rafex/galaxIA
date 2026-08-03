@@ -210,6 +210,6 @@ sequenceDiagram
 - [idl/asyncapi.yaml](asyncapi.yaml) — canales WebSocket y GossipSub
 - [idl/gossipsub.md](gossipsub.md) — especificación de tópicos GossipSub
 - [idl/framing.md](framing.md) — especificación LPP de framing binario
-- [protocol/p2p.md](../protocol/p2p.md) — modelo de red P2P completo
+- [../docs/p2p.md](../../docs/p2p.md) — modelo de red P2P completo
 - [schemas/](../schemas/) — JSON Schemas de los Beacons
 - [spec-native/DECISIONS.md](../spec-native/DECISIONS.md) — DEC-P2P-001

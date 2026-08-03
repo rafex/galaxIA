@@ -46,7 +46,7 @@ la misma clave Ed25519. Esto permite:
 - Verificar firmas de Envelope FHS usando solo el DID (sin PKI)
 - Que el PeerId libp2p y el DID FHS sean el mismo nodo sin ambigüedad
 
-Ver `protocol/identity.md` para generación de claves y formato del DID.
+Ver `identity.md` para generación de claves y formato del DID.
 
 ---
 
@@ -256,7 +256,7 @@ Para nodos detrás de NAT (celular, red doméstica):
 3. **WebRTC** (libp2p, opcional): para conexiones browser-to-browser sin relay.
 
 Los **Ephemeral Satellites** (WASM en browser) siempre usan relay porque los browsers
-no pueden aceptar conexiones entrantes. Ver `protocol/ephemeral-satellite.md`.
+no pueden aceptar conexiones entrantes. Ver `ephemeral-satellite.md`.
 
 ---
 

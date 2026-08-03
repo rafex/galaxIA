@@ -55,7 +55,7 @@ info:
     | `{did}`                    | DhtBeaconRecord      | El nodo mismo    |
     | `reputation/{did}`         | DhtReputationRecord  | Navigators       |
 
-    Ver `idl/gossipsub.md` y `protocol/p2p.md` para detalles completos.
+    Ver `idl/gossipsub.md` y `docs/p2p.md` para detalles completos.
 
     ## Identidad y autenticación
 

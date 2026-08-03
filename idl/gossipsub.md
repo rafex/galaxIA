@@ -3,7 +3,7 @@
 Especificación de los tópicos libp2p GossipSub usados por el protocolo FHS.
 Los mensajes de GossipSub NO son Envelopes — llevan su propia firma Ed25519.
 
-Ver también `protocol/p2p.md` para el modelo de red completo y `idl/fhs-protocol.proto`
+Ver también `docs/p2p.md` para el modelo de red completo y `idl/fhs-protocol.proto`
 para las definiciones Protobuf de cada mensaje.
 
 ---

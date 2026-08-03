@@ -157,6 +157,6 @@ sequenceDiagram
 
 - [`idl/fhs-protocol.proto`](../idl/fhs-protocol.proto) — definición completa de todos los mensajes
 - [`idl/gossipsub.md`](../idl/gossipsub.md) — especificación de tópicos GossipSub
-- [`protocol/p2p.md`](../protocol/p2p.md) — modelo de red P2P completo
-- [`protocol/trust.md`](../protocol/trust.md) — confianza y reputación
+- [`docs/p2p.md`](./p2p.md) — modelo de red P2P completo
+- [`docs/trust.md`](./trust.md) — confianza y reputación
 - [`docs/protocolo-provider.md`](./protocolo-provider.md) — contrato que todo provider debe cumplir
