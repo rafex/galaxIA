@@ -1,0 +1,9 @@
+[project]
+name = "galaxia-helpers"
+version = "0.1.0"
+description = "Scripts de validación y tooling para el repositorio galaxIA IDL"
+requires-python = ">=3.9"
+dependencies = [
+    "jsonschema>=4.0",
+    "pyyaml>=6.0",
+]

@@ -14,6 +14,10 @@ session-ses_*.md
 # SpecNative — entorno Python generado
 .specnative/.venv/
 
+# Helpers — entorno Python generado
+helpers/python/.venv/
+__pycache__/
+
 # ── Artefactos residuales del monorepo original ──────────────────────────────
 # galaxIA es ahora IDL-only. El código vive en otros repos:
 #   apps/        → galaxIA-Core  (atlas, navigator, portal-chat, log-agent, portal-tui)
