@@ -40,6 +40,7 @@ La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqu
 - [x] `galaxia-parser-catalog`: adapter explícito de parser local a `DynamicValue`/`ToolCall`.
 - [x] `galaxIA-SDK`: retirados `sse.ts`, `AgentSSEEvent` y la variante MCP `transport: "sse"`; publicado `@rafex_labs/galaxia-fhs-protocol@0.1.30`.
 - [x] `galaxIA-Core/apps/navigator`: retirado el puente NATS del runtime; los eventos del Navigator ya no entran por JSON/NATS.
+- [ ] `galaxIA-Core/apps/navigator`: agregado el handler de sesión Portal sobre `/fhs/v1/0.1.0`; falta migrar el cliente web y retirar las rutas HTTP/WebSocket/SSE antiguas.
 - [ ] Eliminar los planos HTTP/WebSocket/SSE de aplicación.
 
 La migración de `FloodSub` a `GossipSub` quedó completada en Core y satellite-star con `@libp2p/gossipsub@16.1.1`, compatible con `@libp2p/interface@3`. La dependencia anterior `@chainsafe/libp2p-gossipsub` y el paquete `@libp2p/floodsub` ya no forman parte de esos repositorios.
