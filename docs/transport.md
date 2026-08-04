@@ -36,6 +36,12 @@ controla:
 La misma frontera aplica a adaptadores locales de servicios LLM/OCR externos:
 su HTTP/HTTPS no forma parte del protocolo FHS.
 
+El servidor que entrega los archivos estáticos del Portal no transporta
+mensajes FHS, pero también debe usar cifrado: Portal Chat arranca únicamente
+con HTTPS y un certificado autofirmado local generado en `certs/portal-chat/`.
+La clave privada y el certificado no se versionan; si faltan, el servidor falla
+cerrado y no inicia en HTTP.
+
 ## Stream directo
 
 El stream se negocia con el protocolo libp2p:

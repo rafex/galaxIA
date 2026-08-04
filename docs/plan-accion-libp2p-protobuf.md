@@ -42,6 +42,7 @@ La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqu
 - [x] `galaxIA-Core/apps/navigator`: retirado el puente NATS del runtime; los eventos del Navigator ya no entran por JSON/NATS.
 - [x] `galaxIA-Core`: agregado el handler de sesión Portal sobre `/fhs/v1/0.1.0`; Portal conecta directamente por libp2p y se retiraron las rutas HTTP/WebSocket/SSE de chat.
 - [x] Completar en la sesión Portal los mensajes Protobuf de decisiones KB/adjuntos y `ArtifactRef`.
+- [x] `galaxIA-Core/apps/portal-chat`: servidor estático y Vite de desarrollo requieren HTTPS; generan un certificado autofirmado local y no tienen fallback HTTP.
 
 La migración de `FloodSub` a `GossipSub` quedó completada en Core y satellite-star con `@libp2p/gossipsub@16.1.1`, compatible con `@libp2p/interface@3`. La dependencia anterior `@chainsafe/libp2p-gossipsub` y el paquete `@libp2p/floodsub` ya no forman parte de esos repositorios.
 
