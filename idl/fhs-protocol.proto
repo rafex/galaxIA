@@ -97,6 +97,10 @@ message Envelope {
     ToolSelectedMessage       tool_selected       = 63;
     AssistantDeltaMessage     assistant_delta     = 64;
     AssistantCompletedMessage assistant_completed = 65;
+    OcrExtractedMessage       ocr_extracted       = 66;
+    KbRecommendedMessage      kb_recommended      = 67;
+    AttachmentDecisionMessage attachment_decision = 68;
+    KbDecisionMessage         kb_decision         = 69;
 
     // Ephemeral Satellite (SPEC-EPHSAT-0001)             [70-79]
     MissionFeedbackMessage    mission_feedback    = 70;
@@ -386,6 +390,7 @@ message ChatRequestMessage {
   repeated Message    messages   = 2;
   repeated ToolDefinition tools  = 3;
   string              model      = 4;  // Modelo LLM solicitado (opcional)
+  repeated ArtifactRef artifacts = 5; // Adjuntos declarativos, no JSON/base64 ad hoc
 }
 
 // chat.cancel — Portal → Navigator (stream directo)
@@ -618,6 +623,12 @@ message AgentStartMessage {
   string session_id = 1;  // UUID de la sesión Portal
   string scope      = 2;  // "local" | "network" | "community" | "external"
   string model      = 3;  // Modelo LLM preferido (hint)
+  string ocr_mode   = 4;  // "confirm" | "auto"
+  string kb         = 5;  // Provider KB elegido manualmente (opcional)
+  int32  kb_max_per_question = 6;
+  bool   ipfs_enabled = 7;
+  string ipfs_network = 8; // "public" | "private"
+  string ipfs_retention = 9; // "ephemeral" | "reuse"
 }
 
 // agent.status — Navigator → Portal
@@ -662,4 +673,38 @@ message AssistantCompletedMessage {
   string         mission_id = 1;
   string         content    = 2;  // Respuesta completa del agente
   ProvenanceInfo provenance = 3;
+}
+
+// ocr.extracted — Navigator → Portal. El texto se transporta como campo
+// Protobuf para que el Portal pida confirmación sin abrir otro canal.
+message OcrExtractedMessage {
+  string mission_id = 1;
+  string filename   = 2;
+  string text       = 3;
+}
+
+message KbCandidate {
+  string provider_id = 1;
+  string provider_name = 2;
+  string description = 3;
+}
+
+// kb.recommended — Navigator → Portal.
+message KbRecommendedMessage {
+  string mission_id = 1;
+  repeated KbCandidate candidates = 2;
+  bool chosen_by_llm = 3;
+}
+
+// attachment.decision — Portal → Navigator.
+message AttachmentDecisionMessage {
+  string mission_id = 1;
+  bool use = 2;
+}
+
+// kb.decision — Portal → Navigator. La sesión conserva las candidatas
+// anunciadas y solo necesita recibir la decisión del usuario.
+message KbDecisionMessage {
+  string mission_id = 1;
+  bool use = 2;
 }

@@ -40,8 +40,8 @@ La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqu
 - [x] `galaxia-parser-catalog`: adapter explícito de parser local a `DynamicValue`/`ToolCall`.
 - [x] `galaxIA-SDK`: retirados `sse.ts`, `AgentSSEEvent` y la variante MCP `transport: "sse"`; publicado `@rafex_labs/galaxia-fhs-protocol@0.1.30`.
 - [x] `galaxIA-Core/apps/navigator`: retirado el puente NATS del runtime; los eventos del Navigator ya no entran por JSON/NATS.
-- [ ] `galaxIA-Core/apps/navigator`: agregado el handler de sesión Portal sobre `/fhs/v1/0.1.0`; falta migrar el cliente web y retirar las rutas HTTP/WebSocket/SSE antiguas.
-- [ ] Eliminar los planos HTTP/WebSocket/SSE de aplicación.
+- [x] `galaxIA-Core`: agregado el handler de sesión Portal sobre `/fhs/v1/0.1.0`; Portal conecta directamente por libp2p y se retiraron las rutas HTTP/WebSocket/SSE de chat.
+- [x] Completar en la sesión Portal los mensajes Protobuf de decisiones KB/adjuntos y `ArtifactRef`.
 
 La migración de `FloodSub` a `GossipSub` quedó completada en Core y satellite-star con `@libp2p/gossipsub@16.1.1`, compatible con `@libp2p/interface@3`. La dependencia anterior `@chainsafe/libp2p-gossipsub` y el paquete `@libp2p/floodsub` ya no forman parte de esos repositorios.
 
@@ -59,7 +59,7 @@ El commit `92b474f` de `galaxIA-Core` dejó el camino P2P del Navigator en modo 
 - JSON permanece únicamente en identidad local y en la frontera explícita del modelo de aplicación (`tool.function.arguments`), antes/después de convertirse a `DynamicValue`.
 - `fhs-node` y Navigator usan GossipSub como único pub/sub; la validación dirigida de `fhs-node` pasa 5 pruebas y el typecheck/build de Core pasa.
 
-Queda pendiente para cerrar esta fase la limpieza de interfaces HTTP/SSE de la UI local, que no forman parte del wire FHS.
+La UI de chat ya no usa interfaces HTTP/SSE/WebSocket de aplicación; su conexión FHS es un stream libp2p. La sesión ya transporta adjuntos `ArtifactRef`, preferencias, OCR, recomendaciones KB y decisiones mediante Protobuf; queda la verificación E2E con providers reales.
 
 ### Avance aplicado en satellite-star — 2026-08-04
 
@@ -85,7 +85,7 @@ La migración del wire ya se completó con `c5fa076` y `ea1d487`:
 - Los cinco providers importan directamente el wire compartido.
 - `satellite-ocr-example` ya no anuncia ni acepta `fileBase64`; la tool exige `file: ArtifactRef` y resuelve `inline` o un CID IPFS mediante el gateway externo declarado.
 
-La representación formal de `ArtifactRef` y la limpieza de la API SSE del SDK ya quedaron resueltas. Permanecen pendientes la sustitución de la UI HTTP/WebSocket/SSE por una sesión libp2p y las pruebas E2E entre Navigator y providers.
+La representación formal de `ArtifactRef`, la limpieza de la API SSE del SDK, la sustitución de la UI HTTP/WebSocket/SSE por una sesión libp2p y los mensajes Portal de OCR/KB/decisiones ya quedaron resueltos. Permanece pendiente la prueba E2E entre Navigator, Portal y providers.
 
 ### Avance aplicado en parser-catalog — 2026-08-04
 
@@ -134,8 +134,8 @@ Repositorio: `galaxIA-Core`.
 5. [x] Sustituir FloodSub por GossipSub compatible con la versión actual de libp2p.
 6. Eliminar `any`, tipos locales P2P y casts a interfaces heredadas.
 7. Migrar `P2pLlmGateway`, `P2pMcpHost`, discovery y mission cycle al SDK generado.
-8. Eliminar del plano FHS las rutas de chat, eventos, providers, métricas y WebSocket.
-9. Convertir Portal Chat a cliente libp2p; cualquier `/ws` o `/wss` será exclusivamente transporte libp2p.
+8. [x] Eliminar del plano FHS las rutas de chat, eventos, providers, métricas y WebSocket de aplicación.
+9. [x] Convertir Portal Chat a cliente libp2p; cualquier `/ws` o `/wss` restante es exclusivamente transporte libp2p.
 10. Separar el almacenamiento IPFS interno libp2p del adapter de gateway externo.
 
 ### Fase 3 — proveedores satélite
