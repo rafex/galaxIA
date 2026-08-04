@@ -80,8 +80,9 @@ La migración del wire ya se completó con `c5fa076` y `ea1d487`:
 - Se eliminaron los cinco `fhs-p2p-types.ts` y los cinco `stream-codec.ts` locales.
 - `fhs-wire` solo conserva conversiones locales explícitas para JSON de configuración/modelo hacia `ToolInputSchema` y `DynamicValue`; ningún JSON cruza el wire.
 - Los cinco providers importan directamente el wire compartido.
+- `satellite-ocr-example` ya no anuncia ni acepta `fileBase64`; la tool exige `file: ArtifactRef` y resuelve `inline` o un CID IPFS mediante el gateway externo declarado.
 
-Queda pendiente en esta fase representar adjuntos con el contrato canónico, en lugar de transportar `fileBase64` dentro de la frontera local de OCR.
+Queda pendiente en esta fase formalizar `ArtifactRef` como mensaje generado dedicado si el IDL deja de representarlo como objeto dentro de `DynamicValue`; el flujo operativo ya usa exclusivamente `file: ArtifactRef` y no transporta `fileBase64`.
 
 ### Avance aplicado en parser-catalog — 2026-08-04
 
@@ -140,7 +141,7 @@ Repositorio: `galaxIA-satellite-star`.
 2. [x] Usar el SDK generado y la fábrica libp2p compartida.
 3. [x] Migrar handshake, chat, tools, anuncios, DHT y pub/sub a Protobuf.
 4. [x] Usar `DynamicValue` para argumentos y resultados, sin `JSON.stringify` en mensajes FHS.
-5. [ ] Representar adjuntos según el contrato canónico; no enviar `fileBase64` como formato de wire.
+5. [x] Representar adjuntos según el contrato canónico; no enviar `fileBase64` como formato de wire.
 6. [x] Mantener HTTP/HTTPS de LLM/OCR solo como adapters externos aislados.
 7. [ ] Añadir pruebas por proveedor y una prueba Navigator → Star/Nova/OCR/RAG/KB.
 
