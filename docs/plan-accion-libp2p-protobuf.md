@@ -30,6 +30,18 @@ La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqu
 - `galaxIA-satellite-star`: cada proveedor duplica tipos P2P y codecs JSON. Los bridges LLM/OCR externos son adaptadores permitidos, pero deben quedar aislados del wire FHS.
 - `galaxia-parser-catalog`: JSON y SQLite son almacenamiento y parseo local; deben tener una frontera explícita antes de producir `DynamicValue` y `ToolCall` FHS.
 
+## Progreso de implementación
+
+- [x] `galaxIA`: `Envelope.signature` definido como `bytes`.
+- [x] `galaxIA-SDK`: mensajes generados desde el IDL canónico y codec `Envelope` + LPP binario.
+- [x] `galaxIA-Core/packages/fhs-node`: streams, DHT y pub/sub reciben codecs binarios inyectables; no serializan JSON.
+- [ ] `galaxIA-Core/apps/navigator`: migrar el codec P2P específico y eliminar sus tipos manuales.
+- [ ] `galaxIA-satellite-star`: migrar proveedores al SDK generado.
+- [ ] `galaxia-parser-catalog`: completar adapter de parser local a `DynamicValue`.
+- [ ] Eliminar los planos HTTP/WebSocket/SSE de aplicación.
+
+La migración de `FloodSub` a `GossipSub` permanece bloqueada por la incompatibilidad de la versión instalada de `@chainsafe/libp2p-gossipsub` con `@libp2p/interface@3`; se requiere una combinación de dependencias compatible antes de activarla.
+
 ## Fases de ejecución
 
 ### Fase 0 — contrato y decisiones bloqueantes
