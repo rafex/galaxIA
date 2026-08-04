@@ -1,11 +1,11 @@
 # Red FHS — Topología libp2p
 
-FHS es una red descentralizada. Atlas, Navigator, Star, Satellite y Nova
-participan como peers libp2p del swarm DHT/GossipSub. El Portal también es un
-peer libp2p para el stream FHS con Navigator, pero su cliente web necesita una
-dirección TLS de bootstrap entregada por la configuración estática HTTPS del
-portal; no implementa todavía DHT/GossipSub en el navegador. Atlas es solo un
-punto de bootstrap; no es un registro ni un proxy de Missions.
+FHS es una red descentralizada. Atlas, Navigator, Star, Satellite, Nova y
+Portal participan como peers libp2p del swarm DHT/GossipSub. El cliente web
+solo necesita una o más direcciones TLS de bootstrap entregadas por la
+configuración estática HTTPS del portal; después descubre el Navigator por
+GossipSub y verifica su `DhtBeaconRecord`. Atlas es solo un punto de
+bootstrap; no es un registro ni un proxy de Missions.
 
 ## Planes de comunicación
 
@@ -42,15 +42,18 @@ graph TB
     DHT[("DHT Kademlia")]
     GOSSIP[("GossipSub")]
 
-    PORTAL -->|"bootstrap TLS + stream /fhs/v1/0.1.0"| NAV
+    PORTAL -->|"bootstrap TLS"| ATLAS
+    PORTAL -->|"stream /fhs/v1/0.1.0"| NAV
     NAV <-->|"stream /fhs/v1/0.1.0"| STAR
     NAV <-->|"stream /fhs/v1/0.1.0"| SAT
     NAV <-->|"stream /fhs/v1/0.1.0"| NOVA
+    PORTAL --- DHT
     ATLAS --- DHT
     NAV --- DHT
     STAR --- DHT
     SAT --- DHT
     NOVA --- DHT
+    PORTAL --- GOSSIP
     ATLAS --- GOSSIP
     NAV --- GOSSIP
     STAR --- GOSSIP
@@ -58,15 +61,12 @@ graph TB
     NOVA --- GOSSIP
 ```
 
-El bootstrap del Portal contiene únicamente una multiaddr TLS WebSocket, sin
-`/p2p/<peerId>`. El Portal aprende la identidad remota mediante libp2p
-Identify/Noise y autentica los Envelopes con el handshake FHS firmado. La
-dirección se carga al arrancar el contenedor desde configuración estática
-HTTPS, por lo que rotar IPs o peers no requiere reconstruir la imagen.
-
-La participación del Portal en DHT/GossipSub desde navegador queda pendiente:
-requiere un transporte seguro para el bootstrap Atlas y un mecanismo protobuf
-para seleccionar el rol Navigator sin introducir un registro centralizado.
+El bootstrap del Portal contiene únicamente una o más multiaddrs TLS WebSocket,
+sin fijar el `peerId` del Navigator. El Portal entra al swarm, suscribe
+`fhs/v1/nodes/advertise`, verifica el anuncio Protobuf firmado, resuelve el
+`DhtBeaconRecord` y deriva el `peerId` desde el DID antes de abrir el stream.
+La configuración se carga al arrancar el contenedor desde HTTPS, por lo que
+rotar bootstraps o peers no requiere reconstruir la imagen.
 
 ## Identidad
 

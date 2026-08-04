@@ -2,7 +2,7 @@
 
 Estado: aprobado para ejecución por fases  
 Alcance: `galaxIA`, `galaxIA-SDK`, `galaxIA-Core`, `galaxIA-satellite-star` y `galaxia-parser-catalog`  
-Fecha: 2026-08-03
+Fecha: 2026-08-04
 
 ## Objetivo
 
@@ -25,7 +25,7 @@ Las siguientes excepciones no son transportes FHS entre nodos:
 La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqueleto funcional, pero aún no es el camino único ni binario:
 
 - `galaxIA`: el IDL canónico está en `idl/fhs-protocol.proto`, pero `ECOSYSTEM.md` todavía describe tipos TypeScript como fuente primaria.
-- `galaxIA-Core`: `FHS_P2P_MODE` es opcional; Navigator registra Atlas HTTP, HTTP, WebSocket y SSE aunque active P2P. Los codecs P2P de streams, DHT y pub/sub usan JSON dentro de framing length-prefixed.
+- `galaxIA-Core`: el runtime FHS ya no tiene fallback de aplicación HTTP/WebSocket/SSE; el Portal web aún necesitaba completar discovery DHT/GossipSub desde navegador.
 - `galaxIA-SDK`: el wire ya se genera desde Protobuf; los contratos de eventos de UI ya no forman parte del SDK. Las interfaces HTTP/WebSocket/SSE de aplicación todavía existen en algunas superficies locales y deben retirarse.
 - `galaxIA-satellite-star`: cada proveedor duplica tipos P2P y codecs JSON. Los bridges LLM/OCR externos son adaptadores permitidos, pero deben quedar aislados del wire FHS.
 - `galaxia-parser-catalog`: JSON y SQLite son almacenamiento y parseo local; deben tener una frontera explícita antes de producir `DynamicValue` y `ToolCall` FHS.
@@ -43,6 +43,8 @@ La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqu
 - [x] `galaxIA-Core`: agregado el handler de sesión Portal sobre `/fhs/v1/0.1.0`; Portal conecta directamente por libp2p y se retiraron las rutas HTTP/WebSocket/SSE de chat.
 - [x] Completar en la sesión Portal los mensajes Protobuf de decisiones KB/adjuntos y `ArtifactRef`.
 - [x] `galaxIA-Core/apps/portal-chat`: servidor estático y Vite de desarrollo requieren HTTPS; generan un certificado autofirmado local y no tienen fallback HTTP.
+- [x] `galaxIA-Core/apps/portal-chat`: el navegador entra por uno o más bootstraps TLS, se une a DHT/GossipSub, verifica `NodeAdvertiseMessage` y `DhtBeaconRecord`, y deriva el peer ID desde el DID sin fijarlo en el bundle.
+- [x] `galaxIA-Core`: Atlas y Navigator exigen certificados para sus transportes `/tls/ws`; los defaults `/ws` fueron eliminados del runtime y de los Containerfiles.
 
 La migración de `FloodSub` a `GossipSub` quedó completada en Core y satellite-star con `@libp2p/gossipsub@16.1.1`, compatible con `@libp2p/interface@3`. La dependencia anterior `@chainsafe/libp2p-gossipsub` y el paquete `@libp2p/floodsub` ya no forman parte de esos repositorios.
 
@@ -61,6 +63,16 @@ El commit `92b474f` de `galaxIA-Core` dejó el camino P2P del Navigator en modo 
 - `fhs-node` y Navigator usan GossipSub como único pub/sub; la validación dirigida de `fhs-node` pasa 5 pruebas y el typecheck/build de Core pasa.
 
 La UI de chat ya no usa interfaces HTTP/SSE/WebSocket de aplicación; su conexión FHS es un stream libp2p. La sesión ya transporta adjuntos `ArtifactRef`, preferencias, OCR, recomendaciones KB y decisiones mediante Protobuf; el SDK valida ese ciclo con round-trip binario y queda la verificación E2E con providers reales.
+
+### Avance aplicado en Portal discovery — 2026-08-04
+
+El Portal ya no marca un Navigator fijo ni depende de un peer ID embebido. La
+configuración runtime HTTPS solo entrega `FHS_BOOTSTRAP_ADDRS`; el cliente
+crea su peer libp2p, suscribe GossipSub antes de marcar presencia, conecta un
+bootstrap TLS, verifica anuncios Protobuf firmados, consulta el beacon DHT y
+abre `/fhs/v1/0.1.0` con el peer ID derivado del DID. Navigator vuelve a
+publicar su anuncio al conectar un peer nuevo para evitar la carrera del
+primer anuncio.
 
 ### Avance aplicado en satellite-star — 2026-08-04
 
@@ -138,6 +150,8 @@ Repositorio: `galaxIA-Core`.
 8. [x] Eliminar del plano FHS las rutas de chat, eventos, providers, métricas y WebSocket de aplicación.
 9. [x] Convertir Portal Chat a cliente libp2p; cualquier `/ws` o `/wss` restante es exclusivamente transporte libp2p.
 10. Separar el almacenamiento IPFS interno libp2p del adapter de gateway externo.
+11. [x] Implementar discovery DHT/GossipSub del Portal web con bootstrap TLS dinámico y autenticación por DID.
+12. [x] Hacer TLS obligatorio en los transportes WebSocket de Atlas y Navigator.
 
 ### Fase 3 — proveedores satélite
 
