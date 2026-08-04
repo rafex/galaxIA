@@ -36,7 +36,7 @@ La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqu
 - [x] `galaxIA-SDK`: mensajes generados desde el IDL canónico y codec `Envelope` + LPP binario.
 - [x] `galaxIA-Core/packages/fhs-node`: streams, DHT y pub/sub reciben codecs binarios inyectables; no serializan JSON.
 - [x] `galaxIA-Core/apps/navigator`: migrar el codec P2P específico y eliminar sus tipos manuales.
-- [ ] `galaxIA-satellite-star`: migrar proveedores al SDK generado.
+- [~] `galaxIA-satellite-star`: migración del stream al SDK generado completada; topics/DHT aún deben abandonar la fachada legacy.
 - [ ] `galaxia-parser-catalog`: completar adapter de parser local a `DynamicValue`.
 - [ ] Eliminar los planos HTTP/WebSocket/SSE de aplicación.
 
@@ -66,7 +66,14 @@ El commit `5a4687d` de `galaxIA-satellite-star` añadió `@galaxia/fhs-wire`, un
 - DHT: `DhtBeaconRecord` codificado con Protobuf.
 - Los adapters locales conservan JSON solo al interactuar con LLM/OCR/parser, configuración, identidad o modelos legacy internos.
 
-La migración todavía no se marca completa porque los handlers siguen usando tipos legacy como fachada de aplicación; el wire ya firma/verifica antes de aceptar mensajes. El siguiente paso es reemplazar esa fachada por `FhsProto` directamente.
+El commit `ea53adb` completó la migración directa del stream en los cinco providers:
+
+- `decodeStream` entrega `FhsProto.Envelope` firmado y verificado; los handlers discriminan por `payload.case`.
+- Los mensajes de respuesta se envían como mensajes protobuf generados; el framing LPP y la firma siguen en la frontera compartida.
+- Los argumentos de tools se convierten de `DynamicValue` al modelo local solo al entrar al adapter de cada provider.
+- `stream-codec.ts` dejó de exportar `FhsEnvelope` y ya no existe una fachada `{ type, payload }` para el stream.
+
+La migración todavía no se marca completa porque los constructores de topics/DHT conservan un adaptador local de beacon y los providers siguen usando tipos legacy para esos mensajes. El siguiente paso es reemplazar esa fachada por `FhsProto` también en presencia, mission cycle y registros DHT.
 
 ## Fases de ejecución
 
