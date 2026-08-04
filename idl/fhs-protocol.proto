@@ -237,7 +237,31 @@ message DynamicValue {
     bytes bytes_value        = 5;
     DynamicObject object_value = 6;
     DynamicList list_value   = 7;
+    ArtifactRef artifact_ref = 8;
   }
+}
+
+// Referencia canónica a un binario (DEC-0046/0047). El endpoint de escritura
+// nunca viaja por FHS: inline transporta los bytes directamente y ipfs solo
+// transporta la referencia de lectura que el provider debe resolver.
+message ArtifactRef {
+  oneof transport {
+    InlineArtifact inline = 1;
+    IpfsArtifact ipfs      = 2;
+  }
+}
+
+message InlineArtifact {
+  bytes data     = 1;
+  string filename = 2;
+}
+
+message IpfsArtifact {
+  string cid         = 1;
+  string network     = 2;  // public | private
+  string gateway_url = 3;  // endpoint de lectura; nunca API de escritura
+  string filename    = 4;
+  string retention   = 5;  // ephemeral | reuse
 }
 
 message DynamicObject {

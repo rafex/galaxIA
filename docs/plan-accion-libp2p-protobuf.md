@@ -82,7 +82,7 @@ La migración del wire ya se completó con `c5fa076` y `ea1d487`:
 - Los cinco providers importan directamente el wire compartido.
 - `satellite-ocr-example` ya no anuncia ni acepta `fileBase64`; la tool exige `file: ArtifactRef` y resuelve `inline` o un CID IPFS mediante el gateway externo declarado.
 
-Queda pendiente en esta fase formalizar `ArtifactRef` como mensaje generado dedicado si el IDL deja de representarlo como objeto dentro de `DynamicValue`; el flujo operativo ya usa exclusivamente `file: ArtifactRef` y no transporta `fileBase64`.
+La representación formal de `ArtifactRef` ya quedó resuelta en el IDL y el SDK; permanecen pendientes la eliminación de `sse.ts` junto con la UI HTTP/WebSocket/SSE y las pruebas E2E entre Navigator y providers.
 
 ### Avance aplicado en parser-catalog — 2026-08-04
 
@@ -95,7 +95,7 @@ El commit `dc5120f` añadió `toFhsToolCall`: el catálogo puede seguir interpre
 Repositorio principal: `galaxIA`.
 
 1. Mantener `idl/fhs-protocol.proto` como única fuente de verdad.
-2. Resolver la representación formal de `ArtifactRef`. El IDL actual lo modela lógicamente dentro de `DynamicValue`; no se debe crear un tipo paralelo en TypeScript.
+2. [x] Resolver la representación formal de `ArtifactRef` como `oneof` Protobuf dentro de `DynamicValue`, con variantes `inline` e `ipfs`.
 3. Fijar el generador y runtime Protobuf para Node y navegador.
 4. Definir serialización determinista para firmas, validación de timestamps y prevención de replay.
 5. Actualizar `ECOSYSTEM.md`, `DIAGNOSE.md` y documentación de implementación para reflejar el contrato real.
@@ -117,6 +117,8 @@ Repositorio: `galaxIA-SDK`.
 5. Eliminar los tipos manuales duplicados del wire; conservar solo tipos locales de UI, configuración o adapters que no se transmitan.
 6. Publicar una versión coordinada del paquete sin capa de compatibilidad.
 7. Añadir pruebas de vectores binarios y de round-trip.
+
+El SDK `0.1.29` genera `ArtifactRef`, `InlineArtifact` e `IpfsArtifact` desde el IDL. Los adaptadores de Navigator y `fhs-wire` convierten el shape local `ArtifactRef` a ese `oneof` y de regreso sin serializar JSON en el wire.
 
 ### Fase 2 — Core y nodo libp2p
 
