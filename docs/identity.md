@@ -30,7 +30,7 @@ message Envelope {
   string dest_peer_id   = 3;  // DID del destino; vacío = broadcast
   int64  timestamp      = 4;  // Unix ms — anti-replay (±30 000 ms)
   string version        = 5;  // "1"
-  string signature      = 6;  // Ed25519 base64 de sha256(fields 1-5 + payload)
+  bytes signature       = 6;  // Ed25519 sobre sha256(fields 1-5 + payload)
   oneof payload { ... }
 }
 ```

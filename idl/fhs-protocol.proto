@@ -47,7 +47,7 @@ message Envelope {
   string dest_peer_id   = 3;  // DID del destino; vacío solo en handshake inicial
   int64  timestamp      = 4;  // Unix ms — anti-replay (ventana recomendada ±30 000 ms)
   string version        = 5;  // Versión del protocolo FHS ("1")
-  string signature      = 6;  // Ed25519 base64 de sha256(message_id:source:dest:timestamp:payload_bytes_hex)
+  bytes signature        = 6;  // Ed25519 sobre sha256(message_id:source:dest:timestamp:payload_bytes_hex)
 
   // ── Payload ─────────────────────────────────────────────────────────────────
   oneof payload {
