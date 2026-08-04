@@ -35,12 +35,26 @@ La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqu
 - [x] `galaxIA`: `Envelope.signature` definido como `bytes`.
 - [x] `galaxIA-SDK`: mensajes generados desde el IDL canónico y codec `Envelope` + LPP binario.
 - [x] `galaxIA-Core/packages/fhs-node`: streams, DHT y pub/sub reciben codecs binarios inyectables; no serializan JSON.
-- [ ] `galaxIA-Core/apps/navigator`: migrar el codec P2P específico y eliminar sus tipos manuales.
+- [x] `galaxIA-Core/apps/navigator`: migrar el codec P2P específico y eliminar sus tipos manuales.
 - [ ] `galaxIA-satellite-star`: migrar proveedores al SDK generado.
 - [ ] `galaxia-parser-catalog`: completar adapter de parser local a `DynamicValue`.
 - [ ] Eliminar los planos HTTP/WebSocket/SSE de aplicación.
 
 La migración de `FloodSub` a `GossipSub` permanece bloqueada por la incompatibilidad de la versión instalada de `@chainsafe/libp2p-gossipsub` con `@libp2p/interface@3`; se requiere una combinación de dependencias compatible antes de activarla.
+
+### Avance aplicado en Core — 2026-08-03
+
+El commit `92b474f` de `galaxIA-Core` dejó el camino P2P del Navigator en modo obligatorio:
+
+- `stream-codec.ts` codifica y decodifica `FhsProto.Envelope` con Protobuf + LPP; ya no existe `{ type, payload }` en JSON.
+- Handshake, chat y tool calls usan los mensajes generados y `DynamicValue` para argumentos/resultados.
+- Presence, mission offer/bid/assign y beacon DHT usan codecs protobuf inyectados en pubsub/DHT.
+- `AtlasClient` quedó como interfaz de descubrimiento; Navigator usa `P2pAtlasClient` y no conserva cliente Atlas HTTP.
+- Se eliminaron los gateways FHS WebSocket/WSS del runtime y el fallback `FHS_P2P_MODE`; los providers P2P son el único camino de ejecución.
+- Se eliminaron los tipos manuales P2P duplicados; `FhsProto` es la fuente de los mensajes transmitidos.
+- JSON permanece únicamente en identidad local y en la frontera explícita del modelo de aplicación (`tool.function.arguments`), antes/después de convertirse a `DynamicValue`.
+
+Queda pendiente para cerrar esta fase la validación de firmas antes de aceptar mensajes, la compatibilidad GossipSub y la limpieza de interfaces HTTP/SSE de la UI local, que no forman parte del wire FHS.
 
 ## Fases de ejecución
 
