@@ -36,7 +36,7 @@ La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqu
 - [x] `galaxIA-SDK`: mensajes generados desde el IDL canónico y codec `Envelope` + LPP binario.
 - [x] `galaxIA-Core/packages/fhs-node`: streams, DHT y pub/sub reciben codecs binarios inyectables; no serializan JSON.
 - [x] `galaxIA-Core/apps/navigator`: migrar el codec P2P específico y eliminar sus tipos manuales.
-- [~] `galaxIA-satellite-star`: migración del stream al SDK generado completada; topics/DHT aún deben abandonar la fachada legacy.
+- [x] `galaxIA-satellite-star`: providers migrados al wire protobuf compartido; sin tipos ni codecs P2P duplicados.
 - [x] `galaxia-parser-catalog`: adapter explícito de parser local a `DynamicValue`/`ToolCall`.
 - [ ] Eliminar los planos HTTP/WebSocket/SSE de aplicación.
 
@@ -73,7 +73,14 @@ El commit `ea53adb` completó la migración directa del stream en los cinco prov
 - Los argumentos de tools se convierten de `DynamicValue` al modelo local solo al entrar al adapter de cada provider.
 - `stream-codec.ts` dejó de exportar `FhsEnvelope` y ya no existe una fachada `{ type, payload }` para el stream.
 
-La migración todavía no se marca completa porque los constructores de topics/DHT conservan un adaptador local de beacon y los providers siguen usando tipos legacy para esos mensajes. El siguiente paso es reemplazar esa fachada por `FhsProto` también en presencia, mission cycle y registros DHT.
+La migración del wire ya se completó con `c5fa076` y `ea1d487`:
+
+- Presencia, mission cycle y DHT usan mensajes `FhsProto` generados, firmados y verificados.
+- Se eliminaron los cinco `fhs-p2p-types.ts` y los cinco `stream-codec.ts` locales.
+- `fhs-wire` solo conserva conversiones locales explícitas para JSON de configuración/modelo hacia `ToolInputSchema` y `DynamicValue`; ningún JSON cruza el wire.
+- Los cinco providers importan directamente el wire compartido.
+
+Queda pendiente en esta fase representar adjuntos con el contrato canónico, en lugar de transportar `fileBase64` dentro de la frontera local de OCR.
 
 ### Avance aplicado en parser-catalog — 2026-08-04
 
@@ -128,13 +135,13 @@ Repositorio: `galaxIA-Core`.
 
 Repositorio: `galaxIA-satellite-star`.
 
-1. Eliminar `fhs-p2p-types.ts` y `stream-codec.ts` duplicados.
-2. Usar el SDK generado y la fábrica libp2p compartida.
-3. Migrar handshake, chat, tools, anuncios, DHT y pub/sub a Protobuf.
-4. Usar `DynamicValue` para argumentos y resultados, sin `JSON.stringify` en mensajes FHS.
-5. Representar adjuntos según el contrato canónico; no enviar `fileBase64` como formato de wire.
-6. Mantener HTTP/HTTPS de LLM/OCR solo como adapters externos aislados.
-7. Añadir pruebas por proveedor y una prueba Navigator → Star/Nova/OCR/RAG/KB.
+1. [x] Eliminar `fhs-p2p-types.ts` y `stream-codec.ts` duplicados.
+2. [x] Usar el SDK generado y la fábrica libp2p compartida.
+3. [x] Migrar handshake, chat, tools, anuncios, DHT y pub/sub a Protobuf.
+4. [x] Usar `DynamicValue` para argumentos y resultados, sin `JSON.stringify` en mensajes FHS.
+5. [ ] Representar adjuntos según el contrato canónico; no enviar `fileBase64` como formato de wire.
+6. [x] Mantener HTTP/HTTPS de LLM/OCR solo como adapters externos aislados.
+7. [ ] Añadir pruebas por proveedor y una prueba Navigator → Star/Nova/OCR/RAG/KB.
 
 ### Fase 4 — parser catalog
 
