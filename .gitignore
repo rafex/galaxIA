@@ -44,3 +44,14 @@ data/
 # Generadas en el servidor — nunca se commitean.
 *.pem
 *.key
+
+
+# opencode (local, no versionar)
+.opencode/sessions.db
+.opencode/sessions*db
+.opencode/sessions.db-shm
+.opencode/sessions.db-wal
+.opencode/worktrees/
+.opencode/worktrees.db
+.opencode/worktrees.log
+.opencode/node_modules/
