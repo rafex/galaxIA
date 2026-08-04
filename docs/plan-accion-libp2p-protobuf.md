@@ -37,7 +37,7 @@ La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqu
 - [x] `galaxIA-Core/packages/fhs-node`: streams, DHT y pub/sub reciben codecs binarios inyectables; no serializan JSON.
 - [x] `galaxIA-Core/apps/navigator`: migrar el codec P2P específico y eliminar sus tipos manuales.
 - [~] `galaxIA-satellite-star`: migración del stream al SDK generado completada; topics/DHT aún deben abandonar la fachada legacy.
-- [ ] `galaxia-parser-catalog`: completar adapter de parser local a `DynamicValue`.
+- [x] `galaxia-parser-catalog`: adapter explícito de parser local a `DynamicValue`/`ToolCall`.
 - [ ] Eliminar los planos HTTP/WebSocket/SSE de aplicación.
 
 La migración de `FloodSub` a `GossipSub` permanece bloqueada por la incompatibilidad de la versión instalada de `@chainsafe/libp2p-gossipsub` con `@libp2p/interface@3`; se requiere una combinación de dependencias compatible antes de activarla.
@@ -74,6 +74,10 @@ El commit `ea53adb` completó la migración directa del stream en los cinco prov
 - `stream-codec.ts` dejó de exportar `FhsEnvelope` y ya no existe una fachada `{ type, payload }` para el stream.
 
 La migración todavía no se marca completa porque los constructores de topics/DHT conservan un adaptador local de beacon y los providers siguen usando tipos legacy para esos mensajes. El siguiente paso es reemplazar esa fachada por `FhsProto` también en presencia, mission cycle y registros DHT.
+
+### Avance aplicado en parser-catalog — 2026-08-04
+
+El commit `dc5120f` añadió `toFhsToolCall`: el catálogo puede seguir interpretando JSON producido localmente por el LLM, pero expone una salida `FhsProto.ToolCall` con argumentos `DynamicValue` antes de entrar a una misión. La prueba de integración verifica que `function.arguments` deja de ser string en la representación de protocolo. El JSON queda limitado a la frontera del parser/modelo.
 
 ## Fases de ejecución
 
