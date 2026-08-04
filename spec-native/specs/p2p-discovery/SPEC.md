@@ -1,5 +1,11 @@
 # SPEC-P2P-0001 — Descubrimiento local por mDNS (fase 1 de "descubrimiento descentralizado")
 
+> **Documento histórico/superado:** esta spec describe una PoC anterior basada
+> en Registry, mDNS y WebSocket. No es el contrato vigente y sus rutas web no
+> deben implementarse. El descubrimiento FHS actual usa DHT Kademlia,
+> GossipSub y streams libp2p con mensajes Protobuf (DEC-0090/0091). Ver
+> `docs/network.md` y `idl/fhs-protocol.proto`.
+
 ## Estado
 
 `draft` — implementado y verificado en local (2026-07-06, DEC-0032); pendiente solo la verificación contra los 3 equipos reales de la demo (mismo bloqueo de hardware que issue #1)

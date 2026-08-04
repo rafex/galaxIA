@@ -17,6 +17,25 @@ cliente que no pueda abrir libp2p no es un cliente FHS conforme.
 Atlas es únicamente un bootstrap peer. No registra nodos, no despacha Missions
 y no recibe el contenido de una conversación.
 
+## Dependencias externas y adjuntos IPFS
+
+La regla libp2p-only aplica al protocolo FHS y a la comunicación entre sus
+peers. Una dependencia externa puede imponer otro protocolo que galaxIA no
+controla:
+
+- Un gateway HTTP/HTTPS de IPFS externo puede usarse para **leer** un CID cuando
+  ese servicio no ofrece acceso libp2p. Es una adaptación en la frontera del
+  servicio externo, no un transporte FHS y no lleva Envelopes ni mensajes de
+  Mission.
+- Si el nodo IPFS pertenece a la red galaxIA, se debe usar el acceso
+  IPFS/libp2p nativo. El gateway web no es el camino interno de la red.
+- El gateway externo debe ser explícito, limitado a lectura y validado contra
+  el CID. Nunca se anuncia en `Beacon.endpoint.multiaddr` ni se usa para
+  descubrimiento, dispatch, heartbeat, chat o tool calls.
+
+La misma frontera aplica a adaptadores locales de servicios LLM/OCR externos:
+su HTTP/HTTPS no forma parte del protocolo FHS.
+
 ## Stream directo
 
 El stream se negocia con el protocolo libp2p:

@@ -1,5 +1,10 @@
 # TASKS.md — Completar IDL del protocolo FHS
 
+> **Nota de alcance:** las tareas históricas que mencionan OpenAPI, REST,
+> WebSocket, WSS o SSE están supersedidas por DEC-0090/0091. Los únicos
+> contratos vigentes son `idl/fhs-protocol.proto` y la documentación AsyncAPI
+> del transporte libp2p; los JSON Schema son auxiliares y no wire format.
+
 ## Metadata
 
 - Iniciativa: `idl-protocol-complete`

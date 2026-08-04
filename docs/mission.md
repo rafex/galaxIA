@@ -108,14 +108,15 @@ Cuando Navigator busca un Star o Satellite para una Mission, usa el `scope` del 
 
 Cada `AssistantCompletedMessage` incluye `ProvenanceInfo` con la trazabilidad completa:
 
-```json
-{
-  "providerId":     "did:key:z<star>",
-  "model":          "llama3.2:3b",
-  "completionTokens": 142,
-  "toolProviderIds": ["did:key:z<satellite-ocr>", "did:key:z<ephemeral-satellite>"],
-  "dataExported":   false,
-  "jurisdiction":   "MX"
+```protobuf
+ProvenanceInfo {
+  provider_id: "did:key:z<star>"
+  model: "llama3.2:3b"
+  completion_tokens: 142
+  tool_provider_ids: "did:key:z<satellite-ocr>"
+  tool_provider_ids: "did:key:z<ephemeral-satellite>"
+  data_exported: false
+  jurisdiction: "MX"
 }
 ```
 

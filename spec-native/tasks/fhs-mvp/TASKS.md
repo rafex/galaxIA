@@ -1,5 +1,10 @@
 # TASKS.md — Iniciativa fhs-mvp
 
+> **Backlog histórico/superado:** estas tareas pertenecen a la PoC HTTP/
+> WebSocket/SSE anterior y no deben ejecutarse como plan vigente. El trabajo
+> actual debe seguir `idl/fhs-protocol.proto`, `docs/transport.md` y las
+> decisiones DEC-0090/0091/0092.
+
 ## Especificación relacionada
 
 - `spec-native/specs/fhs-mvp/SPEC.md` (SPEC-FHS-0001)

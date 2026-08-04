@@ -1472,3 +1472,29 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
 - **Consecuencia:** el código generado debe usar los tipos Protobuf anidados y
   firmar la serialización Protobuf determinista de cada mensaje, sin hashes de
   texto JSON.
+
+## DEC-0092 — Gateway IPFS externo como frontera de adaptación
+
+- **Fecha:** 2026-08-03
+- **Estado:** `accepted`
+- **Contexto:** FHS exige libp2p-only y Protobuf-only, pero algunos servicios
+  IPFS externos solo ofrecen un gateway HTTP/HTTPS. galaxIA no controla esos
+  servicios y no puede imponerles acceso P2P. El gateway no transporta mensajes
+  FHS, pero sí puede ser necesario para recuperar los bytes de un adjunto.
+- **Decisión:**
+  1. El tráfico FHS entre peers —incluidos Beacon, descubrimiento, dispatch,
+     handshake, chat, tools y reputación— sigue usando únicamente libp2p y
+     Protobuf.
+  2. Se permite un gateway HTTP/HTTPS externo únicamente como ruta de lectura
+     de datos IPFS cuando el servicio externo no ofrece libp2p. Es una frontera
+     de adaptación, no un transporte, endpoint ni peer FHS.
+  3. Si el IPFS es operado dentro de la red galaxIA, la recuperación y
+     publicación deben usar el acceso IPFS/libp2p nativo. El gateway web no es
+     el camino interno.
+  4. La referencia a un gateway externo debe ser explícita, de solo lectura,
+     verificarse contra el CID y nunca usarse para control, descubrimiento,
+     Mission, heartbeat o comunicación entre providers.
+- **Consecuencias:** `gatewayUrl`, cuando sea necesario para la integración
+  externa, se documenta como pista de recuperación dentro del `DynamicValue`
+  Protobuf y no como `endpoint.multiaddr`. Los servicios externos quedan fuera
+  del perímetro que FHS puede hacer cumplir.

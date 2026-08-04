@@ -1,42 +1,52 @@
-# STACK.md
+# STACK.md — stack vigente
 
-## Runtime
+> **Nota normativa:** este archivo describe el stack actual del protocolo. Las
+> referencias históricas a Fastify, WebSocket, WSS, SSE, REST o OpenAPI
+> corresponden a PoC retiradas y no son dependencias del wire FHS.
 
-- **Lenguaje:** TypeScript
-- **Versión:** >= 5.0
-- **Entorno:** Node.js >= 20
+## Contratos y serialización
 
-## Frameworks
+- **Protobuf v3:** formato único de wire para FHS.
+- **LPP:** framing de los Envelopes dentro del stream libp2p.
+- **libp2p:** DHT Kademlia, GossipSub y stream directo
+  `/fhs/v1/0.1.0`.
+- **AsyncAPI:** documentación del protocolo; no introduce un transporte web.
+- **JSON Schema:** validación y documentación auxiliar en `schemas/`; no se
+  transmite por FHS.
+- **XML:** no forma parte del protocolo ni de sus artefactos normativos.
 
-- **Frontend:** Vite + vanilla TypeScript + HTML5 + CSS3
-  - Sin React, Vue ni frameworks pesados para mantener el PoC ligero.
-  - Componentes nativos o funciones puras de manipulación de DOM.
-- **Backend:** Fastify
-  - Ligero, rápido y con buen soporte para WebSocket y SSE.
-- **Cliente de tools:** FHS WebSocket propio (`apps/agent-server/src/providers/mcp-host.ts`), **no** el SDK oficial de MCP — se removió como dependencia tras DEC-0014 (nunca conectaba con los providers reales de este repo, que hablan FHS, no MCP nativo).
-- **HTTP Client:** `curl` vía `child_process.execFile` en los bridges de los providers (evita un conflicto de event loop entre `ws` y Undici, ver `spec-native/DECISIONS.md`).
+## Runtimes
 
-## Infraestructura
+Los runtimes de Portal, Navigator, Atlas, Star, Satellite y Nova se mantienen
+en repositorios separados. Cada implementación puede elegir el lenguaje y la
+biblioteca libp2p que necesite, siempre que respete el IDL Protobuf, el framing,
+las firmas y el protocolo `/fhs/v1/0.1.0`.
 
-- **Base de datos:** almacenamiento en memoria para la PoC (interfaz `RegistryStore` preparada para SQLite u otro backend).
-- **Contenedores:** Podman / Docker Compose en `containers/compose.yaml`. Cada servicio tiene su propio `Containerfile`:
-  - `containers/agent-server/` — Agent Backend
-  - `containers/web/` — Frontend con Nginx
-  - `containers/llm-provider/` — Wrapper FHS hacia llama.cpp
-  - `containers/ocr-provider/` — Wrapper FHS hacia ether-ocr-api (TypeScript; ya no existe una implementación propia en Python)
-- **Hosting (PoC):** local o en el host `192.168.3.173` con Podman; cada nodo puede correr en su propia máquina.
-- **CI/CD:** a definir (por ahora manual para la ponencia).
-- **Observabilidad:** logs por consola en `agent-server`; panel de actividad en `apps/web`.
+Este repositorio conserva el contrato compartido y herramientas como
+`protoc`/validadores; no define un servidor HTTP para el protocolo.
 
-## Integraciones
+## Dependencias externas
 
-- **llama.cpp / llama-server:** proveedor LLM local, expuesto como servidor HTTP compatible con OpenAI API. Se gestiona fuera de este repo (proyecto `PoC-Llama.cpp` en el bastion).
-- **ether-ocr-api:** servicio REST de OCR (Tesseract por debajo), proveedor de capacidad `document.ocr` vía `examples/ocr-provider/`. Corre en su propio contenedor.
-- **WebSocket:** conexión entre proveedores y Registry embebido, y entre Agent Server y providers (FHS).
-- **SSE:** streaming de eventos del agente hacia el frontend, filtrado por `conversationId`.
+Un nodo puede envolver servicios que no controla:
 
-## Restricciones
+- LLM/OCR externos: HTTP/HTTPS solo dentro del adaptador local del provider.
+- IPFS externo: un gateway HTTP/HTTPS de lectura es una excepción de adaptación
+  cuando el servicio no ofrece libp2p. No transporta mensajes FHS.
+- IPFS de la red galaxIA: acceso nativo IPFS/libp2p obligatorio; el gateway
+  externo no se usa como sustituto interno.
 
-- **Restricción de versión:** Node.js >= 20 para usar `fetch` nativo y APIs modernas.
-- **Restricción de plataforma:** v0.1 se prueba en macOS y Linux. Windows puede requerir ajustes menores.
-- **Restricción de red:** se asume red local o VPN comunitaria. No se incluye NAT traversal.
+Estas integraciones no se anuncian como endpoints FHS, no participan en
+descubrimiento ni reciben el Beacon o los mensajes de Mission.
+
+## Restricciones de implementación
+
+- No agregar rutas de protocolo HTTP/HTTPS, REST, WebSocket/WSS o SSE.
+- No agregar JSON/XML embebido en `string` o `bytes` para representar datos
+  estructurados del protocolo.
+- Mantener `endpoint.multiaddr` como única autoridad de conexión.
+- Verificar PeerId, DID, firma, versión, timestamp y destinatario antes de
+  procesar cualquier payload.
+
+Consulta [spec-native/ARCHITECTURE.md](ARCHITECTURE.md),
+[docs/transport.md](../docs/transport.md) y
+[spec-native/DECISIONS.md](DECISIONS.md).

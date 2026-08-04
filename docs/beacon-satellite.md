@@ -46,30 +46,24 @@ Ver `protocol/p2p.md` y `idl/gossipsub.md` para el flujo completo.
 
 Cuando Navigator abre el stream directo post-assign, puede enviar `tool.list` para obtener el schema de cada tool:
 
-```json
-{
-  "type": "tool.list.response",
-  "missionId": "uuid-v4",
-  "tools": [
-    {
-      "name": "ocr_extract",
-      "description": "Extrae texto de una imagen o PDF",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "file_base64": {
-            "type": "string",
-            "description": "Archivo codificado en base64 (imagen o PDF)"
-          },
-          "lang": {
-            "type": "string",
-            "description": "Idiomas OCR separados por + (default: spa+eng)"
-          }
-        },
-        "required": ["file_base64"]
+```protobuf
+ToolListResponse {
+  mission_id: "uuid-v4"
+  tools: {
+    name: "ocr_extract"
+    description: "Extrae texto de una imagen o PDF"
+    input_schema: {
+      properties: {
+        name: "file"
+        description: "Referencia ArtifactRef inline o IPFS"
       }
+      properties: {
+        name: "lang"
+        description: "Idiomas OCR separados por + (default: spa+eng)"
+      }
+      required: "file"
     }
-  ]
+  }
 }
 ```
 

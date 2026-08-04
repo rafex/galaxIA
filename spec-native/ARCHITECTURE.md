@@ -1,128 +1,89 @@
-# ARCHITECTURE.md
+# ARCHITECTURE.md — arquitectura vigente
+
+> **Contrato actual (DEC-0090, DEC-0091 y DEC-0092):** FHS es libp2p-only y
+> Protobuf-only. Los flujos HTTP, HTTPS, WebSocket, WSS, SSE, REST y OpenAPI
+> que aparezcan en documentos históricos describen PoC anteriores y no deben
+> implementarse como transporte FHS.
 
 ## Visión general
 
-FHS es un protocolo para descubrir, autenticar, seleccionar y consumir capacidades de IA distribuidas entre nodos soberanos. La implementación del MVP consta de un chat web, un agente backend y un protocolo compartido. El backend descubre proveedores locales o comunitarios, selecciona un modelo LLM, invoca tools MCP cuando el modelo las solicita y devuelve la respuesta al usuario con transparencia total de procedencia.
+FHS descubre, autentica, selecciona y consume capacidades de IA distribuidas
+entre peers soberanos. Todos los nodos —Portal, Navigator, Atlas, Star,
+Satellite y Nova— participan en la red libp2p. Atlas puede actuar como peer de
+bootstrap, pero no es un registro central, proxy ni punto obligatorio de paso
+para una Mission.
 
-## Módulos principales
+Este repositorio es actualmente IDL/documentación y herramientas de validación;
+los runtimes de las aplicaciones viven en repositorios separados. La
+arquitectura normativa de esos runtimes es la siguiente.
 
-### `packages/fhs-protocol`
-- **Responsabilidad:** definir los contratos del protocolo FHS v0.1.
-- **Inputs:** manifiestos de proveedores, mensajes WebSocket.
-- **Outputs:** tipos TypeScript, esquemas de manifiesto, mensajes de registro.
-- **Límites:** no contiene lógica de red ni runtime. Solo contratos.
+## Capas normativas
 
-### `apps/agent-server`
-- **Responsabilidad:** host del agente. Expone API REST + WebSocket para chat, mantiene el Registry embebido y ejecuta el ciclo del agente. Es el orquestador central: toda comunicación con proveedores pasa por él.
-- **Inputs:** mensajes del chat vía WebSocket, registro de nodos vía FHS WebSocket, preferencias de privacidad.
-- **Outputs:** eventos tipados FHS al frontend, llamadas a LLM vía FHS WebSocket, invocación de tools MCP.
-- **Límites:** no ejecuta directamente el OCR ni el modelo; delega a proveedores externos registrados en el Registry.
-
-#### Submódulos internos
-
-- **`registry/`**: mantiene el catálogo de nodos y servicios en memoria (MemoryRegistryStore), gestiona leases (30s) y heartbeats (10s) por WebSocket en `/fhs/v1/ws`. Expone `getProviders(type)` para que el runtime resuelva LLM y tools.
-- **`agent/`**: ejecuta el ciclo del agente: clasificar intención, resolver LLM desde Registry, resolver tools MCP desde Registry, generar vía LlmGateway, ejecutar tools vía McpHost, responder con procedencia.
-- **`providers/llm-gateway.ts`**: **habla exclusivamente el protocolo FHS.** Abre un WebSocket al LLM provider y envía `chat.request` con el `GenerateRequest`. Recibe `chat.delta` (streaming) y `chat.completed` (respuesta final). No conoce OpenAI API. El provider LLM es un nodo FHS completo (`examples/llm-provider/`) que traduce `chat.request` → llama.cpp internamente. Esto permite demostrar el protocolo end-to-end.
-- **`providers/mcp-host.ts`**: pese al nombre, **no usa el SDK oficial de MCP** — habla FHS WebSocket (`tool.list`/`tool.call`/`tool.result`) directamente con el provider, igual que `llm-gateway.ts`. Corregido en DEC-0014: la implementación original sí usaba `StreamableHTTPClientTransport` del SDK MCP-HTTP contra un endpoint `ws://`, por lo que nunca lograba conectar con los providers reales de este repo.
-- **`api/`**: endpoints REST (`/api/fhs/providers`, `/api/fhs/models`) y WebSocket (`/api/chat/ws` para chat, `/fhs/v1/ws` para Registry).
-- **`sse/`**: bus de eventos (`EventBus`) que distribuye eventos tipados FHS a los runtimes y al frontend.
-
-### `apps/web`
-- **Responsabilidad:** interfaz de chat. Permite enviar mensajes, adjuntar archivos, elegir modelo y ámbito de privacidad, y ver actividad/procedencia del agente.
-- **Inputs:** teclado, archivos, selección de usuario.
-- **Outputs:** llamadas a la API REST, suscripción SSE.
-- **Límites:** no conecta directamente a nodos; todo pasa por `agent-server`.
-
-## Flujo principal
-
-1. El usuario envía un mensaje desde `apps/web` vía WebSocket a `/api/chat/ws`.
-2. `agent-server` recibe el mensaje y el Agent Runtime clasifica las capacidades necesarias.
-3. El runtime consulta al Registry (`getProviders("llm")`) y resuelve el mejor LLM (prefiere tool calling nativo).
-4. El runtime consulta al Registry (`getProviders("mcp")`) y resuelve tools MCP candidatas.
-5. El LlmGateway **abre un WebSocket FHS** al LLM provider (`chat.request`) con historial + tools.
-6. Si el LLM responde con tool calls, el runtime:
-   - verifica permisos con el policy engine,
-   - resuelve el proveedor MCP desde el Registry,
-   - ejecuta la tool vía McpHost,
-   - reinyecta el resultado en el LLM con una segunda llamada FHS.
-7. El LLM genera la respuesta final (`chat.completed`) y el runtime emite `assistant.delta` + `assistant.completed` al frontend vía EventBus.
-8. El frontend muestra la respuesta junto con su procedencia completa (qué LLM, qué tools, qué datos viajaron).
-
-### Protocolo FHS en la capa LLM
-
-```
-Agent Runtime          LlmGateway           LLM Provider (FHS node)      llama.cpp
-     │                     │                        │                      │
-     │ generate(sel, req)  │                        │                      │
-     ├────────────────────►│                        │                      │
-     │                     │ WebSocket FHS          │                      │
-     │                     │ chat.request ─────────►│                      │
-     │                     │                        │ HTTP /chat/completions
-     │                     │                        ├─────────────────────►│
-     │                     │                        │◄─────────────────────┤
-     │                     │◄── chat.delta ─────────┤                      │
-     │                     │◄── chat.completed ─────┤                      │
-     │◄────────────────────┤                        │                      │
-```
-
-El Agent Server no conoce la API de llama.cpp. Solo habla FHS. El provider LLM (`examples/llm-provider/`) es el único que traduce FHS → HTTP internamente.
-
-### Protocolo FHS en la capa de Tools (OCR)
-
-```
-Agent Runtime         MCP Host           OCR Provider (FHS node)    ether-ocr-api
-     │                   │                        │                      │
-     │ resolveTool()     │                        │                      │
-     ├──────────────────►│                        │                      │
-     │                   │ FHS WebSocket          │                      │
-     │                   │ tool.call ────────────►│                      │
-     │                   │                        │ curl -F              │
-     │                   │                        │ POST /api/v1/ocr ───►│
-     │                   │                        │◄── {"status":"ok"} ──┤
-     │                   │◄── tool.result ────────┤                      │
-     │◄──────────────────┤                        │                      │
-```
-
-El OCR Provider (`examples/ocr-provider/`) traduce `tool.call` (FHS WebSocket) → `curl -F` multipart/form-data a ether-ocr-api. El Agent Server no conoce la API REST de ether-ocr.
-
-### Puentes internos (bridges)
-
-Ambos providers usan `curl` vía `child_process.execFile` en vez de `fetch()`/`http.request()` de Node.js. Esto evita un conflicto de event loop entre la librería `ws` y Undici (cliente HTTP nativo de Node.js). El bug se manifiesta como `fetch` colgado indefinidamente cuando se llama desde un handler WebSocket.
-
-- **LlmBridge** (`examples/llm-provider/src/llm-bridge.ts`): `curl -X POST` a llama.cpp OpenAI-compatible API
-- **OcrBridge** (`examples/ocr-provider/src/ocr-bridge.ts`): `curl -F` multipart a ether-ocr-api REST API
-
-### Redes Docker
-
-Los servicios galaxIA usan la red `fhs` (bridge). `ether-ocr-api` está en `containers_default`. Se conecta manualmente a `fhs`:
-
-```bash
-podman network connect fhs ether-ocr-api
-```
-
-| Origen | Destino | Transporte |
+| Necesidad | Implementación FHS | Serialización |
 |---|---|---|
-| `agent-server` | `llm-provider:43111` | FHS WebSocket |
-| `agent-server` | `ocr-provider:43112` | FHS WebSocket |
-| `llm-provider` | `host.containers.internal:8080` | curl → llama.cpp |
-| `ocr-provider` | `ether-ocr-api:8000` | curl -F → REST API |
+| Descubrimiento y presencia | DHT Kademlia + `DhtBeaconRecord` | Protobuf firmado |
+| Ofertas, bids, asignaciones y reputación | GossipSub | Protobuf firmado |
+| Handshake, Pulse, chat y tools | Stream libp2p `/fhs/v1/0.1.0` | Envelope Protobuf + LPP |
+| Identidad | Ed25519, `did:key` y PeerId libp2p | Campos tipados Protobuf |
+
+`endpoint.multiaddr` es la única dirección de conexión que se anuncia en un
+Beacon. No existe `endpoint.url` como ruta normativa ni se transportan mensajes
+FHS por un endpoint web.
+
+## Flujo de una Mission
+
+1. Portal y Navigator se conectan como peers libp2p.
+2. Navigator descubre capacidades mediante DHT/GossipSub y verifica Beacon,
+   PeerId, firma, versión, timestamp y destinatario.
+3. Navigator publica una oferta de Mission y recibe bids por GossipSub.
+4. Tras asignar un provider, abre directamente el stream libp2p
+   `/fhs/v1/0.1.0`.
+5. Handshake, Pulse, `chat.*`, `tool.*` y los resultados viajan como Envelopes
+   Protobuf con framing LPP.
+6. La reputación posterior se publica como mensaje Protobuf firmado en
+   GossipSub o como record DHT según corresponda.
+
+## Serialización
+
+`idl/fhs-protocol.proto` es la fuente wire canónica. Beacon, esquemas de tools,
+argumentos, resultados, records DHT, mensajes GossipSub y Envelopes son tipos
+Protobuf. No se embebe JSON, XML ni otro formato textual en campos `string` o
+`bytes` para representar datos estructurados del protocolo.
+
+Los archivos JSON Schema que permanecen en `schemas/` son artefactos auxiliares
+para documentación y validación local. No son wire format ni requisito de
+interoperabilidad.
+
+## Fronteras de integración externa
+
+Las dependencias externas pueden imponer sus propios protocolos; eso no cambia
+el transporte FHS entre peers:
+
+- Un provider puede adaptar localmente un motor LLM/OCR externo que solo ofrezca
+  HTTP/HTTPS. Ese HTTP/HTTPS queda dentro del adaptador y nunca lleva mensajes
+  FHS entre nodos.
+- Un gateway HTTP/HTTPS de IPFS externo puede usarse solo para leer un CID cuando
+  el servicio externo no ofrece acceso libp2p y galaxIA no puede imponerle otro
+  transporte. Es una frontera de adaptación de datos, no un canal FHS.
+- Si el IPFS pertenece a la red galaxIA o es operado por un nodo de galaxIA, la
+  recuperación y publicación deben usar el acceso IPFS/libp2p nativo. El
+  gateway web no puede sustituir esa ruta interna.
+
+El gateway externo debe ser explícito, de lectura, verificarse contra el CID y
+no puede aparecer como `multiaddr`, Beacon, ruta de descubrimiento, despacho,
+heartbeat, chat o tool call. Ver DEC-0092 y
+`spec-native/specs/ipfs-adjuntos/SPEC.md`.
 
 ## Restricciones
 
-- **Dependencias prohibidas:** el frontend no puede llamar directamente a proveedores LLM o MCP; todo debe pasar por `agent-server`.
-- **Acoplamientos a evitar:** el runtime no debe conocer implementaciones concretas de LLM ni de tools. Solo usa adaptadores.
-- **Límites de infraestructura:** v0.1 asume red local o comunidad de confianza. NAT traversal y DHT quedan para versiones posteriores.
-- **DID simplificado:** en la PoC se usa `did:key:<nombre-simple>` sin criptografía. Esto es deuda técnica documentada en `DECISIONS.md`.
+- No se implementan REST, OpenAPI, HTTP, HTTPS, WebSocket, WSS ni SSE como
+  transporte o adaptador FHS.
+- Todo nodo FHS debe poder participar como peer libp2p; un cliente que solo
+  pueda usar HTTP no es una implementación FHS conforme.
+- La distribución de documentación, código o artefactos estáticos fuera de la
+  red no forma parte del protocolo.
+- Las interfaces locales de administración, health checks y configuración no
+  deben confundirse con el plano FHS ni anunciarse en Beacons.
 
-## Riesgos
-
-| Riesgo | Impacto | Mitigación |
-|---|---|---|---|
-| Un modelo local no soporta tool calling nativo | Alto | Implementar degradación graceful: prompt-template o ejecución manual |
-| Nodo MCP se desconecta durante una conversación | Medio | Registry detecta la caída por lease y el runtime busca alternativa |
-| El Registry embebido se convierte en cuello de botella | Medio | Documentar separación como tarea pendiente v0.2 |
-| Usuario espera latencia de nube en hardware viejo | Medio | Mostrar tiempos y proveedores; establecer expectativas en la demo |
-| ether-ocr-api no está en la red `fhs` tras reinicio | Bajo | Conectar manualmente: `podman network connect fhs ether-ocr-api`. Automatizar en v0.2 |
-| Modelo LLM demasiado lento en hardware comunitario | Alto | Modelo configurable por env vars (DEC-0019), no hardcodeado. Timeouts a 300s. `llama-server` puede quedar en estado degradado tras varias corridas seguidas — verificar `/slots` y reiniciar si hace falta (ver `docs/despliegue.md`) |
-| fetch()/http.request() de Node.js se cuelga con ws | Alto | Usar curl vía child_process en los bridges (LlmBridge, OcrBridge) |
-| Modelos pequeños no invocan tool calling de forma confiable | Alto | Ejecución determinística de OCR sin depender de la decisión del LLM (DEC-0020); confirmación explícita del usuario antes de gastar una llamada al LLM (SPEC-OCRCONFIRM-0001) |
+Consulta [docs/transport.md](../docs/transport.md), [docs/network.md](../docs/network.md),
+[idl/framing.md](../idl/framing.md) y [docs/p2p.md](../docs/p2p.md).

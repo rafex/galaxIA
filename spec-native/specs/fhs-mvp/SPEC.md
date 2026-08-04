@@ -1,5 +1,11 @@
 # SPEC-FHS-0001 — MVP FHS v0.1: ChatGPT Comunitario
 
+> **Documento histórico/superado:** este MVP conserva el diseño de la PoC
+> original para trazabilidad. Sus referencias a Registry HTTP, WebSocket, SSE,
+> REST, JSON y DID simplificado no son normativa vigente ni deben
+> implementarse. El contrato actual es libp2p-only + Protobuf-only conforme a
+> DEC-0090/0091; las integraciones externas se rigen por DEC-0092.
+
 ## Estado
 
 `active`

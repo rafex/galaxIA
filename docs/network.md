@@ -14,6 +14,18 @@ de bootstrap; no es un registro ni un proxy de Missions.
 
 No existe un plano de borde ni un plano web dentro de FHS.
 
+## Servicios externos
+
+FHS no puede imponer libp2p a un servicio externo. Por eso un provider puede
+adaptar localmente un servicio LLM/OCR que solo exponga HTTP/HTTPS, y un
+gateway HTTP/HTTPS de IPFS externo puede servir como ruta de lectura de un CID.
+Estas son integraciones fuera de FHS: no reciben mensajes FHS ni se anuncian
+como peers o multiaddrs.
+
+Para un IPFS operado dentro de la red galaxIA, la ruta obligatoria es
+IPFS/libp2p nativo. El gateway externo solo cubre el caso en que el servicio de
+IPFS está fuera de nuestro control y no ofrece transporte P2P.
+
 ## Topología
 
 ```mermaid

@@ -1,5 +1,12 @@
 # SPEC-IPFS-0001 — Transporte de adjuntos vía IPFS, configurable por el usuario
 
+> **Transporte vigente (DEC-0090, DEC-0091 y DEC-0092):** FHS transporta sus
+> mensajes únicamente por libp2p y los serializa únicamente con Protobuf. Un
+> gateway HTTP/HTTPS de IPFS externo es una excepción de integración: se admite
+> solo porque galaxIA no puede controlar ni imponer libp2p a ese servicio. No
+> transporta mensajes FHS. Si el IPFS está dentro de la red galaxIA, debe usarse
+> su acceso nativo IPFS/libp2p; el gateway web no sustituye la ruta interna.
+
 ## Estado
 
 `done (local)` — implementado y verificado con `npm run typecheck`/`build` en `galaxIA` (protocolo, Navigator, Portal) y `galaxIA-satellite-star` (`satellite-ocr-example`); UI verificada en `portal-dev` real. Ver DEC-0044, DEC-0045, DEC-0046, DEC-0047, DEC-0051, DEC-0052, DEC-0053.
@@ -16,12 +23,21 @@ Además, la transmisión directa acopla inevitablemente "quién envía la petici
 
 ## Propuesta
 
-Agregar IPFS como un **transporte alternativo de adjuntos**, elegible por el usuario en el Portal — no un reemplazo obligatorio de la transmisión directa. Ambos modos coexisten.
+Agregar IPFS como una **forma alternativa de disponibilidad de adjuntos**,
+elegible por el usuario en el Portal — no como un transporte alternativo del
+protocolo FHS. El descriptor del artefacto viaja por el stream libp2p como
+Protobuf; los bytes se recuperan desde IPFS según la frontera interna o externa
+descrita abajo.
 
 ### Dos modos, configurables en el Portal
 
 1. **Transmisión directa (default, comportamiento actual sin cambios):** el archivo viaja completo en el payload del protocolo, como hoy.
-2. **Vía IPFS (opt-in):** el Portal sube el archivo a un nodo IPFS, obtiene un CID, y el protocolo FHS transporta **solo el CID** hacia el provider (en vez del binario). El provider descarga el blob por su cuenta usando ese CID, en su propio momento — no necesita estar recibiendo un stream en tiempo real, puede tratarlo como un **proceso batch**: descargar cuando le convenga, procesarlo, y responder cuando termine.
+2. **Vía IPFS (opt-in):** Navigator sube el archivo a un nodo IPFS, obtiene un
+   CID, y FHS transporta **solo la referencia tipada** hacia el provider por
+   libp2p (en vez del binario). El provider recupera el blob en su propio
+   momento. Si el nodo IPFS es de galaxIA, usa IPFS/libp2p nativo; si es un
+   servicio externo que solo ofrece gateway, puede usar su HTTP/HTTPS de
+   lectura como excepción de frontera.
 
 La elección es una preferencia explícita del usuario en el Portal (mismo patrón que `preferences.ocrMode`/`preferences.kb` — un control visible en la barra de configuración, no un comportamiento oculto).
 
@@ -33,16 +49,35 @@ La pregunta abierta original ("¿red IPFS pública o nodo privado del operador?"
 
 Consecuencia directa: **el CID solo no alcanza.** Un CID identifica el contenido, pero no dice en qué red/nodo buscarlo — si el usuario eligió un nodo privado, el provider (satellite) necesita saber *dónde* pedir ese CID, no solo *cuál* CID pedir.
 
-### `ArtifactRef` — tipo de protocolo compartido, no campos ad hoc por tool (DEC-0046)
+### `ArtifactRef` — modelo lógico Protobuf compartido, no campos ad hoc por tool (DEC-0046)
+
+`ArtifactRef` no convierte HTTP/HTTPS en transporte FHS. Es el modelo lógico de
+la referencia; en el IDL vigente no existe un mensaje wire independiente con
+ese nombre. Sus campos se representan dentro de `DynamicValue`/
+`DynamicObject`, definidos en `idl/fhs-protocol.proto`, y por tanto viajan
+siempre como Protobuf. Un `gateway_url`, si se conserva por razones de
+integración externa, es solo una pista de recuperación de datos fuera de la red
+FHS.
 
 Descargar un CID (leer) y subir/pinear contenido nuevo (escribir) son operaciones distintas con requisitos distintos:
 
-- **Leer** (lo que necesita quien resuelve un CID): un **gateway URL** de solo lectura (ej. `https://ipfs.io/ipfs/<CID>` en público, o `http://mi-nodo:8080/ipfs/<CID>` en uno propio — puerto por defecto de Kubo). Normalmente sin autenticación en un gateway público; en uno privado, solo si el operador lo puso detrás de un proxy con auth.
+- **Leer desde IPFS externo** (lo que necesita quien resuelve un CID): un
+  **gateway URL** de solo lectura (por ejemplo `https://ipfs.io/ipfs/<CID>` en
+  público). Esta ruta se permite únicamente porque el servicio externo puede no
+  ofrecer libp2p y no está bajo control de galaxIA.
+- **Leer desde IPFS interno de galaxIA:** resolver el CID mediante la red
+  IPFS/libp2p nativa y la identidad/multiaddrs del nodo. No depender de un
+  gateway HTTP/HTTPS público o local si el servicio está integrado al swarm.
 - **Escribir** (lo que necesita quien sube): un **API endpoint** distinto del gateway (ej. puerto `5001` de Kubo, o el endpoint de un servicio de pinning tipo Pinata/web3.storage), casi siempre con credenciales (API key/Bearer token) porque subir/pinear consume recursos del nodo.
 
 El endpoint de **escritura** es configuración local de quien sube — nunca necesita viajar por el protocolo FHS. Solo el endpoint de **lectura** (el gateway) es lo que la otra parte necesita para resolver el CID, y por lo tanto es lo único que el protocolo transporta.
 
-Esto se modela como un tipo compartido en `packages/fhs-protocol/src/types.ts`, no como campos sueltos redefinidos en cada tool — mismo patrón que `RetentionPolicy` (DEC-0025) o `Signal` (DEC-0028):
+Esto se modela como un contrato lógico compartido, no como campos sueltos
+redefinidos en cada tool — mismo patrón conceptual que `RetentionPolicy`
+(DEC-0025) o `Signal` (DEC-0028). En el wire actual,
+`ToolCallFunction.arguments` y `ToolCallResultMessage.result` son
+`DynamicValue` Protobuf; los runtimes deben validar allí la forma lógica de
+`ArtifactRef`:
 
 ```ts
 export type ArtifactRef =
@@ -58,16 +93,23 @@ export type ArtifactRef =
     };
 ```
 
-`gatewayUrl` opcional si `network` es `"public"` (se puede usar un gateway público por default, ver preguntas abiertas); obligatorio si `"private"`. `retention` solo aplica al modo `"ipfs"` — un adjunto `"inline"` no tiene nada que pinear/borrar.
+`gatewayUrl` solo se incluye cuando hace falta resolver un IPFS externo (por
+ejemplo, un gateway público o privado que no expone libp2p); no es un endpoint
+FHS y no sustituye `endpoint.multiaddr`. Para un IPFS interno de galaxIA, la
+referencia debe resolverse por libp2p. `retention` solo aplica al modo `"ipfs"`.
 
 ### Dirección inversa: el provider también puede subir y devolver un CID
 
 Además de recibir adjuntos vía IPFS, un provider debe poder **generar** un resultado (ej. una imagen procesada, un artefacto grande) y devolverlo de la misma forma — subiéndolo él mismo a IPFS (a su propio endpoint de escritura, configuración local suya) y devolviendo un `ArtifactRef` con `transport: "ipfs"` en vez de un payload inline. Mismo tipo, dirección simétrica: cualquiera de las dos partes (quien pide, quien resuelve) puede ser quien sube o quien descarga.
 
-**Dónde vive `ArtifactRef` en los mensajes existentes** (`packages/fhs-protocol/src/messages.ts`):
+**Dónde vive `ArtifactRef` en los mensajes existentes** (`idl/fhs-protocol.proto`):
 
-- **Entrada** — `ToolCallRequestMessage.arguments` reemplaza el campo `file_base64: string` de cada tool por un solo campo `file: ArtifactRef` (el `transport` decide si viene inline o por IPFS; ya no hace falta un nombre de parámetro distinto por modo).
-- **Salida** — `ToolCallResultMessage.content` (hoy `Array<{ type: "text"; text: string }>`) gana un nuevo tipo de item, `{ type: "artifact"; artifact: ArtifactRef }`, para que un provider devuelva un resultado vía IPFS con la misma forma exacta con la que recibió uno.
+- **Entrada** — `ToolCallFunction.arguments` es un `DynamicValue`; cuando una
+  tool recibe un adjunto, su objeto lógico `file` sigue la forma de
+  `ArtifactRef` dentro de ese valor Protobuf.
+- **Salida** — `ToolCallResultMessage.result` es un `DynamicValue`; un provider
+  puede devolver un resultado de artefacto con la misma forma lógica, sin
+  introducir un campo JSON ni un transporte adicional.
 
 ### Por qué IPFS resuelve el problema de fondo
 
@@ -90,8 +132,8 @@ Dos modos, declarados explícitamente en el Portal al subir el archivo — reemp
 ### Dentro del alcance
 
 - Configuración en el Portal (DEC-0052): activar/desactivar transporte IPFS, red (pública/privada) si está activo, y modo de retención (efímera/reutilizar) — configuración explícita, no una elección oculta ni un default silencioso.
-- Subida del archivo a IPFS **desde Navigator** (DEC-0051) — el Portal sigue siendo un frontal puro, entrega el binario a Navigator igual que ya hace hoy en el modo directo (`artifacts: string[]` en `chat-ws.ts`); Navigator usa su endpoint de escritura configurado localmente (nunca transportado por el protocolo, ver `ArtifactRef` arriba).
-- Nuevo tipo de protocolo `ArtifactRef` (`packages/fhs-protocol/src/types.ts`) — reemplaza `file_base64: string` en `ToolCallRequestMessage.arguments` por `file: ArtifactRef`, y agrega `{ type: "artifact"; artifact: ArtifactRef }` como nuevo item posible en `ToolCallResultMessage.content`. Incluye `retention?: "ephemeral" | "reuse"` (DEC-0052).
+- Subida del archivo a IPFS **desde Navigator** (DEC-0051) — el Portal sigue siendo un frontal puro; Navigator usa la integración de publicación configurada localmente. Si el IPFS es interno de galaxIA, esa integración debe usar IPFS/libp2p nativo. Si es un servicio externo, puede usar la interfaz que el servicio imponga, sin transportar sus credenciales por FHS.
+- Contrato lógico `ArtifactRef` — reemplaza `file_base64: string` en el objeto lógico de argumentos por `file: ArtifactRef`; en el wire se representa dentro de `DynamicValue` Protobuf e incluye `retention?: "ephemeral" | "reuse"` (DEC-0052).
 - Simetría: un provider puede devolver un resultado de la misma forma (`ArtifactRef` con `transport: "ipfs"`), no solo recibir adjuntos así.
 - Contrato de borrado (DEC-0052, refinado en DEC-0053): en modo `ephemeral`, **Navigator** (no el satellite) hace unpin del CID en cuanto la llamada a la tool se resuelve (éxito o error); TTL de 3h como respaldo si Navigator mismo se cae antes de ese punto. En modo `reuse`, nadie borra automáticamente — el borrado queda como responsabilidad del usuario (sin mecanismo automático todavía). El satellite solo lee (`gatewayUrl`/`cid`), nunca necesita credenciales de escritura de IPFS.
 
@@ -123,7 +165,7 @@ Dos modos, declarados explícitamente en el Portal al subir el archivo — reemp
 3. ~~¿Quién sube el archivo a IPFS — el propio Portal (cliente) directo contra un nodo/gateway, o el Portal se lo entrega a Navigator y Navigator lo sube?~~ **Resuelta (DEC-0051): Navigator.** El Portal es un frontal puro, no debe guardar credenciales de escritura de IPFS en el navegador (expuestas por construcción). Navigator ya recibe el binario crudo hoy en el modo directo (`artifacts: string[]`, `chat-ws.ts`) — mismo punto de confianza, sin superficie nueva; solo cambia qué hace con el binario una vez recibido.
 4. ~~¿Cómo se implementa técnicamente "ampliar la ventana de retención" — un mensaje/acción nueva en el protocolo, o un parámetro adicional en la tool call original?~~ **Resuelta (DEC-0052):** no es una "ampliación" de una ventana — es una elección binaria declarada por adelantado (`ephemeral` vs `reuse`), transportada como parte de `ArtifactRef`. No hace falta un mensaje nuevo de protocolo.
 5. ~~¿Quién ejecuta el unpin cuando expira el TTL — un proceso propio de Navigator, un servicio aparte, o se delega al propio nodo IPFS si soporta expiración nativa?~~ **Resuelta (DEC-0052):** en modo `ephemeral`, el propio satellite que consumió el archivo, inmediatamente al responder (evento, no TTL) — con el TTL de 3h solo como respaldo si nunca responde. En modo `reuse`, nadie automáticamente — responsabilidad del usuario, sin mecanismo de expiración (funcionalidad de borrado bajo demanda queda a futuro).
-6. ~~¿Cuál es el gateway público *default* cuando el usuario elige `network: "public"` sin especificar `gatewayUrl`? ¿Configurable por el operador del nodo Portal, o hardcodeado a uno conocido (ej. `ipfs.io`)?~~ **Resuelta (DEC-0053):** default `https://ipfs.io/ipfs`, configurable por el operador de Navigator vía `IPFS_PUBLIC_GATEWAY_URL`. El Portal lo consulta en `GET /api/ipfs-config` y lo muestra explícitamente al usuario antes de que elija ese transporte — nunca un detalle oculto.
+6. ~~¿Cuál es el gateway público *default* cuando el usuario elige `network: "public"` sin especificar `gatewayUrl`? ¿Configurable por el operador del nodo Portal, o hardcodeado a uno conocido (ej. `ipfs.io`)?~~ **Resuelta (DEC-0053 y DEC-0092):** para un IPFS externo se puede configurar `https://ipfs.io/ipfs` u otro gateway de lectura mediante `IPFS_PUBLIC_GATEWAY_URL`; el valor se muestra explícitamente al usuario. Esto no aplica a un IPFS interno de galaxIA, que debe resolverse por libp2p nativo.
 7. ~~Si el usuario especifica un nodo privado para subir, ¿la subida y la descarga necesitan URLs distintas?~~ **Resuelta (DEC-0046):** son estructuralmente dos endpoints distintos siempre (API de escritura vs. gateway de lectura) — `ArtifactRef` solo modela el de lectura (`gatewayUrl`); el de escritura es config local de quien sube y nunca viaja por el protocolo.
 8. ~~¿`ArtifactRef` reemplaza por completo `file_base64`, o convive con él durante una transición?~~ **Resuelta (DEC-0047): se reemplaza.** No hay convivencia — `file_base64` se retira del schema de `arguments` en el mismo cambio que introduce `file: ArtifactRef`. Es un breaking change deliberado, no accidental: requiere actualizar `galaxIA` (protocolo) y `galaxIA-satellite-star` (providers que ya implementan `file_base64`: `satellite-ocr-example`, `rag-provider`, `kb-provider`) en el mismo ciclo de trabajo — no hay periodo donde ambas formas coexistan.
 
@@ -143,8 +185,8 @@ Dos modos, declarados explícitamente en el Portal al subir el archivo — reemp
 ## Notas
 
 - Implementado el 2026-07-07 (DEC-0053 documenta los refinamientos surgidos al implementar):
-  - **Protocolo:** `ArtifactRef.retention`, `ToolCallResultMessage.content` con el item `{ type: "artifact" }` (`packages/fhs-protocol/src/types.ts`/`messages.ts`).
-  - **Navigator:** `apps/navigator/src/ipfs/ipfs-client.ts` (cliente mínimo compatible con la API de Kubo — `IPFS_API_URL` para escritura, `IPFS_PUBLIC_GATEWAY_URL`/`IPFS_PRIVATE_GATEWAY_URL` para lectura). `runOcrDeterministically`/`executeToolCall` (`agent/runtime.ts`) reemplazan `file_base64` por `file: ArtifactRef`; unpin inmediato tras la respuesta + TTL de respaldo de 3h. `GET /api/ipfs-config` expone si IPFS está disponible y el gateway público default.
+  - **Protocolo:** el contrato lógico `ArtifactRef` se representa dentro de los `DynamicValue` Protobuf de `idl/fhs-protocol.proto`; no es un mensaje JSON ni un transporte separado.
+  - **Navigator:** mantiene localmente la configuración de publicación y lectura de IPFS. Si el nodo pertenece a galaxIA, debe resolver y publicar por IPFS/libp2p nativo. Para un servicio externo, cualquier API impuesta por ese servicio queda dentro del adaptador y fuera de FHS. El unpin ocurre tras la respuesta + TTL de respaldo de 3h; la configuración del gateway externo debe mostrarse al usuario por un mecanismo local, no por una ruta del protocolo FHS.
   - **Portal:** selector de transporte directo/IPFS + red + retención en la barra de configuración (`chat-view.ts`), deshabilitado si Navigator no tiene IPFS configurado, con el gateway público mostrado explícitamente. Bug de CSS encontrado y corregido: `.settings-bar label { display: flex }` sobrescribía el estilo UA de `[hidden]`, dejando visibles filas que debían estar ocultas — corregido con `.settings-bar [hidden] { display: none }`.
   - **`galaxIA-satellite-star`:** `examples/satellite-ocr-example/src/index.ts` resuelve `file: ArtifactRef` (inline o descarga desde `gatewayUrl`) — nunca hace unpin, eso es responsabilidad exclusiva de Navigator (ver DEC-0053). `rag-provider`/`kb-provider` no se tocaron — no exponen ninguna tool que reciba binarios.
   - Verificado con `npm run typecheck`/`build` en los dos repos, y la UI del Portal probada en `portal-dev` real (toggle directo/IPFS, visibilidad correcta de las filas tras el fix de CSS).

@@ -1,5 +1,11 @@
 # ROADMAP.md
 
+> **Baseline vigente:** las entradas históricas de esta hoja pueden mencionar
+> WebSocket, WSS, REST, SSE o HTTP porque registran implementaciones previas.
+> Desde DEC-0090/0091, FHS solo usa libp2p + Protobuf. La única excepción de
+> datos documentada es un gateway HTTP/HTTPS de IPFS externo fuera del control
+> de galaxIA; un IPFS dentro de la red galaxIA debe usar libp2p nativo (DEC-0092).
+
 ## Ahora
 
 - **Completado (DEC-0038):** separación de repos — `galaxIA` queda como protocolo/SDK/servicios core (Atlas, Navigator, Portal); las implementaciones de referencia de providers (`star-example`, `satellite-ocr-example`, `rag-provider`, `kb-provider`) se movieron a [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star) — 2026-07-06. `@galaxia/fhs-protocol` se consume ahí vía git (`github:rafex/galaxIA#fhs-protocol-dist`), no publicado a npm todavía.
