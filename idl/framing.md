@@ -1,125 +1,89 @@
 # FHS Framing Specification
 
-**Versión:** 1.0  
-**DEC:** DEC-0086  
-**Fecha:** 2026-08-02
+**Versión:** 1.0
 
-## Contexto
+**DEC:** DEC-0086 y DEC-0090
 
-El protocolo FHS puede operar en dos modos sobre un WebSocket:
+**Fecha:** 2026-08-03
 
-| Modo | `Sec-WebSocket-Protocol` | Frame type | Formato |
-|------|--------------------------|------------|---------|
-| **Primario** (P2P) | `fhs.v1` | binary | LPP + Protobuf |
-| **Compat** (JSON) | `fhs.v1.json` | text | JSON plano |
+## Alcance
 
-Si el cliente no envía el header de subprotocolo, el servidor elige el modo por defecto
-(JSON compat para compatibilidad con implementaciones anteriores a DEC-0086).
+FHS opera exclusivamente sobre un stream libp2p negociado con el protocolo
+`/fhs/v1/0.1.0`. No existe un binding web, un modo JSON ni una negociación
+alternativa. Portal, Navigator y cada provider son peers libp2p.
 
----
+## LPP — Length-Prefix Protocol
 
-## LPP — Length-Prefix Protocol (modo binario)
+Cada frame del stream contiene exactamente un `Envelope` FHS serializado como
+Protobuf:
 
-Cada frame WebSocket binary contiene exactamente **un mensaje FHS**:
-
-```
+```text
 ┌──────────────────────────────────────────────────────┐
-│  varint (1-10 bytes)  │  FhsMessage bytes             │
+│  varint (1-10 bytes)  │  Envelope bytes               │
 │  byte-length del body │  proto3 serializado           │
 └──────────────────────────────────────────────────────┘
 ```
 
-### Varint encoding
+El varint usa la codificación estándar de Protocol Buffers (little-endian
+base-128): valores 0–127 ocupan un byte; el máximo es 10 bytes para `uint64`.
+La longitud codificada es el número exacto de bytes del `Envelope` que sigue.
 
-Usa la codificación varint estándar de Protocol Buffers (little-endian base-128):
+## Longitud máxima
 
-- Valores 0–127: 1 byte (`0xxxxxxx`)
-- Valores 128–16383: 2 bytes (`1xxxxxxx 0xxxxxxx`)
-- Máximo: 10 bytes (suficiente para un `uint64`)
+El límite de un frame es **16 MiB** (`16 777 216` bytes). Un receptor que
+reciba un valor mayor debe cerrar el stream y emitir `ErrorMessage` con
+`INTERNAL_ERROR` cuando el estado de la sesión lo permita.
 
-El varint codifica el número de bytes del `FhsMessage` serializado que sigue inmediatamente.
+## Ejemplo — frame mínimo
 
-### Longitud máxima de frame
+`PingMessage` serializado en proto3 tiene 0 bytes. Un `Envelope` con `ping` en
+el oneof serializa como:
 
-**16 MiB** (16 × 1024 × 1024 = 16 777 216 bytes).
-
-Un receptor que reciba un frame con varint > 16 MiB DEBE cerrar la conexión con código
-WebSocket `1009` (Message Too Big) y emitir un `ErrorMessage` con código `INTERNAL_ERROR`
-antes de cerrar (si el estado de la sesión lo permite).
-
-### Ejemplo — frame mínimo (PingMessage)
-
-`PingMessage` serializado en proto3 tiene 0 bytes (mensaje vacío).  
-`FhsMessage` con `ping` en el oneof serializa como:
-
-```
-field 17 (ping), wire type 2 (length-delimited), length 0 → 0x8A 0x01 0x00
+```text
+field 12 (ping), wire type 2, length 0 → 0x62 0x00
 ```
 
-Frame LPP completo: `03 8A 01 00` (varint `3`, luego los 3 bytes del FhsMessage).
+Frame LPP completo:
 
----
-
-## Negotiation flow
-
-```
-Client → Server:   GET /register HTTP/1.1
-                   Upgrade: websocket
-                   Sec-WebSocket-Protocol: fhs.v1, fhs.v1.json
-
-Server → Client:   HTTP/1.1 101 Switching Protocols
-                   Sec-WebSocket-Protocol: fhs.v1
+```text
+02 62 00
 ```
 
-Si el servidor elige `fhs.v1`, todos los frames subsecuentes son binary + LPP.  
-Si elige `fhs.v1.json`, todos los frames son text + JSON (modo compat).  
-El servidor NO DEBE mezclar modos en una misma conexión.
+## Apertura del stream
 
----
-
-## Modo JSON compat
-
-En modo `fhs.v1.json`, el frame WebSocket es **text** y el contenido es un objeto JSON:
-
-```json
-{ "type": "hello", "providerId": "did:key:z...", "timestamp": 1722620400000, ... }
+```text
+Peer A → Peer B: dial multiaddr libp2p
+Peer A → Peer B: negociar /fhs/v1/0.1.0
+Peer A → Peer B: Envelope(handshake)
+Peer B → Peer A: Envelope(handshake_ack)
 ```
 
-El campo `type` es el discriminador equivalente al `oneof` de `FhsMessage`.
-La tabla de equivalencias está en `idl/fhs-protocol.proto` (comentarios de cada mensaje).
+Todos los frames posteriores siguen siendo Protobuf binario con LPP. Los peers
+no deben enviar texto ni cambiar de codec durante un stream activo.
 
----
+## Validación del frame
 
-## Implementación en distintos transportes
+El receptor debe:
 
-El framing LPP es deliberadamente independiente del transporte WebSocket.
-El mismo esquema funciona sobre:
+1. Leer el varint sin aceptar overflow.
+2. Rechazar longitudes mayores a 16 MiB.
+3. Leer exactamente la cantidad indicada de bytes.
+4. Deserializar un `Envelope` Protobuf válido.
+5. Verificar `source_peer_id`, `dest_peer_id`, `timestamp`, versión y firma.
+6. Despachar el payload del `oneof` solo después de validar el Envelope.
 
-| Transporte | Notas |
-|-----------|-------|
-| WebSocket binary | Frame WebSocket = 1 mensaje LPP |
-| TCP stream | Lectura continua; parsear varint, leer N bytes, repetir |
-| QUIC stream | Igual que TCP; QUIC ofrece multiplexado nativo de streams |
-| libp2p stream | Protocolo `/fhs/1.0.0`; misma codificación LPP |
-| Unix socket | Para comunicación local Navigator↔Atlas en mismo host |
+Un cierre de stream no sustituye un error tipado si aún es posible enviar el
+`ErrorMessage` correspondiente.
 
----
+## Versión en Envelope
 
-## Versión del protocolo en FhsMessage
-
-El campo `version` (field 22, `string`, fuera del `oneof payload`) en `FhsMessage`
-identifica la versión del protocolo usada por quien emite el frame. Valor esperado: `"1"`.
-
-Este campo complementa la negociación de `fhsVersion` en `hello`/`welcome`:
-- `fhsVersion` (en `hello`/`welcome`): versión del protocolo que soporta el nodo.
-- `FhsMessage.version`: versión usada en este frame específico (para debugging y routing).
-
-Receptores que no reconozcan la versión DEBEN ignorar el frame (forward compat).
-
----
+El campo `version` (field 5) identifica la versión FHS usada por el frame. El
+valor actual es `"1"` y complementa `fhsVersion` de `handshake` y
+`handshake_ack`. Un peer que no soporte la versión debe rechazar el handshake
+con `UNSUPPORTED_VERSION`; no debe degradar a otro transporte o codec.
 
 ## Referencias
 
-- `idl/fhs-protocol.proto` — definición completa de `FhsMessage` y todos los tipos
-- `idl/asyncapi.yaml` — canales, mensajes y bindings WebSocket
-- `spec-native/DECISIONS.md` DEC-0086 — decisión arquitectónica completa
+- `idl/fhs-protocol.proto` — definición canónica de `Envelope` y payloads.
+- `idl/asyncapi.yaml` — canales lógicos sobre libp2p y tópicos GossipSub.
+- `docs/transport.md` — regla libp2p-only y topología de transporte.

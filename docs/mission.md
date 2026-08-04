@@ -41,7 +41,7 @@ sequenceDiagram
 
         NAV->>SAT: Envelope { tool_call }<br/>missionId, toolCalls[]
 
-        SAT->>NAV: Envelope { tool_result }<br/>missionId, toolCallId, result (JSON)
+        SAT->>NAV: Envelope { tool_result }<br/>missionId, toolCallId, result (DynamicValue Protobuf)
 
         NAV->>STAR: Envelope { chat_request }<br/>missionId, messages[] con tool result incorporado
     end

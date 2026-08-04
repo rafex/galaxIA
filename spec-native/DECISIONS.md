@@ -1394,3 +1394,81 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
   5. **Secuencia de implementación:** TypeScript (validación IDL) → congelación del IDL → Rust SDK → Java/GraalVM SDK → SDKs en Python/Go como última prioridad (py-libp2p es inmaduro; Go es adecuado para relays y bootstrap peers).
 - **Lo que NO cambia:** El IDL (Protobuf, AsyncAPI, JSON Schemas), el vocabulario (Star/Satellite/Nova/Atlas/Navigator), el protocolo de red (libp2p, DHT Kademlia, GossipSub), el modelo de identidad (did:key Ed25519).
 - **Consecuencias:** galaxIA-Core debe reescribirse para implementar el ciclo P2P completo. galaxIA-satellite-star ídem. La guía `docs/implementacion-multilenguaje.md` ya refleja esta estrategia (Rust como primera opción para hardware limitado).
+
+## DEC-0089 — Libp2p-first: transporte normativo y adaptadores de borde
+
+- **Fecha:** 2026-08-03
+- **Estado:** `accepted` — aplicado en el IDL y la documentación del protocolo
+- **Contexto:** La revisión del protocolo encontró que DHT y GossipSub ya estaban
+  definidos como P2P, pero AsyncAPI y OpenAPI presentaban WSS, `/register` y SSE
+  como rutas de primera clase. Eso permitía interpretar que una Mission podía
+  ejecutarse por WebSocket o SSE HTTP convencional, fuera de libp2p.
+- **Decisión:**
+  1. **libp2p es el transporte normativo de FHS.** Todo mensaje de protocolo y
+     todo payload de Mission entre peers viaja por DHT, GossipSub o un stream
+     directo libp2p con protocolo `/fhs/v1/0.1.0`.
+  2. **WSS no es un plano alternativo.** Solo puede representar el transporte
+     WebSocket de libp2p mediante una multiaddr, o un adaptador explícito de
+     borde para un cliente que no pueda hablar libp2p directamente.
+  3. **SSE es únicamente un adaptador de salida Portal↔Navigator.** Puede
+     retransmitir eventos ya producidos por el stream P2P, pero nunca sustituye
+     el stream Navigator↔Star/Satellite ni transporta dispatch, heartbeat o
+     tool calls entre peers.
+  4. **REST/HTTPS quedan fuera del protocolo FHS.** Se permiten solo para
+     salud, métricas, administración, discovery externo de solo lectura y
+     distribución de contenido estático/WASM. `/register` HTTP y cualquier
+     endpoint que transporte una Mission dejan de ser rutas normativas.
+  5. **Las multiaddrs son la autoridad de conexión.** `endpoint.multiaddr`
+     es obligatoria para nodos FHS; `endpoint.url` WSS es opcional y solo
+     describe un adaptador de borde o una representación WebSocket compatible.
+- **Consecuencias:** AsyncAPI marca el stream directo como libp2p y deja WSS
+  como binding opcional; OpenAPI elimina el registro WebSocket y limita chat/SSE
+  a un gateway de borde; los schemas exigen una multiaddr; la documentación
+  separa explícitamente protocolo P2P, adaptadores y gestión.
+
+## DEC-0090 — Libp2p-only: eliminación de transportes y compatibilidad web
+
+- **Fecha:** 2026-08-03
+- **Estado:** `accepted`
+- **Supersede:** DEC-0089 queda supersedida en todo lo relativo a WSS, SSE,
+  HTTP/HTTPS y adaptadores de borde.
+- **Contexto:** FHS no necesita retrocompatibilidad con el PoC HTTP/WebSocket.
+  Mantener rutas web, serialización JSON o adaptadores como opciones del contrato
+  permite que una implementación se declare compatible sin participar en la red
+  P2P real.
+- **Decisión:** El único transporte del protocolo FHS es libp2p:
+  1. DHT Kademlia para records de descubrimiento y reputación.
+  2. GossipSub para presencia, ofertas, bids, asignaciones y reputación.
+  3. Stream libp2p `/fhs/v1/0.1.0` para handshake y ejecución de Missions.
+  4. Protobuf binario con LPP como única serialización wire de los streams.
+- **Reglas normativas:**
+  - No se definen endpoints HTTP/HTTPS, WebSocket/WSS, SSE, REST u OpenAPI
+    dentro de FHS.
+  - No existe binding JSON ni modo de compatibilidad `fhs.v1.json`.
+  - `endpoint.multiaddr` es el único endpoint anunciado en un Beacon.
+  - Portal, Navigator, Star, Satellite y Nova son peers libp2p; un cliente que
+    no pueda abrir libp2p no es una implementación FHS conforme.
+  - La distribución de documentación, código o artefactos fuera de la red queda
+    fuera del protocolo y no puede transportar mensajes FHS.
+- **Consecuencia:** se retiran `idl/openapi.yaml`, los bindings web de AsyncAPI,
+  `endpoint.url` y toda ruta de adaptador. Los documentos históricos que
+  describan el PoC anterior no son especificación ni guía de conformidad.
+
+## DEC-0091 — Protobuf-only: ningún JSON embebido en el wire
+
+- **Fecha:** 2026-08-03
+- **Estado:** `accepted`
+- **Decisión:** Todos los datos transmitidos por FHS se codifican como mensajes
+  Protobuf. Esto incluye `Envelope`, payloads de stream, mensajes GossipSub,
+  records DHT, `Beacon`, `ToolInputSchema`, argumentos de tools y resultados.
+- **Reglas:**
+  - No se aceptan manifiestos, schemas, argumentos o resultados JSON dentro de
+    campos `string` o `bytes`.
+  - `Beacon`, `DynamicValue`, `DynamicObject`, `DynamicList` y
+    `ToolInputSchema` son tipos Protobuf canónicos definidos en
+    `idl/fhs-protocol.proto`.
+  - Los JSON Schema existentes son artefactos auxiliares de documentación y
+    validación; no son wire format ni requisito de interoperabilidad.
+- **Consecuencia:** el código generado debe usar los tipos Protobuf anidados y
+  firmar la serialización Protobuf determinista de cada mensaje, sin hashes de
+  texto JSON.

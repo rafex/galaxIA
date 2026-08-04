@@ -2,35 +2,42 @@
 
 GalaxIA es un PoC de inteligencia artificial federada y soberana. Conecta equipos reutilizados donde cada nodo aporta capacidades: LLM locales con llama.cpp o herramientas como OCR vía MCP. Un chat web descubre nodos, aplica reglas de privacidad y combina razonamiento y acción. Sin nube, suscripciones ni dueño.
 
-Implementa **FHS (Federation of Sovereign Horizons)**, un protocolo JSON sobre WebSocket, independiente de lenguaje — ver [`docs/implementacion-multilenguaje.md`](docs/implementacion-multilenguaje.md).
+Define **FHS (Federation of Sovereign Horizons)**, un protocolo **libp2p-only**
+e independiente de lenguaje. DHT Kademlia, GossipSub y los streams directos
+`/fhs/v1/0.1.0` son los únicos caminos normativos. Las definiciones formales
+viven en `idl/` y `schemas/`; no hay compatibilidad con transportes web ni JSON
+en el wire. Todos los datos transmitidos están tipados en Protobuf.
 
 ¿Quieres correrlo? Ver [`docs/instalacion.md`](docs/instalacion.md) (contenedor + release, `npx`, o clonar y compilar).
 
 ## Vocabulario
 
-GalaxIA (Galaxy + IA) tiene su propio vocabulario de producto — **Star** (nodo LLM), **Satellite** (nodo de herramientas), **Atlas** (Registry), **Portal** (chat web), **Navigator** (orquestador), **Beacon** (manifiesto), **Pulse** (heartbeat), **Mission** (ejecución de una tool), **Flight Log** (procedencia/auditoría), **Orbit** (conexión activa), **Signal** (capacidad anunciada). Desde DEC-0033/DEC-0034/DEC-0035 este vocabulario también nombra identificadores de código, archivos, paquetes npm y contenedores (`Atlas`, `Signal`, `Beacon`, `apps/atlas`, `apps/navigator`...) — lo único que **no** cambia es el protocolo JSON en el cable (nombres de campo como `providerId`, tipos de mensaje `hello`/`register`). Tabla completa en [`docs/vocabulario.md`](docs/vocabulario.md).
+GalaxIA (Galaxy + IA) tiene su propio vocabulario de producto — **Star** (nodo LLM), **Satellite** (nodo de herramientas), **Atlas** (bootstrap peer), **Portal** (chat web), **Navigator** (orquestador), **Beacon** (manifiesto), **Pulse** (heartbeat), **Mission** (ejecución de una tool), **Flight Log** (procedencia/auditoría), **Orbit** (conexión activa), **Signal** (capacidad anunciada). Desde DEC-0033/DEC-0034/DEC-0035 este vocabulario también nombra identificadores de código, archivos, paquetes npm y contenedores (`Atlas`, `Signal`, `Beacon`...) — el wire protocol canónico es `Envelope` Protobuf sobre libp2p, con `handshake`/`handshake_ack`. Tabla completa en [`docs/vocabulario.md`](docs/vocabulario.md).
 
 ## Estructura del repo
 
 | Carpeta | Qué es |
 |---|---|
-| `apps/atlas/` | Atlas — Registry (catálogo de nodos), servicio independiente desde DEC-0035 |
-| `apps/navigator/` | Navigator — Agent Runtime + API de chat, habla con Atlas por HTTP |
-| `apps/portal-chat/` | Portal de chat web — vanilla TypeScript con Vite |
-| `apps/portal-tui/` | Portal de terminal (TUI) — estructura base, sin implementar todavía |
-| `packages/fhs-protocol/` | Tipos y constantes del protocolo FHS — fuente de verdad, no dependencia obligatoria |
+| `idl/` | Protobuf, AsyncAPI y framing del protocolo |
+| `schemas/` | Artefactos de documentación/validación; no forman parte del wire Protobuf |
 | `docs/` | Documentación para humanos — protocolo, despliegue, vocabulario, contenedores |
 | `spec-native/` | Contexto técnico para agentes de IA — specs, decisiones (`DECISIONS.md`), roadmap, trazabilidad |
 | `site/` | Portal web público ([galax-ia.rafex.io](https://galax-ia.rafex.io)), sitio Jekyll |
-| `containers/` | `compose.yaml` y overlays (TLS) para desplegar el core (Atlas/Navigator/Portal) con Podman/Docker |
 
-Este repo es **protocolo + SDK + servicios core** únicamente. Las implementaciones de referencia de nodos (Star/LLM, Satellite/OCR, RAG, KB) viven en el repo separado [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star), que depende de `@rafex/galaxia-fhs-protocol` publicado desde aquí (hoy vía git, `github:rafex/galaxIA#fhs-protocol-dist`; también publicado a GitHub Packages en cada push a `main` — ver `spec-native/DECISIONS.md` y `spec-native/pipelines/CD.md`).
+Este repo es **IDL + schemas + documentación del protocolo**. El runtime de Atlas,
+Navigator y Portal vive en `galaxIA-Core`; los tipos cliente y SDK viven en
+`galaxIA-SDK`; las implementaciones de referencia de Star/Satellite/Nova/RAG/KB
+viven en [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star).
+Ver el mapa completo en [`ECOSYSTEM.md`](ECOSYSTEM.md).
 
 ## Estado del proyecto
 
-PoC activa, evolucionando hacia mayor madurez — no producción todavía. Ya validada end-to-end con hardware real (topología multi-host laptop + bastion, TLS/WSS con certificado autofirmado, chat con LLM local y flujo completo de OCR con confirmación). Sigue una metodología **spec-first** ("SpecNative"): cada decisión y capacidad nueva se documenta en `spec-native/` antes de escribirse en código.
+PoC activa, evolucionando hacia mayor madurez — no producción todavía. El
+protocolo está definido como libp2p-only; las implementaciones runtime deben
+validar DHT, GossipSub y el stream directo antes de considerarse conformes.
+Sigue una metodología **spec-first** ("SpecNative").
 
-- **Hecho:** protocolo FHS v0.1 (hello/register/Pulse), chat federado con tool calling, OCR con confirmación explícita, rating de nodos (`dispatch.ack` + latencia), TLS de punta a punta, despliegue multi-host real, vocabulario de marca.
+- **Hecho en el contrato:** FHS P2P alpha con Envelope Protobuf, DHT, GossipSub, Mission dispatch, handshake directo y provenance (DEC-0090).
 - **En curso / próximo:** `rag-provider` y `kb-provider` (ya implementados en `galaxIA-satellite-star`), descubrimiento por mDNS, SDKs de referencia en Python/Rust/Java.
 - **Roadmap público:** [Project — galaxIA Roadmap](https://github.com/users/rafex/projects/9) e [Issues](https://github.com/rafex/galaxIA/issues).
 

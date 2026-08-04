@@ -40,7 +40,7 @@ Las guías completas viven en
   <div class="card">
     <span class="tag">Alta prioridad</span>
     <h3>Implementar P2P en galaxIA-Core</h3>
-    <p>Navigator y los providers de referencia todavía usan el modelo WebSocket centralizado. Deben migrar a DHT + GossipSub + stream directo según el IDL ya definido.</p>
+    <p>Navigator y los providers de referencia deben implementar DHT + GossipSub + stream directo libp2p según el IDL ya definido.</p>
   </div>
   <div class="card">
     <span class="tag">Media prioridad</span>

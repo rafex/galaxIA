@@ -30,12 +30,13 @@ Cuando escribes un mensaje en el chat, el coordinador lo convierte en una "misi�
 
 ## ¿Cómo uso el chat?
 
-Si alguien ya tiene la infraestructura levantada y te compartió la dirección del portal, lo único que necesitas es un navegador web.
+Si alguien ya tiene la infraestructura levantada, el operador debe entregarte
+un cliente Portal que participe en la red FHS como peer libp2p.
 
-1. Abre la dirección del portal en tu navegador (algo como `http://192.168.1.X:5173`).
+1. Inicia el cliente Portal y conéctalo a un bootstrap peer autorizado.
 2. Escribe tu mensaje en el campo de texto.
 3. Presiona Enter o el botón de enviar.
-4. La respuesta aparece en tiempo real, igual que en cualquier chat de IA.
+4. La respuesta llega por el stream libp2p del Portal.
 
 Al final de cada respuesta verás un bloque de **Procedencia** que indica qué modelo respondió y desde qué nodo — esto te permite saber exactamente de dónde vino la respuesta.
 

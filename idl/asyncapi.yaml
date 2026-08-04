@@ -13,20 +13,19 @@ info:
     Atlas actúa únicamente como **bootstrap peer**: ayuda a nuevos nodos a unirse
     a la DHT Kademlia, pero no tiene autoridad sobre los demás nodos.
 
-    ## Dos planos de mensajería
-
-    ### 1. Stream directo FHS
+    ## Transporte único
 
     Protocolo libp2p: `/fhs/v1/0.1.0`
-    Negociación con `Sec-WebSocket-Protocol`:
+    El stream se establece exclusivamente por una multiaddr libp2p.
+    Cada frame es `[varint-length][Envelope Protobuf bytes]`.
+    Ver `idl/framing.md`.
 
-    | Subprotocol    | Frames  | Formato                        |
-    |----------------|---------|-------------------------------|
-    | `fhs.v1`       | binary  | LPP + Protobuf (primario, P2P) |
-    | `fhs.v1.json`  | text    | JSON compat (solo desarrollo)  |
+    ## Regla libp2p-only
 
-    En modo `fhs.v1`, cada frame binario es `[varint-length][Envelope bytes]`.
-    Ver `idl/framing.md`. En modo JSON, el campo `type` actúa como discriminador.
+    Los canales `/chat`, `/mission/chat`, `/mission/tool` y `/fhs` son canales
+    lógicos sobre el mismo stream libp2p; sus `address` son identificadores de
+    protocolo, no endpoints web. No existen bindings web, adaptadores de borde
+    ni rutas de compatibilidad JSON en FHS.
 
     Todos los mensajes de stream viajan dentro de un `Envelope` con campos de routing:
     `messageId` (UUID), `sourcePeerId` (DID), `destPeerId` (DID),
@@ -64,25 +63,28 @@ info:
     lleva firma Ed25519 del emisor.
 
     Versión de referencia: @rafex/galaxia-fhs-protocol
-    Repositorio: https://github.com/rafex/galaxIA-SDK
     Framing spec: idl/framing.md
 
   license:
     name: MIT
   contact:
     name: galaxIA
-    url: https://github.com/rafex/galaxIA
 
-defaultContentType: application/json
+defaultContentType: application/octet-stream
 
 # ── Canales de stream directo FHS ────────────────────────────────────────────
 # Los streams directos se establecen entre CUALQUIER par de nodos FHS.
-# El protocolo libp2p /fhs/v1/0.1.0 negocia la conexión; WSS la transporta.
+# El protocolo libp2p /fhs/v1/0.1.0 establece la conexión.
+# El único binding FHS es el stream libp2p `/fhs/v1/0.1.0`.
 
 channels:
   # ── Stream: Portal ↔ Navigator ───────────────────────────────────────────
   /chat:
-    address: wss://{navigator}/chat
+    address: /fhs/v1/0.1.0
+    x-fhs-transport:
+      kind: libp2p
+      protocol: /fhs/v1/0.1.0
+      role: peer-to-peer-only
     description: |
       Stream directo Portal↔Navigator para misiones de chat y control de agente.
       El Portal inicia con agent.start, envía chat.request / chat.cancel.
@@ -110,19 +112,13 @@ channels:
         $ref: "#/components/messages/ChatErrorMessage"
       error:
         $ref: "#/components/messages/ErrorMessage"
-    bindings:
-      ws:
-        method: GET
-        headers:
-          type: object
-          properties:
-            Sec-WebSocket-Protocol:
-              type: string
-              enum: [fhs.v1, fhs.v1.json]
-
   # ── Stream: Navigator ↔ Star (stream directo, post-assign) ───────────────
   /mission/chat:
-    address: wss://{star}/mission/chat
+    address: /fhs/v1/0.1.0
+    x-fhs-transport:
+      kind: libp2p
+      protocol: /fhs/v1/0.1.0
+      role: peer-to-peer-only
     description: |
       Stream directo Navigator↔Star para ejecución de Mission de chat.
       Abierto DESPUÉS de que el Star gana un MissionBid via GossipSub.
@@ -148,19 +144,13 @@ channels:
         $ref: "#/components/messages/ToolListRequestMessage"
       error:
         $ref: "#/components/messages/ErrorMessage"
-    bindings:
-      ws:
-        method: GET
-        headers:
-          type: object
-          properties:
-            Sec-WebSocket-Protocol:
-              type: string
-              enum: [fhs.v1, fhs.v1.json]
-
   # ── Stream: Navigator ↔ Satellite (stream directo, post-assign) ──────────
   /mission/tool:
-    address: wss://{satellite}/mission/tool
+    address: /fhs/v1/0.1.0
+    x-fhs-transport:
+      kind: libp2p
+      protocol: /fhs/v1/0.1.0
+      role: peer-to-peer-only
     description: |
       Stream directo Navigator↔Satellite para ejecución de tool.call.
       Abierto DESPUÉS de que el Satellite gana un MissionBid via GossipSub.
@@ -184,19 +174,13 @@ channels:
         $ref: "#/components/messages/DispatchAckMessage"
       error:
         $ref: "#/components/messages/ErrorMessage"
-    bindings:
-      ws:
-        method: GET
-        headers:
-          type: object
-          properties:
-            Sec-WebSocket-Protocol:
-              type: string
-              enum: [fhs.v1, fhs.v1.json]
-
   # ── Stream: Handshake (cualquier par de nodos FHS) ───────────────────────
   /fhs:
-    address: wss://{peer}/fhs
+    address: /fhs/v1/0.1.0
+    x-fhs-transport:
+      kind: libp2p
+      protocol: /fhs/v1/0.1.0
+      role: peer-to-peer-only
     description: |
       Handshake de establecimiento de stream FHS entre CUALQUIER par de nodos.
       Primer mensaje al abrir un stream libp2p /fhs/v1/0.1.0.
@@ -214,16 +198,6 @@ channels:
         $ref: "#/components/messages/PongMessage"
       error:
         $ref: "#/components/messages/ErrorMessage"
-    bindings:
-      ws:
-        method: GET
-        headers:
-          type: object
-          properties:
-            Sec-WebSocket-Protocol:
-              type: string
-              enum: [fhs.v1, fhs.v1.json]
-
   # ── GossipSub: fhs/v1/nodes/advertise ────────────────────────────────────
   /gossipsub/nodes/advertise:
     address: "fhs/v1/nodes/advertise"
@@ -534,7 +508,7 @@ components:
           description: Ed25519 base64 de sha256(messageId:source:dest:timestamp:payload_bytes_hex)
         type:
           type: string
-          description: Discriminador del payload en modo JSON
+          description: Discriminador lógico del payload Protobuf `oneof`
 
     # ── Handshake ─────────────────────────────────────────────────────────────
     HandshakeMessage:
@@ -555,7 +529,7 @@ components:
               description: Multiaddrs P2P con TLS — /ip4/.../tcp/.../tls/ws
             beacon:
               type: object
-              description: Beacon completo del nodo. Ver schemas/beacon-*.schema.json
+              description: Beacon tipado en Protobuf; la estructura canónica está en fhs-protocol.proto
             delegationToken:
               $ref: "#/components/schemas/DelegationToken"
               description: Solo para Ephemeral Satellites (SPEC-EPHSAT-0001)
@@ -782,6 +756,7 @@ components:
           type: string
         inputSchema:
           type: object
+          description: Estructura espejo de ToolInputSchema Protobuf; no se transmite como JSON
 
     ToolCall:
       type: object
@@ -799,7 +774,8 @@ components:
             name:
               type: string
             arguments:
-              type: string
+              type: object
+              description: Estructura espejo de DynamicValue Protobuf; no se transmite como JSON
 
     Message:
       type: object
@@ -956,7 +932,8 @@ components:
             toolCallId:
               type: string
             result:
-              type: string
+              type: object
+              description: Estructura espejo de DynamicValue Protobuf; no se transmite como JSON
 
     ToolCallErrorMessage:
       allOf:
@@ -1013,12 +990,12 @@ components:
           pattern: "^did:key:z"
         beacon:
           type: object
-          description: Beacon completo del nodo (JSON)
+          description: Beacon tipado en Protobuf
         multiaddrs:
           type: array
           items:
             type: string
-          description: Multiaddrs P2P del nodo (solo wss://)
+          description: Multiaddrs libp2p del nodo
         timestamp:
           type: integer
           format: int64
@@ -1035,7 +1012,7 @@ components:
           enum: [standard, delegated, community, unverified]
         signature:
           type: string
-          description: Ed25519 base64 de (did + sha256(beacon) + timestamp + ttlSeconds)
+          description: Ed25519 sobre la serialización Protobuf determinista de los campos 1-8
 
     # ── GossipSub — Dispatch ──────────────────────────────────────────────────
     MissionOfferMessage:
@@ -1262,32 +1239,12 @@ components:
             delegatedBy:
               type: string
 
-  servers:
-    navigator:
-      host: "{navigator}"
-      protocol: wss
-      description: Navigator — Agent Runtime
-      variables:
-        navigator:
-          default: "localhost:8444"
-    atlas:
-      host: "{atlas}"
-      protocol: wss
-      description: Atlas — Bootstrap Peer (no es registro central)
-      variables:
-        atlas:
-          default: "localhost:8443"
-    star:
-      host: "{star}"
-      protocol: wss
-      description: Star — LLM Provider
-      variables:
-        star:
-          default: "localhost:43111"
-    satellite:
-      host: "{satellite}"
-      protocol: wss
-      description: Satellite — Tool Provider
-      variables:
-        satellite:
-          default: "localhost:43112"
+servers:
+  libp2p:
+    host: "{multiaddr}"
+    protocol: libp2p
+    protocolVersion: /fhs/v1/0.1.0
+    description: Único transporte FHS, establecido por multiaddr libp2p
+    variables:
+      multiaddr:
+        default: "/ip4/127.0.0.1/tcp/8443/p2p/<peerId>"

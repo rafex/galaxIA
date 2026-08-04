@@ -2,7 +2,7 @@
 
 Documentación del **protocolo FHS (Federation of Sovereign Horizons)** y la red P2P descentralizada que implementa. Esta carpeta unifica la documentación orientada a humanos y la documentación técnica detallada del protocolo.
 
-> **Definiciones formales** (Protobuf, AsyncAPI, JSON Schemas) → [`idl/`](../idl/) y [`schemas/`](../schemas/)
+> **Definiciones formales** (Protobuf; AsyncAPI y schemas solo documentales) → [`idl/`](../idl/) y [`schemas/`](../schemas/)
 > **Decisiones de arquitectura y specs** → [`spec-native/`](../spec-native/)
 > **Documentación de las apps** (despliegue, contenedores, configuración) → repo `galaxIA-Core`
 
@@ -44,15 +44,15 @@ galaxIA es un experimento para construir un **chat de IA comunitario y soberano*
 | [`handshake.md`](./handshake.md) | Handshake del stream directo `/fhs/v1/0.1.0` y ciclo de vida en Orbit |
 | [`mission.md`](./mission.md) | Ciclo de vida de una Mission: chat, tool dispatch, cancelación |
 | [`trust.md`](./trust.md) | Confianza: niveles, delegación, reputación distribuida |
-| [`transport.md`](./transport.md) | Capa de transporte: P2P + Protobuf primario, cuándo se justifica WSS |
-| [`network.md`](./network.md) | Mapa completo de protocolos: libp2p, stream FHS, WSS, HTTPS, REST |
+| [`transport.md`](./transport.md) | Capa de transporte única: libp2p + Protobuf |
+| [`network.md`](./network.md) | Topología completa de la red libp2p FHS |
 | [`ephemeral-satellite.md`](./ephemeral-satellite.md) | Ephemeral Satellite: WASM en dispositivos móviles, delegación, confianza |
 
 ---
 
 ## Principio base
 
-> **El transporte canónico del protocolo FHS es P2P (libp2p) con Protobuf binario.**
+> **El único transporte del protocolo FHS es P2P (libp2p) con Protobuf binario.**
 > No hay un Registry central obligatorio. Atlas es solo el bootstrap peer de entrada al swarm.
 > Ver [`p2p.md`](./p2p.md) y [`transport.md`](./transport.md).
 

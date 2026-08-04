@@ -182,7 +182,7 @@ title: galaxIA — IA federada y soberana
   <div class="grid">
     <div class="card">
       <h3>galaxIA (este repo)</h3>
-      <p>IDL del protocolo FHS: Protobuf, AsyncAPI, JSON Schemas y documentación del protocolo.</p>
+      <p>IDL del protocolo FHS: Protobuf como wire único, AsyncAPI y documentación auxiliar.</p>
     </div>
     <div class="card">
       <h3>galaxIA-Core</h3>

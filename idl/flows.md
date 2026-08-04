@@ -138,11 +138,11 @@ sequenceDiagram
   participant R as Receptor<br/>(Star / Satellite / Navigator)
 
   I->>R: libp2p dial (multiaddr del bid o DHT lookup)
-  note over I,R: Negociación de subprotocolo: fhs.v1 (binario) o fhs.v1.json
+  note over I,R: Negociación libp2p del protocolo /fhs/v1/0.1.0
 
-  I->>R: Envelope { handshake: HandshakeMessage }<br/>fhsVersion, listenAddrs, beacon (JSON serializado)
+  I->>R: Envelope { handshake: HandshakeMessage }<br/>fhsVersion, listenAddrs, beacon (Protobuf)
 
-  note over R: 1. Valida Envelope.signature Ed25519<br/>2. Verifica DID en caché GossipSub o DHT lookup<br/>3. Valida Beacon contra JSON Schema
+  note over R: 1. Valida Envelope.signature Ed25519<br/>2. Verifica DID en caché GossipSub o DHT lookup<br/>3. Valida Beacon Protobuf
 
   alt Handshake exitoso
     R->>I: Envelope { handshake_ack: HandshakeAckMessage }<br/>leaseSeconds, heartbeatSeconds, leaseExpires, trustLevel
@@ -207,9 +207,9 @@ sequenceDiagram
 ## Referencias
 
 - [idl/fhs-protocol.proto](fhs-protocol.proto) — definición completa de todos los tipos de mensaje
-- [idl/asyncapi.yaml](asyncapi.yaml) — canales WebSocket y GossipSub
+- [idl/asyncapi.yaml](asyncapi.yaml) — canales libp2p y GossipSub
 - [idl/gossipsub.md](gossipsub.md) — especificación de tópicos GossipSub
 - [idl/framing.md](framing.md) — especificación LPP de framing binario
 - [../docs/p2p.md](../../docs/p2p.md) — modelo de red P2P completo
-- [schemas/](../schemas/) — JSON Schemas de los Beacons
+- [schemas/](../schemas/) — validación documental; no es wire format
 - [spec-native/DECISIONS.md](../spec-native/DECISIONS.md) — DEC-P2P-001

@@ -45,20 +45,20 @@ Publicar cada `ttlSeconds / 2` segundos. Default: cada 30 segundos (TTL = 60s).
 
 ```
 did           string  — DID del nodo (did:key:z...)
-beacon        string  — Beacon JSON serializado
-multiaddrs    []string — Multiaddrs P2P: /ip4/.../tcp/.../tls/ws
+beacon        Beacon  — Beacon tipado en Protobuf
+multiaddrs    []string — Multiaddrs libp2p del nodo
 timestamp     int64   — Unix ms
 ttlSeconds    int32   — Tiempo de vida del anuncio (default 60)
 ephemeral     bool    — true si es Ephemeral Satellite
 delegatedBy   string  — DID del Nodo Host; solo si ephemeral = true
 trustLevel    string  — "standard" | "delegated" | "community" | "unverified"
-signature     bytes   — Ed25519 de (did + sha256(beacon) + timestamp + ttlSeconds)
+signature     bytes   — Ed25519 del encoding Protobuf determinista de los campos 1-8
 ```
 
 ### Verificación del receptor
 
 1. Extraer clave pública Ed25519 del campo `did` (prefijo `z` = base58btc de la clave).
-2. Verificar `signature` sobre `did + sha256(beacon) + timestamp + ttlSeconds`.
+2. Verificar `signature` sobre la serialización Protobuf determinista de los campos 1-8.
 3. Verificar `timestamp` ≤ now + 30s (anti-replay).
 4. Si `ephemeral = true`: verificar que `delegatedBy` esté presente y en el caché local de nodos conocidos.
 5. Actualizar caché local con `ttlSeconds` como expiración.

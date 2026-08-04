@@ -49,14 +49,14 @@ La clave privada **nunca sale del nodo**. Todos los Envelopes y mensajes GossipS
 
 Publicar en `fhs/v1/nodes/advertise` cada `ttlSeconds / 2` segundos (default cada 30s):
 
-```json
-{
-  "did": "did:key:z...",
-  "beacon": "{ ...Beacon JSON serializado... }",
-  "multiaddrs": ["/ip4/.../tcp/.../tls/ws"],
-  "ttlSeconds": 60,
-  "timestamp": 1722620400000,
-  "signature": "base64-ed25519..."
+```protobuf
+NodeAdvertiseMessage {
+  did: "did:key:z..."
+  beacon: Beacon { fhs_version: "1", endpoint: Endpoint { multiaddr: "/ip4/.../tcp/.../p2p/<peerId>" } }
+  multiaddrs: "/ip4/.../tcp/.../p2p/<peerId>"
+  ttl_seconds: 60
+  timestamp: 1722620400000
+  signature: <ed25519 bytes>
 }
 ```
 
@@ -73,18 +73,18 @@ Suscribirse a `fhs/v1/missions/offer`. Al recibir un `MissionOfferMessage`:
 
 Si todas se cumplen, publicar `MissionBidMessage` en `fhs/v1/missions/bid`:
 
-```json
-{
-  "missionId": "uuid-v4",
-  "providerDid": "did:key:z...",
-  "providerMultiaddrs": ["/ip4/.../tcp/.../tls/ws"],
-  "providerType": "star",
-  "offeredCapabilities": ["chat"],
-  "reputationScore": 0.92,
-  "estimatedLatencyMs": 1200,
-  "trustLevel": "standard",
-  "timestamp": 1722620400000,
-  "signature": "base64-ed25519..."
+```protobuf
+MissionBidMessage {
+  mission_id: "uuid-v4"
+  provider_did: "did:key:z..."
+  provider_multiaddrs: "/ip4/.../tcp/.../p2p/<peerId>"
+  provider_type: "star"
+  offered_capabilities: "chat"
+  reputation_score: 0.92
+  estimated_latency_ms: 1200
+  trust_level: "standard"
+  timestamp: 1722620400000
+  signature: <ed25519 bytes>
 }
 ```
 
@@ -135,8 +135,8 @@ Loggear metadata por `missionId` — proveedor, duración, éxito/error — pero
 
 Todo provider debe tener un Beacon válido según el schema correspondiente:
 
-- Star: `schemas/beacon-star.schema.json` (ver `docs/beacon-star.md`)
-- Satellite: `schemas/beacon-satellite.schema.json` (ver `docs/beacon-satellite.md`)
+- Star: `Beacon.models` (ver `docs/beacon-star.md`)
+- Satellite: `Beacon.capabilities` (ver `docs/beacon-satellite.md`)
 
 Campos obligatorios en cualquier Beacon:
 
@@ -146,8 +146,7 @@ Campos obligatorios en cualquier Beacon:
 | `provider.id` | Sí | DID único del nodo |
 | `provider.type` | Sí | `"star"` / `"satellite"` / `"nova"` |
 | `provider.visibility` | Sí | Acota en qué scope puede recibir bids |
-| `endpoint.url` | Sí | WSS URL directa (patrón `^wss://`) |
-| `endpoint.multiaddr` | Sí | Multiaddr libp2p para DHT |
+| `endpoint.multiaddr` | Sí | Única dirección libp2p para DHT y streams directos |
 | `privacy.retention` | Sí | Qué hace con los datos recibidos |
 
 ---

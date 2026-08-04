@@ -26,7 +26,7 @@ No hay un registro central obligatorio. Cada nodo es igual a los demás.
 ├─────────────────────────────────────────────────────┤
 │  Multiplexor: yamux / mplex                         │
 ├─────────────────────────────────────────────────────┤
-│  Transporte: TCP + WebSocket (WSS obligatorio)      │
+│  Transporte: libp2p                                │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -131,38 +131,38 @@ sequenceDiagram
     participant S as Star/Satellite
     participant STREAM as Stream Directo
 
-    P->>NAV: agent.start { scope, model }
+    P->>NAV: stream libp2p: agent.start { scope, model }
     P->>NAV: chat.request { missionId, messages }
 
     NAV->>NAV: Buscar providers elegibles en caché local
     NAV->>G: MissionOfferMessage (fhs/v1/missions/offer)<br/>{ missionId, requiredCapabilities, bidDeadlineMs }
 
-    NAV->>P: agent.status { status: "offering" }
+    NAV->>P: stream libp2p: agent.status { status: "offering" }
 
     G->>S: (reciben la oferta en el tópico)
     S->>S: Evaluar si puede satisfacer la oferta
     S->>G: MissionBidMessage (fhs/v1/missions/bid)<br/>{ missionId, providerDid, reputationScore, estimatedLatencyMs }
 
-    NAV->>P: agent.status { status: "waiting_bid" }
+    NAV->>P: stream libp2p: agent.status { status: "waiting_bid" }
 
     Note over NAV: Espera hasta bid_deadline_ms
     NAV->>NAV: Ordenar bids: trustLevel > reputation > latencia
 
     NAV->>G: MissionAssignMessage (fhs/v1/missions/assign)<br/>{ missionId, assignedProvider: <did del ganador> }
-    NAV->>P: agent.status { status: "assigning" }
-    NAV->>P: star.selected { providerId, model }
+    NAV->>P: stream libp2p: agent.status { status: "assigning" }
+    NAV->>P: stream libp2p: star.selected { providerId, model }
 
     NAV->>STREAM: Abrir stream directo /fhs/v1/0.1.0 → Star ganador
     NAV->>S: Handshake → HandshakeAck
     NAV->>S: chat.request { missionId, messages, model }
-    NAV->>P: agent.status { status: "calling_star" }
+    NAV->>P: stream libp2p: agent.status { status: "calling_star" }
 
     S->>NAV: chat.delta (streaming)
-    NAV->>P: assistant.delta (streaming)
+    NAV->>P: stream libp2p: assistant.delta (streaming)
 
     S->>NAV: chat.completed
-    NAV->>P: assistant.completed { provenance }
-    NAV->>P: agent.status { status: "completed" }
+    NAV->>P: stream libp2p: assistant.completed { provenance }
+    NAV->>P: stream libp2p: agent.status { status: "completed" }
 
     NAV->>G: ReputationUpdateMessage (fhs/v1/reputation/update)
 ```
@@ -224,10 +224,9 @@ Se usan para la ejecución de Missions (chat.request, tool.call, etc.).
 
 ```
 Protocol ID: /fhs/v1/0.1.0
-Transport:   WebSocket + TLS (WSS)
+Transport:   stream libp2p
 Framing:     LPP (ver idl/framing.md)
-Encoding:    Protobuf binario (Sec-WebSocket-Protocol: fhs.v1)
-             JSON compat (Sec-WebSocket-Protocol: fhs.v1.json, solo dev)
+Encoding:    Protobuf binario
 ```
 
 ### Ciclo de vida de un stream

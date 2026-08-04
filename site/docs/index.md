@@ -41,11 +41,11 @@ Documentación técnica del protocolo, mantenida junto al IDL en
   </li>
   <li>
     <a href="https://github.com/{{ site.repository }}/blob/main/docs/beacon-star.md">Beacon Star (LLM provider)</a>
-    <p>Campos del Beacon, ejemplo JSON completo y ciclo de vida P2P de un Star.</p>
+    <p>Campos del Beacon Protobuf y ciclo de vida P2P de un Star.</p>
   </li>
   <li>
     <a href="https://github.com/{{ site.repository }}/blob/main/docs/beacon-satellite.md">Beacon Satellite (tool provider)</a>
-    <p>Campos del Beacon, ejemplo JSON completo y ciclo de vida P2P de un Satellite.</p>
+    <p>Campos del Beacon Protobuf y ciclo de vida P2P de un Satellite.</p>
   </li>
 </ul>
 
@@ -80,11 +80,11 @@ Documentación técnica del protocolo, mantenida junto al IDL en
   </li>
   <li>
     <a href="https://github.com/{{ site.repository }}/blob/main/docs/transport.md">Transporte</a>
-    <p>P2P + Protobuf como transporte canónico; cuándo se justifica WSS o REST y por qué.</p>
+    <p>Libp2p + Protobuf como único transporte del protocolo.</p>
   </li>
   <li>
     <a href="https://github.com/{{ site.repository }}/blob/main/docs/network.md">Red — mapa de protocolos</a>
-    <p>Mapa completo de qué protocolo se usa en cada capa: libp2p, stream FHS, WSS, HTTPS, REST.</p>
+    <p>Mapa completo de la topología libp2p: DHT, GossipSub y streams FHS.</p>
   </li>
   <li>
     <a href="https://github.com/{{ site.repository }}/blob/main/docs/ephemeral-satellite.md">Ephemeral Satellite</a>

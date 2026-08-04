@@ -1,38 +1,20 @@
 # Beacon Satellite (proveedor de tools)
 
 Un Satellite es el nodo de la red FHS que expone herramientas (capabilities) que Navigator
-puede invocar durante una misión. Se une al swarm P2P publicando su Beacon en la DHT y
-anunciándolo vía GossipSub (DEC-P2P-001).
-El schema completo está en `schemas/beacon-satellite.schema.json`.
+puede invocar durante una misión. Se une al swarm P2P publicando su Beacon Protobuf en la
+DHT y anunciándolo vía GossipSub (DEC-P2P-001).
+La definición wire canónica está en `idl/fhs-protocol.proto`; el schema JSON es solo
+validación documental.
 
 ## Ejemplo completo
 
-```json
-{
-  "fhsVersion": "1",
-  "provider": {
-    "id": "did:key:z6Mknq8Hk8RiACRSfkbHJbJUqtqc9W5JfHoS5JbCKBSZdJL",
-    "name": "OCR Raspberry Pi",
-    "type": "satellite",
-    "visibility": "community"
-  },
-  "endpoint": {
-    "url": "wss://192.168.3.173:8082",
-    "multiaddr": "/ip4/192.168.3.173/tcp/8082/ws"
-  },
-  "capabilities": [
-    {
-      "id": "document.ocr",
-      "name": "Extracción de texto",
-      "description": "Extrae texto de imágenes y PDFs usando OCR (Tesseract)",
-      "inputMediaTypes": ["image/jpeg", "image/png", "application/pdf"],
-      "outputMediaTypes": ["text/plain"],
-      "languages": ["es", "en"]
-    }
-  ],
-  "privacy": {
-    "retention": "none"
-  }
+```protobuf
+Beacon {
+  fhs_version: "1"
+  provider: { id: "did:key:z...", name: "OCR Raspberry Pi", type: PROVIDER_TYPE_SATELLITE, visibility: VISIBILITY_COMMUNITY }
+  endpoint: { multiaddr: "/ip4/192.168.3.173/tcp/8444/p2p/<peerId>" }
+  capabilities: { id: "document.ocr", name: "Extracción de texto", description: "Extrae texto de imágenes y PDFs usando OCR", input_media_types: "image/jpeg", input_media_types: "image/png", input_media_types: "application/pdf", output_media_types: "text/plain", languages: "es", languages: "en" }
+  privacy: { retention: RETENTION_NONE }
 }
 ```
 
@@ -41,8 +23,7 @@ El schema completo está en `schemas/beacon-satellite.schema.json`.
 - `provider.id`: DID Ed25519 del nodo en formato `did:key:z...`. Se firma con la clave privada del nodo.
 - `provider.type`: siempre `"satellite"`.
 - `provider.visibility`: acota en qué `scope` de `MissionOfferMessage` puede recibir bids — `"local"` / `"network"` / `"community"` / `"external"`.
-- `endpoint.url`: WSS URL directa del Satellite (formato `^wss://`). Navigator abre el stream `/fhs/v1/0.1.0` post-assign.
-- `endpoint.multiaddr`: Multiaddr libp2p publicado en el `DhtBeaconRecord` para conexión P2P directa.
+- `endpoint.multiaddr`: Única dirección libp2p normativa publicada en el `DhtBeaconRecord`. Navigator abre el stream `/fhs/v1/0.1.0` post-assign mediante esta dirección.
 - `capabilities[].id`: identificador de la capability (ej. `document.ocr`). Navigator filtra providers por este campo en `MissionOfferMessage.requiredCapabilities`.
 - `capabilities[].inputMediaTypes`: media types aceptados como entrada.
 - `capabilities[].outputMediaTypes`: media types que produce la capability.
@@ -94,5 +75,5 @@ Cuando Navigator abre el stream directo post-assign, puede enviar `tool.list` pa
 
 ## Referencia de schemas
 
-- `schemas/beacon-satellite.schema.json` — schema completo del Beacon
+- `idl/fhs-protocol.proto` — `Beacon` y `CapabilityDescriptor` wire
 - `idl/fhs-protocol.proto` — definición Protobuf de `DhtBeaconRecord` y mensajes GossipSub

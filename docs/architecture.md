@@ -9,7 +9,7 @@
 | **Satellite** | Proveedor de herramientas (tools). Expone capabilities como OCR, búsqueda, CURP, etc. | `satellite` |
 | **Nova** | Agente autónomo con loop propio. Puede coordinar Stars y Satellites. | `nova` |
 | **Navigator** | Agent Runtime. Recibe Missions del Portal, despacha via GossipSub, ejecuta por stream directo. | — (peer FHS, no en DHT Beacon) |
-| **Portal** | Interfaz de chat del usuario. Inicia sesiones de agente con Navigator. | — (cliente FHS) |
+| **Portal** | Interfaz de chat del usuario y peer FHS. Inicia sesiones de agente con Navigator. | — (peer libp2p) |
 | **Ephemeral Satellite** | Satellite efímero ejecutando WASM en browser o móvil, delegado por un Nodo Host. | `satellite` + `ephemeral: true` |
 
 ## Topología de red
@@ -28,8 +28,8 @@ graph TB
         EPH["Ephemeral Satellite\n(WASM browser)"]
     end
 
-    subgraph "Portal (cliente)"
-        PORT["Portal\n(Chat UI)"]
+    subgraph "Portal (peer libp2p)"
+        PORT["Portal\n(peer FHS)"]
     end
 
     subgraph "GossipSub tópicos"
@@ -68,7 +68,7 @@ graph TB
     NAV --- D2
 
     %% Stream directo (solo durante misiones activas)
-    PORT -->|"WSS stream directo\nchat.request / agent.start"| NAV
+    PORT -->|"stream libp2p\nchat.request / agent.start"| NAV
     NAV -.->|"stream directo post-assign\nchat.request"| STAR1
     NAV -.->|"stream directo post-assign\ntool.call"| SAT
     NAV -.->|"stream directo post-assign\ntool.call"| EPH

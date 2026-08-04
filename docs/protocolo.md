@@ -142,14 +142,12 @@ sequenceDiagram
 
 ---
 
-## Cuatro planos de comunicación
+## Planos de comunicación
 
 | Plano | Para qué | Protocolo |
 |-------|----------|-----------|
 | P2P (DHT + GossipSub) | Descubrimiento, presencia, dispatch de Missions, reputación | libp2p Kademlia + GossipSub |
 | Stream directo | Ejecución de Missions (chat.request, tool.call) | libp2p `/fhs/v1/0.1.0` + Protobuf |
-| Distribución HTTPS | Descarga de WASM (Ephemeral Satellite) | HTTPS |
-| Gestión REST | Health, métricas, discovery externo | HTTP/REST |
 
 ---
 

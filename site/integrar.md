@@ -103,8 +103,7 @@ El ejemplo de referencia está en
 | `provider.id` | Sí | DID único (`did:key:z...` Ed25519 real) |
 | `provider.type` | Sí | `"star"` \| `"satellite"` \| `"nova"` |
 | `provider.visibility` | Sí | Acota en qué `scope` puede recibir bids |
-| `endpoint.url` | Sí | WSS URL directa del provider |
-| `endpoint.multiaddr` | Sí | Multiaddr libp2p publicado en la DHT |
+| `endpoint.multiaddr` | Sí | Única dirección libp2p publicada en la DHT |
 | `privacy.retention` | Sí | Qué hace el nodo con los datos recibidos |
 | `privacy.trainingUse` | Sí, si `type: "star"` | Explícito, nunca implícito |
 

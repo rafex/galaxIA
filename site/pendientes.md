@@ -22,7 +22,7 @@ galaxIA es un proyecto activo en fase **alpha** — este roadmap es la ruta haci
 | Componente | Estado |
 |---|---|
 | IDL del protocolo FHS P2P (Protobuf + AsyncAPI) | ✅ Publicado `v0.1.0-p2p-alpha` |
-| JSON Schemas (Beacon Star / Satellite / Base) | ✅ Publicados |
+| Schemas auxiliares de Beacon | ✅ Publicados; no forman parte del wire |
 | Documentación del protocolo (`docs/`) | ✅ Actualizada al modelo P2P |
 | SDK TypeScript (`@rafex/galaxia-fhs-protocol`) | ✅ Publicado en npm |
 | SDK TypeScript (`@rafex/galaxia-satellite-capabilities`) | ✅ Publicado en npm |
@@ -38,7 +38,7 @@ El IDL está definido y publicado. El siguiente paso es que las apps lo implemen
 
 ### Migrar galaxIA-Core al modelo P2P
 
-- **Navigator**: migrar de WebSocket/Atlas centralizado a DHT + GossipSub + stream directo.
+- **Navigator**: implementar DHT + GossipSub + stream directo libp2p; el cliente también debe ser peer.
   Navigator debe publicar su propio `DhtBeaconRecord`, emitir `NodeAdvertiseMessage`, y
   publicar `MissionOfferMessage` en GossipSub para dispatch descentralizado.
 - **Star y Satellite de referencia**: migrar los providers de `galaxIA-satellite-star` del
@@ -52,7 +52,7 @@ El IDL está definido y publicado. El siguiente paso es que las apps lo implemen
   - Python: `protoc --python_out=.` desde `idl/fhs-protocol.proto`
   - Rust: `tonic-build` en `build.rs`
 - **Publicar SDK Go** (`github.com/rafex/galaxia-fhs`) — wrapper sobre `go-libp2p` con los tipos generados.
-- **Publicar SDK Python** (`galaxia-fhs-python`) — wrapper sobre `py-libp2p` (o fallback WebSocket directo).
+- **Publicar SDK Python** (`galaxia-fhs-python`) — wrapper sobre `py-libp2p` con DHT, GossipSub y streams completos.
 - **Publicar SDK Rust** (`galaxia-fhs`) — wrapper sobre `rust-libp2p`.
 - **CLI de bootstrap** — herramienta de línea de comandos para levantar un bootstrap peer
   (Atlas) con un solo comando, sin configuración adicional.

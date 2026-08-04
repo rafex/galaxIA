@@ -1,7 +1,7 @@
 # Ephemeral Satellite — WASM en Dispositivos Móviles
 
 > Spec completa: `spec-native/specs/ephemeral-satellite/SPEC.md`
-> IDL: `idl/fhs-protocol.proto`, `idl/asyncapi.yaml`, `schemas/beacon-base.schema.json`
+> IDL wire: `idl/fhs-protocol.proto`; los schemas auxiliares no se transmiten.
 
 ## Concepto
 
@@ -23,10 +23,8 @@ sequenceDiagram
     participant G as GossipSub
     participant NAV as Navigator
 
-    note over M,H: 1. Distribución del WASM
-
-    M->>H: Carga página web del Nodo Host<br/>(HTTP/HTTPS — plano de distribución)
-    H->>M: bundle.wasm + DelegationToken pre-firmado<br/>{ issuer:hostDID, subject:"", capabilities:[...],<br/>wasmHash:"sha256:...", expiresAt:..., signature:... }
+    note over M,H: 1. El runtime recibe WASM + DelegationToken fuera de FHS
+    note over M,H: { issuer:hostDID, subject:"", capabilities:[...],<br/>wasmHash:"sha256:...", expiresAt:..., signature:... }
 
     note over M: 2. Preparación local
     note over M: Verifica SHA-256 del bundle contra DelegationToken.wasmHash

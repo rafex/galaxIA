@@ -34,10 +34,9 @@ graph TD
 
 **Contiene:**
 - `idl/` — Definiciones IDL del protocolo
-  - `asyncapi.yaml` — Mensajes WebSocket/async del wire protocol FHS
+  - `asyncapi.yaml` — Canales libp2p y mensajes del wire protocol FHS
   - `fhs-protocol.proto` — Definiciones Protobuf
-  - `openapi.yaml` — Endpoints REST de Atlas y Navigator
-- `schemas/` — JSON Schema generado (`fhs-protocol.schema.json`)
+- `schemas/` — Artefactos de validación documental; el wire canónico es Protobuf
 - `docs/` — Documentación del protocolo (Markdown + diagramas Mermaid)
 - `spec-native/` — Especificaciones, decisiones (DECISIONS.md), arquitectura
 
@@ -123,8 +122,8 @@ graph LR
 ```
 
 La fuente de verdad del protocolo son los tipos TypeScript en `galaxIA-SDK/packages/fhs-protocol`.
-El JSON Schema (`schemas/fhs-protocol.schema.json`) en este repo se genera a partir de esos tipos.
-Las definiciones AsyncAPI, Protobuf y OpenAPI en `idl/` son transcripciones formales del mismo contrato.
+Los artefactos JSON de `schemas/` son auxiliares de documentación y validación; no se generan ni se transmiten como parte del wire.
+Las definiciones AsyncAPI y Protobuf en `idl/` son transcripciones formales del mismo contrato libp2p.
 
 ## Registro de decisiones de arquitectura
 

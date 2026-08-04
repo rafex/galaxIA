@@ -18,11 +18,11 @@ sequenceDiagram
     participant R as Receptor<br/>(Star / Satellite / Navigator)
 
     I->>R: libp2p dial (multiaddr del MissionBidMessage o DHT lookup)
-    note over I,R: Negociación de subprotocolo: fhs.v1 (binario) o fhs.v1.json
+    note over I,R: Negociación libp2p del protocolo /fhs/v1/0.1.0
 
-    I->>R: Envelope { handshake: HandshakeMessage }<br/>fhsVersion, listenAddrs, beacon (JSON serializado)
+    I->>R: Envelope { handshake: HandshakeMessage }<br/>fhsVersion, listenAddrs, beacon (Protobuf)
 
-    note over R: 1. Valida Envelope.signature Ed25519 del iniciador<br/>2. Verifica DID del iniciador en caché GossipSub o DHT<br/>3. Valida Beacon contra JSON Schema
+    note over R: 1. Valida Envelope.signature Ed25519 del iniciador<br/>2. Verifica DID del iniciador en caché GossipSub o DHT<br/>3. Valida Beacon Protobuf
 
     alt Handshake exitoso
         R->>I: Envelope { handshake_ack: HandshakeAckMessage }<br/>leaseSeconds, heartbeatSeconds, leaseExpires, trustLevel
@@ -52,10 +52,7 @@ sequenceDiagram
     participant G as GossipSub
     participant NAV as Navigator
 
-    note over B,H: Pre-unión: obtener WASM + DelegationToken
-
-    B->>H: GET /wasm-bundle (HTTPS — plano de distribución, no protocolo FHS)
-    H->>B: bundle.wasm + DelegationToken pre-firmado<br/>{ issuer: hostDID, subject: ephDID,<br/>  capabilities, wasmHash, expiresAt, signature }
+    note over B,H: Pre-unión: el runtime recibe WASM + DelegationToken fuera de FHS
     note over B: Verifica SHA-256(bundle) == DelegationToken.wasmHash
 
     note over B: Unirse al swarm P2P (igual que cualquier nodo)
@@ -105,36 +102,20 @@ Si el Nodo Host de un Ephemeral Satellite deja de publicar (DhtBeaconRecord expi
 
 ## Campos del Beacon
 
-El `HandshakeMessage.beacon` es un JSON serializado siguiendo el schema `beacon-base.schema.json` (y sus extensiones por tipo: `beacon-star`, `beacon-satellite`, `beacon-nova`).
+El `HandshakeMessage.beacon` es un mensaje `Beacon` Protobuf tipado. Los
+archivos JSON Schema solo sirven como validación documental y no se transmiten.
 
 Campos clave para Ephemeral Satellites:
 
-```json
-{
-  "fhsVersion": "1",
-  "provider": {
-    "id": "did:key:z<efímero>",
-    "type": "satellite",
-    "visibility": "community",
-    "ephemeral": true,
-    "delegatedBy": "did:key:z<host>",
-    "leaseSeconds": 3600
-  },
-  "capabilities": [
-    { "id": "arithmetic.solve", "name": "Aritmética" },
-    { "id": "curp.compute",    "name": "Cálculo de CURP" }
-  ],
-  "device": {
-    "platform": "browser",
-    "wasmTier": "baseline",
-    "fingerprint": "sha256:<hash-no-reversible>"
-  },
-  "endpoint": {
-    "url": "wss://atlas.ejemplo.com"
-  },
-  "privacy": {
-    "retention": "none"
-  }
+```protobuf
+Beacon {
+  fhs_version: "1"
+  provider: { id: "did:key:z<efímero>", type: PROVIDER_TYPE_SATELLITE, visibility: VISIBILITY_COMMUNITY, ephemeral: true, delegated_by: "did:key:z<host>", lease_seconds: 3600 }
+  capabilities: { id: "arithmetic.solve", name: "Aritmética" }
+  capabilities: { id: "curp.compute", name: "Cálculo de CURP" }
+  device: { platform: DEVICE_PLATFORM_BROWSER, wasm_tier: WASM_TIER_BASELINE, fingerprint: "sha256:<hash-no-reversible>" }
+  endpoint: { multiaddr: "/ip4/192.0.2.10/tcp/4001/p2p/<ephemeralPeerId>" }
+  privacy: { retention: RETENTION_NONE }
 }
 ```
 

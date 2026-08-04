@@ -89,21 +89,13 @@
     },
     "endpoint": {
       "type": "object",
-      "description": "Endpoints de acceso al nodo. Al menos url o multiaddr debe estar presente.",
-      "anyOf": [
-        { "required": ["url"] },
-        { "required": ["multiaddr"] }
-      ],
+      "description": "Dirección P2P normativa del nodo. La multiaddr libp2p es la única dirección de conexión FHS.",
+      "required": ["multiaddr"],
       "properties": {
-        "url": {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^wss://",
-          "description": "WebSocket Secure URL del nodo. Obligatoriamente wss:// — el protocolo FHS no permite ws:// sin cifrado TLS. Atlas rechaza el handshake con INVALID_MANIFEST si el esquema no es wss://."
-        },
         "multiaddr": {
           "type": "string",
-          "description": "Multiaddr P2P del nodo (ej. /ip4/1.2.3.4/tcp/8081/ws). Para conexión directa peer-to-peer (DEC-0086)."
+          "minLength": 1,
+          "description": "Multiaddr libp2p obligatoria para conexión directa peer-to-peer. El transporte concreto lo negocia libp2p; FHS no define otro endpoint."
         }
       },
       "additionalProperties": false

@@ -1,110 +1,99 @@
-# Transporte — WSS + Protobuf (obligatorio)
+# Transporte FHS: libp2p-only
 
-## Principio
+## Regla normativa
 
-> **WSS (WebSocket Secure, TLS obligatorio) + Protobuf binario es el único transporte
-> permitido en el protocolo FHS.**
-> `ws://` sin cifrado **no es válido** y Atlas rechaza el handshake de cualquier nodo
-> que lo declare en su Beacon con el error `INVALID_MANIFEST`.
+**libp2p es el único transporte del protocolo FHS.** Todo mensaje y todo
+payload de una Mission viaja por una capacidad libp2p:
 
-La coherencia del sistema lo exige: si el Portal (chat web) sirve por HTTPS y el usuario
-espera privacidad en sus conversaciones, la capa de red entre nodos debe cifrar igualmente.
-No tendría sentido proteger el último tramo (browser↔servidor) y dejar sin cifrar la
-comunicación inter-nodo donde viajan los mismos datos.
+| Necesidad | Camino FHS |
+|---|---|
+| Descubrimiento de nodos y Beacons | DHT Kademlia |
+| Presencia, ofertas, bids y reputación | GossipSub |
+| Handshake, chat y tools | Stream `/fhs/v1/0.1.0` |
 
-## Capa de Transporte
+No existen endpoints web, adaptadores de borde ni rutas de compatibilidad. Un
+cliente que no pueda abrir libp2p no es un cliente FHS conforme.
 
-```
-WSS (WebSocket Secure — TLS sobre TCP)
-  └── Subprotocol: Sec-WebSocket-Protocol: fhs.v1
-        └── Frames binarios
-              └── LPP framing: [varint: longitud][Envelope bytes]
-                    └── Envelope (Protobuf 3) → payload oneof
-```
+Atlas es únicamente un bootstrap peer. No registra nodos, no despacha Missions
+y no recibe el contenido de una conversación.
 
-- **Conexión**: `wss://` siempre. Sin excepciones.
-- **TLS**: mínimo TLS 1.2; recomendado TLS 1.3.
-- **Certificados**: Let's Encrypt para producción; autofirmados aceptados con validación explícita en clientes.
-- **Encoding**: Protocol Buffers 3 (binario), serialización determinista para firmas.
-- **Framing**: Length-Prefixed Protobuf (LPP) — ver `idl/framing.md`.
-- **Autenticación**: firma Ed25519 en cada Envelope. TLS cifra el canal; Ed25519 autentica el emisor. Ambas capas son complementarias, no alternativas.
+## Stream directo
 
-## Negociación de Subprotocolo
+El stream se negocia con el protocolo libp2p:
 
-```
-GET /register HTTP/1.1
-Host: atlas.ejemplo.com
-Upgrade: websocket
-Sec-WebSocket-Protocol: fhs.v1, fhs.v1.json
+```text
+/fhs/v1/0.1.0
 ```
 
-| Subprotocol | Frames | Uso |
-| ----------- | ------ | --- |
-| `fhs.v1` | Binario (Protobuf + LPP) | **Primario — producción, P2P** |
-| `fhs.v1.json` | Texto (JSON) | Depuración y herramientas de desarrollo únicamente |
+Cada frame contiene exactamente un Envelope Protobuf firmado. Beacon, schemas
+de tools, argumentos, resultados y records también son mensajes Protobuf; no
+se encapsula JSON dentro de ningún campo.
 
-`fhs.v1.json` existe para facilitar el desarrollo con herramientas como `wscat` o Postman.
-No es un modo de producción — ambos modos requieren WSS de igual forma.
-
-## Multiaddr P2P
-
-Para conexiones directas nodo-a-nodo (libp2p, DEC-0086), el multiaddr usa TLS:
-
-```
-/ip4/1.2.3.4/tcp/8443/tls/ws
+```text
+[varint: longitud][Envelope Protobuf bytes]
 ```
 
-**No** se usa `/ip4/1.2.3.4/tcp/8081/ws` (sin `/tls/`). Atlas rechaza `listen_addrs`
-que no incluyan `/tls/` o `/wss`.
+La identidad del peer se deriva de Ed25519 (`did:key:z...` y PeerId libp2p).
+Cada Envelope, mensaje GossipSub y record DHT lleva la firma Ed25519 del
+emisor.
 
-## Aplicación en el Beacon
+## Capas de la red
 
-El campo `endpoint.url` del Beacon (`schemas/beacon-base.schema.json`) tiene la restricción:
+### DHT Kademlia
 
-```json
-"url": {
-  "type": "string",
-  "format": "uri",
-  "pattern": "^wss://",
-  "description": "WebSocket Secure URL del nodo. Obligatoriamente wss://."
-}
-```
+La DHT publica y resuelve `DhtBeaconRecord` bajo el DID del nodo y
+`DhtReputationRecord` bajo `reputation/{did}`. El record contiene las
+multiaddrs libp2p del peer y está firmado por quien lo publica.
 
-Atlas evalúa el Beacon contra el schema en el momento del handshake. Un `endpoint.url`
-que empiece por `ws://` (sin `s`) produce `INVALID_MANIFEST` y el handshake es rechazado.
+### GossipSub
 
-## Cuándo NO usar WebSocket
+Los tópicos normativos son:
 
-WebSocket (WSS o no) no es para todo:
+- `fhs/v1/nodes/advertise`
+- `fhs/v1/missions/offer`
+- `fhs/v1/missions/bid`
+- `fhs/v1/missions/assign`
+- `fhs/v1/reputation/update`
 
-| Caso | Alternativa |
-| ---- | ----------- |
-| Herramientas de monitoreo externas (Prometheus, dashboards) | REST — plano de gestión (`idl/openapi.yaml`) |
-| Integraciones con sistemas sin soporte WebSocket | REST — plano de gestión |
-| Descarga del bundle WASM por Ephemeral Satellites | HTTPS estático (distribución, no protocolo FHS) |
+Los mensajes de estos tópicos son Protobuf firmado. No son Envelopes de stream.
 
-**REST es solo plano de gestión**, no protocolo FHS. Cualquier comunicación que sea
-parte del protocolo (registro, Missions, heartbeat, feedback) va por WSS+Proto.
+### Stream de ejecución
 
-## Diagrama de Transporte
+Después de descubrir y asignar un provider, el Navigator abre el stream
+`/fhs/v1/0.1.0` directamente con su multiaddr. El stream transporta el
+handshake, Pulse y los mensajes de la Mission.
+
+## Beacon y direccionamiento
+
+`endpoint.multiaddr` es obligatoria y es la única autoridad de conexión. No se
+anuncia una URL alternativa. La multiaddr debe identificar el PeerId correcto y
+permitir que libp2p establezca el transporte y la seguridad negociados por la
+red.
+
+## Flujo normativo
 
 ```mermaid
 flowchart TD
-    A[¿El cliente habla protocolo FHS?] -->|Sí| B[WSS + fhs.v1 binario]
-    A -->|No — herramienta externa| Z[REST — plano de gestión únicamente]
-    B --> C{¿Puede serializar Protobuf?}
-    C -->|Sí| D[WSS + fhs.v1 binario — producción]
-    C -->|No — solo desarrollo/debug| E[WSS + fhs.v1.json — modo compat]
+    A[Nodo FHS] --> B[Bootstrap peer]
+    B --> C[Join DHT Kademlia]
+    C --> D[Publicar DhtBeaconRecord]
+    D --> E[Suscribir GossipSub]
+    E --> F[NodeAdvertiseMessage]
+    F --> G[MissionOffer / Bid / Assign]
+    G --> H[Abrir stream libp2p]
+    H --> I[Handshake + Envelope Protobuf LPP]
+    I --> J[Ejecutar Mission entre peers]
+    J --> K[ReputationUpdateMessage]
+    K --> C
 ```
 
-## Configuración de TLS
+## Seguridad
 
-Para infraestructura propia, ver `docs/tls-autofirmado.md`.
+libp2p negocia el canal seguro y el multiplexado. FHS añade identidad y
+autenticidad de mensaje mediante Ed25519 en el Envelope, GossipSub y DHT. Un
+peer debe verificar PeerId, DID, firma, timestamp, versión y destinatario antes
+de procesar un payload.
 
-Variables de entorno relevantes (todos los nodos):
-
-```bash
-TLS_CERT_PATH=/etc/fhs/tls/cert.pem   # Certificado TLS del servidor
-TLS_KEY_PATH=/etc/fhs/tls/key.pem     # Clave privada TLS (≠ clave FHS Ed25519)
-ATLAS_URL=wss://atlas.ejemplo.com:8443/fhs/v1/ws  # Siempre wss://
-```
+Consulta [idl/framing.md](../idl/framing.md),
+[idl/fhs-protocol.proto](../idl/fhs-protocol.proto) y
+[docs/p2p.md](p2p.md) para los detalles de wire y descubrimiento.

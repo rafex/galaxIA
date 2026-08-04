@@ -1,42 +1,20 @@
 # Beacon Star (proveedor LLM)
 
 Un Star es el nodo de la red FHS que provee acceso a un modelo LLM. Se une al swarm P2P
-publicando su Beacon (manifiesto JSON) en la DHT y anunciándolo vía GossipSub (DEC-P2P-001).
-El schema completo está en `schemas/beacon-star.schema.json`.
+publicando su Beacon Protobuf en la DHT y anunciándolo vía GossipSub (DEC-P2P-001).
+La definición wire canónica está en `idl/fhs-protocol.proto`; el schema JSON es
+solo validación documental.
 
 ## Ejemplo completo
 
-```json
-{
-  "fhsVersion": "1",
-  "provider": {
-    "id": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
-    "name": "Mac mini de Raúl",
-    "type": "star",
-    "visibility": "community",
-    "region": "mx-cdmx"
-  },
-  "endpoint": {
-    "url": "wss://192.168.3.173:8081",
-    "multiaddr": "/ip4/192.168.3.173/tcp/8081/ws"
-  },
-  "models": [
-    {
-      "id": "qwen2.5-coder-3b",
-      "displayName": "Qwen 2.5 Coder 3B",
-      "capabilities": ["chat", "tool_calling"],
-      "contextWindow": 4096,
-      "languages": ["es", "en"],
-      "toolCalling": true
-    }
-  ],
-  "privacy": {
-    "retention": "none",
-    "trainingUse": false
-  },
-  "availability": {
-    "maxConcurrentRequests": 2
-  }
+```protobuf
+Beacon {
+  fhs_version: "1"
+  provider: { id: "did:key:z...", type: PROVIDER_TYPE_STAR, visibility: VISIBILITY_COMMUNITY, name: "Mac mini de Raúl", region: "mx-cdmx" }
+  endpoint: { multiaddr: "/ip4/192.168.3.173/tcp/8443/p2p/<peerId>" }
+  models: { id: "qwen2.5-coder-3b", display_name: "Qwen 2.5 Coder 3B", capabilities: MODEL_CAPABILITY_CHAT, capabilities: MODEL_CAPABILITY_TOOL_CALLING, context_window: 4096, languages: "es", languages: "en", tool_calling: true }
+  privacy: { retention: RETENTION_NONE, training_use: false }
+  availability: { max_concurrent_requests: 2 }
 }
 ```
 
@@ -45,8 +23,7 @@ El schema completo está en `schemas/beacon-star.schema.json`.
 - `provider.id`: DID Ed25519 del nodo en formato `did:key:z...`. Se genera con la clave privada del nodo — no es un nombre elegido a mano. El `handshake` y el `DhtBeaconRecord` se firman con esa clave.
 - `provider.type`: siempre `"star"`.
 - `provider.visibility`: acota en qué `scope` de `MissionOfferMessage` puede recibir bids — `"local"` / `"network"` / `"community"` / `"external"`.
-- `endpoint.url`: WSS URL directa del Star (formato `^wss://`). Los peers abren el stream `/fhs/v1/0.1.0` contra esta URL.
-- `endpoint.multiaddr`: Multiaddr libp2p para conexión P2P directa sin DNS — publicado también en el `DhtBeaconRecord`.
+- `endpoint.multiaddr`: Única dirección libp2p normativa para conexión P2P directa — publicada también en el `DhtBeaconRecord`. Los peers abren `/fhs/v1/0.1.0` mediante esta dirección.
 - `models[].capabilities`: `"chat"`, `"completion"`, `"embedding"`, `"vision"`, `"tool_calling"`.
 - `models[].toolCalling`: `true` si el modelo puede invocar tools de forma nativa.
 - `availability.maxConcurrentRequests`: misiones simultáneas máximas — si se supera, el Star no debe publicar bids.
@@ -67,5 +44,5 @@ Ver `protocol/p2p.md` y `idl/gossipsub.md` para el flujo completo.
 
 ## Referencia de schemas
 
-- `schemas/beacon-star.schema.json` — schema completo del Beacon
+- `idl/fhs-protocol.proto` — `Beacon` y `ModelDescriptor` wire
 - `idl/fhs-protocol.proto` — definición Protobuf de `DhtBeaconRecord` y mensajes GossipSub
