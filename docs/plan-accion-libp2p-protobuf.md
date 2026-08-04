@@ -56,6 +56,17 @@ El commit `92b474f` de `galaxIA-Core` dejó el camino P2P del Navigator en modo 
 
 Queda pendiente para cerrar esta fase la validación de firmas antes de aceptar mensajes, la compatibilidad GossipSub y la limpieza de interfaces HTTP/SSE de la UI local, que no forman parte del wire FHS.
 
+### Avance aplicado en satellite-star — 2026-08-04
+
+El commit `5a4687d` de `galaxIA-satellite-star` añadió `@galaxia/fhs-wire`, una frontera compartida para los cinco providers de referencia:
+
+- Streams directos: Protobuf `Envelope` con framing LPP.
+- Pubsub: anuncios y ciclo de misión codificados con los schemas generados.
+- DHT: `DhtBeaconRecord` codificado con Protobuf.
+- Los adapters locales conservan JSON solo al interactuar con LLM/OCR/parser, configuración, identidad o modelos legacy internos.
+
+La migración todavía no se marca completa porque los handlers siguen usando tipos legacy como fachada de aplicación y aún publican firmas vacías; el siguiente paso es reemplazar esa fachada por `FhsProto` directamente y firmar/verificar antes de aceptar mensajes.
+
 ## Fases de ejecución
 
 ### Fase 0 — contrato y decisiones bloqueantes
