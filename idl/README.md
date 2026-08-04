@@ -32,7 +32,7 @@ Los tópicos normativos son `nodes/advertise`, `missions/offer`,
 Todo stream usa `/fhs/v1/0.1.0`, con handshake bilateral, Pulse y Envelopes
 Protobuf firmados. El framing es `[varint-length][Envelope bytes]`.
 
-- **Portal ↔ Navigator:** `agent.start`, `chat.request`, estado y resultado.
+- **Portal ↔ Navigator:** `agent.start`, `chat.request`, `ArtifactRef`, OCR/KB y decisiones (`attachment.decision`/`kb.decision`), estado y resultado.
 - **Navigator ↔ Star:** `chat.request`, `chat.delta`, `chat.completed`.
 - **Navigator ↔ Satellite:** `tool.call`, `tool.result` y errores.
 - **Cualquier par:** `handshake`, `handshake_ack`, `ping`, `pong`, `error`.
