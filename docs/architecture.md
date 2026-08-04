@@ -9,7 +9,7 @@
 | **Satellite** | Proveedor de herramientas (tools). Expone capabilities como OCR, búsqueda, CURP, etc. | `satellite` |
 | **Nova** | Agente autónomo con loop propio. Puede coordinar Stars y Satellites. | `nova` |
 | **Navigator** | Agent Runtime. Recibe Missions del Portal, despacha via GossipSub, ejecuta por stream directo. | — (peer FHS, no en DHT Beacon) |
-| **Portal** | Interfaz de chat del usuario y peer FHS. Inicia sesiones de agente con Navigator. | — (peer libp2p) |
+| **Portal** | Interfaz de chat del usuario y peer FHS. Inicia sesiones de agente con Navigator mediante bootstrap TLS. | — (peer libp2p de stream; DHT/GossipSub web pendiente) |
 | **Ephemeral Satellite** | Satellite efímero ejecutando WASM en browser o móvil, delegado por un Nodo Host. | `satellite` + `ephemeral: true` |
 
 ## Topología de red
@@ -28,8 +28,8 @@ graph TB
         EPH["Ephemeral Satellite\n(WASM browser)"]
     end
 
-    subgraph "Portal (peer libp2p)"
-        PORT["Portal\n(peer FHS)"]
+    subgraph "Portal (peer libp2p, bootstrap TLS)"
+        PORT["Portal\n(peer FHS; DHT/Gossip web pendiente)"]
     end
 
     subgraph "GossipSub tópicos"
@@ -75,6 +75,7 @@ graph TB
 
     %% Bootstrap (solo al unirse)
     STAR1 -.->|"bootstrap (solo 1 vez)"| AT
+    PORT -.->|"bootstrap TLS configurado"| NAV
 ```
 
 **Leyenda:**
@@ -115,6 +116,13 @@ Cuando llega una Mission, Navigator:
 4. Ejecuta la Mission.
 
 Atlas solo interviene cuando un nodo nuevo quiere unirse al swarm por primera vez.
+
+El Portal es una excepción operativa de bootstrap: el navegador no puede
+descubrir por mDNS y todavía no participa en el DHT/GossipSub del swarm. Su
+configuración HTTPS solo entrega la multiaddr TLS inicial; el chat y todos los
+mensajes FHS siguen viajando por el stream libp2p directo. La incorporación del
+Portal al descubrimiento DHT/GossipSub es una tarea posterior del protocolo,
+no un registro HTTP oculto.
 
 ## Discovery vs Routing
 
