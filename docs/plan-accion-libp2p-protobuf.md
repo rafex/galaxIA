@@ -52,6 +52,7 @@ El commit `92b474f` de `galaxIA-Core` dejó el camino P2P del Navigator en modo 
 - `AtlasClient` quedó como interfaz de descubrimiento; Navigator usa `P2pAtlasClient` y no conserva cliente Atlas HTTP.
 - Se eliminaron los gateways FHS WebSocket/WSS del runtime y el fallback `FHS_P2P_MODE`; los providers P2P son el único camino de ejecución.
 - Se eliminaron los tipos manuales P2P duplicados; `FhsProto` es la fuente de los mensajes transmitidos.
+- `Envelope`, anuncios, misiones y beacons DHT se firman/verifican con Ed25519; el DID usa el multicodec `0xed01` requerido por `verifySignature`.
 - JSON permanece únicamente en identidad local y en la frontera explícita del modelo de aplicación (`tool.function.arguments`), antes/después de convertirse a `DynamicValue`.
 
 Queda pendiente para cerrar esta fase la validación de firmas antes de aceptar mensajes, la compatibilidad GossipSub y la limpieza de interfaces HTTP/SSE de la UI local, que no forman parte del wire FHS.
@@ -65,7 +66,7 @@ El commit `5a4687d` de `galaxIA-satellite-star` añadió `@galaxia/fhs-wire`, un
 - DHT: `DhtBeaconRecord` codificado con Protobuf.
 - Los adapters locales conservan JSON solo al interactuar con LLM/OCR/parser, configuración, identidad o modelos legacy internos.
 
-La migración todavía no se marca completa porque los handlers siguen usando tipos legacy como fachada de aplicación y aún publican firmas vacías; el siguiente paso es reemplazar esa fachada por `FhsProto` directamente y firmar/verificar antes de aceptar mensajes.
+La migración todavía no se marca completa porque los handlers siguen usando tipos legacy como fachada de aplicación; el wire ya firma/verifica antes de aceptar mensajes. El siguiente paso es reemplazar esa fachada por `FhsProto` directamente.
 
 ## Fases de ejecución
 
