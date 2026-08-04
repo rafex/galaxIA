@@ -40,7 +40,7 @@ La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqu
 - [x] `galaxia-parser-catalog`: adapter explícito de parser local a `DynamicValue`/`ToolCall`.
 - [ ] Eliminar los planos HTTP/WebSocket/SSE de aplicación.
 
-La migración de `FloodSub` a `GossipSub` permanece bloqueada por la incompatibilidad de la versión instalada de `@chainsafe/libp2p-gossipsub` con `@libp2p/interface@3`; se requiere una combinación de dependencias compatible antes de activarla.
+La migración de `FloodSub` a `GossipSub` quedó completada en Core y satellite-star con `@libp2p/gossipsub@16.1.1`, compatible con `@libp2p/interface@3`. La dependencia anterior `@chainsafe/libp2p-gossipsub` y el paquete `@libp2p/floodsub` ya no forman parte de esos repositorios.
 
 ### Avance aplicado en Core — 2026-08-03
 
@@ -54,8 +54,9 @@ El commit `92b474f` de `galaxIA-Core` dejó el camino P2P del Navigator en modo 
 - Se eliminaron los tipos manuales P2P duplicados; `FhsProto` es la fuente de los mensajes transmitidos.
 - `Envelope`, anuncios, misiones y beacons DHT se firman/verifican con Ed25519; el DID usa el multicodec `0xed01` requerido por `verifySignature`.
 - JSON permanece únicamente en identidad local y en la frontera explícita del modelo de aplicación (`tool.function.arguments`), antes/después de convertirse a `DynamicValue`.
+- `fhs-node` y Navigator usan GossipSub como único pub/sub; la validación dirigida de `fhs-node` pasa 5 pruebas y el typecheck/build de Core pasa.
 
-Queda pendiente para cerrar esta fase la validación de firmas antes de aceptar mensajes, la compatibilidad GossipSub y la limpieza de interfaces HTTP/SSE de la UI local, que no forman parte del wire FHS.
+Queda pendiente para cerrar esta fase la limpieza de interfaces HTTP/SSE de la UI local, que no forman parte del wire FHS.
 
 ### Avance aplicado en satellite-star — 2026-08-04
 
@@ -124,7 +125,7 @@ Repositorio: `galaxIA-Core`.
 2. Migrar `apps/navigator/src/p2p/stream-codec.ts` y `packages/fhs-node/src/stream.ts` de JSON a Envelope Protobuf con framing binario.
 3. Migrar DHT y pub/sub a valores Protobuf firmados.
 4. Verificar firmas antes de aceptar beacons, anuncios, misiones y reputación.
-5. Sustituir FloodSub por GossipSub compatible con la versión actual de libp2p.
+5. [x] Sustituir FloodSub por GossipSub compatible con la versión actual de libp2p.
 6. Eliminar `any`, tipos locales P2P y casts a interfaces heredadas.
 7. Migrar `P2pLlmGateway`, `P2pMcpHost`, discovery y mission cycle al SDK generado.
 8. Eliminar del plano FHS las rutas de chat, eventos, providers, métricas y WebSocket.
