@@ -154,6 +154,30 @@ Deberías ver eventos `assistant.delta` con texto y un evento `assistant.complet
 
 ---
 
+## Abrir puertos en el firewall
+
+Si el host usa **UFW** (Ubuntu/Debian) u otro firewall, los puertos deben estar abiertos para que otros dispositivos en la red puedan acceder:
+
+```bash
+sudo ufw allow 4001/tcp comment "FHS Atlas P2P"
+sudo ufw allow 4002/tcp comment "FHS Star P2P"
+sudo ufw allow 4010/tcp comment "FHS Navigator P2P"
+sudo ufw allow 8081/tcp comment "FHS Atlas REST"
+sudo ufw allow 8090/tcp comment "FHS Navigator REST/SSE"
+sudo ufw allow 5173/tcp comment "FHS Portal Chat"
+sudo ufw status numbered
+```
+
+> Con `podman rootless` (red `pasta`), `rootlessport` publica los puertos del usuario. UFW los trata como tráfico externo de todas formas, así que la regla es necesaria igual.
+
+**Si no tienes acceso a `sudo`**, usa un túnel SSH desde la máquina cliente:
+
+```bash
+ssh -L 5173:127.0.0.1:5173 -L 8090:127.0.0.1:8090 usuario@ip-del-host
+```
+
+---
+
 ## Orden de arranque recomendado
 
 ```

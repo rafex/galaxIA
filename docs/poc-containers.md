@@ -11,6 +11,7 @@ Esta guía describe cómo levantar la prueba de concepto P2P completa usando **P
 - Podman ≥ 4.x con soporte `pasta` (instalado por defecto en Fedora/RHEL/Alma Linux; en Ubuntu instalar `podman-rootless`)
 - `llama-server` corriendo en el host en el puerto `43110`
 - Las imágenes construidas localmente (ver sección Construir imágenes)
+- **UFW (o el firewall del host) con los puertos correctos abiertos** (ver sección Firewall)
 
 ---
 
@@ -220,6 +221,38 @@ podman rm fhs-navigator fhs-star fhs-atlas
 # Para borrarlos también:
 podman volume rm star-data navigator-data
 ```
+
+---
+
+## Firewall (UFW) — puertos requeridos
+
+En Linux con UFW activo, los contenedores publican sus puertos en el host pero el firewall los bloquea para conexiones externas. Abre todos los puertos necesarios **antes de intentar acceder desde otra máquina**:
+
+```bash
+# Protocolo P2P (libp2p WebSocket)
+sudo ufw allow 4001/tcp comment "FHS Atlas P2P"
+sudo ufw allow 4002/tcp comment "FHS Star P2P"
+sudo ufw allow 4010/tcp comment "FHS Navigator P2P"
+
+# APIs HTTP y portal
+sudo ufw allow 8081/tcp comment "FHS Atlas REST"
+sudo ufw allow 8090/tcp comment "FHS Navigator REST/SSE"
+sudo ufw allow 5173/tcp comment "FHS Portal Chat"
+
+# Verificar
+sudo ufw status numbered
+```
+
+> **Nota:** Si usas `podman rootless` con `pasta`, los puertos se publican vía `rootlessport`. UFW ve estas conexiones como tráfico externo aunque el proceso sea del usuario — la regla de firewall es necesaria igual que para cualquier servicio del sistema.
+
+**Alternativa sin tocar el firewall (port forward SSH):**
+
+```bash
+# Ejecutar desde la máquina cliente
+ssh -L 5173:127.0.0.1:5173 -L 8090:127.0.0.1:8090 <usuario>@<ip-bastion>
+```
+
+Mientras ese túnel esté activo, accede al portal en `http://127.0.0.1:5173`.
 
 ---
 

@@ -474,6 +474,20 @@ sleep 0.5
 curl -N "http://localhost:8090/api/chat/$CONV/events"
 ```
 
+### Abrir puertos en UFW (necesario para acceso desde otras máquinas)
+
+```bash
+sudo ufw allow 4001/tcp comment "FHS Atlas P2P"
+sudo ufw allow 4002/tcp comment "FHS Star P2P"
+sudo ufw allow 4010/tcp comment "FHS Navigator P2P"
+sudo ufw allow 8081/tcp comment "FHS Atlas REST"
+sudo ufw allow 8090/tcp comment "FHS Navigator REST/SSE"
+sudo ufw allow 5173/tcp comment "FHS Portal Chat"
+sudo ufw status numbered
+```
+
+> Con `podman rootless` (pasta), `rootlessport` publica los puertos pero UFW los bloquea igualmente para tráfico externo. Sin estas reglas, el acceso desde otras máquinas de la LAN falla con "Connection refused" o timeout, aunque el contenedor esté corriendo.
+
 ### Reiniciar la pila (sin perder identidades)
 
 ```bash
