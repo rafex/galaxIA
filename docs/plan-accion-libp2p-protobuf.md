@@ -26,7 +26,7 @@ La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqu
 
 - `galaxIA`: el IDL canónico está en `idl/fhs-protocol.proto`, pero `ECOSYSTEM.md` todavía describe tipos TypeScript como fuente primaria.
 - `galaxIA-Core`: `FHS_P2P_MODE` es opcional; Navigator registra Atlas HTTP, HTTP, WebSocket y SSE aunque active P2P. Los codecs P2P de streams, DHT y pub/sub usan JSON dentro de framing length-prefixed.
-- `galaxIA-SDK`: `messages-p2p.ts` es un mapeo TypeScript manual, no código generado desde Protobuf. También se exportan mensajes WebSocket y SSE heredados.
+- `galaxIA-SDK`: el wire ya se genera desde Protobuf; los contratos de eventos de UI ya no forman parte del SDK. Las interfaces HTTP/WebSocket/SSE de aplicación todavía existen en algunas superficies locales y deben retirarse.
 - `galaxIA-satellite-star`: cada proveedor duplica tipos P2P y codecs JSON. Los bridges LLM/OCR externos son adaptadores permitidos, pero deben quedar aislados del wire FHS.
 - `galaxia-parser-catalog`: JSON y SQLite son almacenamiento y parseo local; deben tener una frontera explícita antes de producir `DynamicValue` y `ToolCall` FHS.
 
@@ -38,6 +38,7 @@ La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqu
 - [x] `galaxIA-Core/apps/navigator`: migrar el codec P2P específico y eliminar sus tipos manuales.
 - [x] `galaxIA-satellite-star`: providers migrados al wire protobuf compartido; sin tipos ni codecs P2P duplicados.
 - [x] `galaxia-parser-catalog`: adapter explícito de parser local a `DynamicValue`/`ToolCall`.
+- [x] `galaxIA-SDK`: retirados `sse.ts`, `AgentSSEEvent` y la variante MCP `transport: "sse"`; publicado `@rafex_labs/galaxia-fhs-protocol@0.1.30`.
 - [ ] Eliminar los planos HTTP/WebSocket/SSE de aplicación.
 
 La migración de `FloodSub` a `GossipSub` quedó completada en Core y satellite-star con `@libp2p/gossipsub@16.1.1`, compatible con `@libp2p/interface@3`. La dependencia anterior `@chainsafe/libp2p-gossipsub` y el paquete `@libp2p/floodsub` ya no forman parte de esos repositorios.
@@ -82,7 +83,7 @@ La migración del wire ya se completó con `c5fa076` y `ea1d487`:
 - Los cinco providers importan directamente el wire compartido.
 - `satellite-ocr-example` ya no anuncia ni acepta `fileBase64`; la tool exige `file: ArtifactRef` y resuelve `inline` o un CID IPFS mediante el gateway externo declarado.
 
-La representación formal de `ArtifactRef` ya quedó resuelta en el IDL y el SDK; permanecen pendientes la eliminación de `sse.ts` junto con la UI HTTP/WebSocket/SSE y las pruebas E2E entre Navigator y providers.
+La representación formal de `ArtifactRef` y la limpieza de la API SSE del SDK ya quedaron resueltas. Permanecen pendientes la sustitución de la UI HTTP/WebSocket/SSE por una sesión libp2p y las pruebas E2E entre Navigator y providers.
 
 ### Avance aplicado en parser-catalog — 2026-08-04
 
@@ -113,12 +114,12 @@ Repositorio: `galaxIA-SDK`.
    - `function.arguments: string` → `DynamicValue`.
    - `result: string` → `DynamicValue`.
    - `signature: string` → `bytes`.
-4. Eliminar de la API pública `messages.ts`, `sse.ts`, `fhs.v1.json` y `Sec-WebSocket-Protocol`.
+4. [x] Eliminar de la API pública `messages.ts`, `sse.ts`, `fhs.v1.json` y `Sec-WebSocket-Protocol`.
 5. Eliminar los tipos manuales duplicados del wire; conservar solo tipos locales de UI, configuración o adapters que no se transmitan.
 6. Publicar una versión coordinada del paquete sin capa de compatibilidad.
 7. Añadir pruebas de vectores binarios y de round-trip.
 
-El SDK `0.1.29` genera `ArtifactRef`, `InlineArtifact` e `IpfsArtifact` desde el IDL. Los adaptadores de Navigator y `fhs-wire` convierten el shape local `ArtifactRef` a ese `oneof` y de regreso sin serializar JSON en el wire.
+El SDK `0.1.30` genera `ArtifactRef`, `InlineArtifact` e `IpfsArtifact` desde el IDL y ya no exporta contratos SSE. Los eventos de Navigator y Portal son tipos locales de aplicación. Los adaptadores de Navigator y `fhs-wire` convierten el shape local `ArtifactRef` a ese `oneof` y de regreso sin serializar JSON en el wire.
 
 ### Fase 2 — Core y nodo libp2p
 
