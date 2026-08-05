@@ -1,18 +1,32 @@
 +++
 [session]
-state = "idle"
+state = "active"
 agent = "claude"
-initiative = "fhs-mvp"
-task = "protocol-document-context-and-e2e"
-intent = "Formalizar DocumentContext en Protobuf, retirar la confirmación OCR manual y automatizar la E2E PDF + pregunta inicial + seguimiento."
-last_updated = "2026-08-05T14:00:00-06:00"
+initiative = "curp-wasm-service"
+task = "implement-curp-wasm-service"
+intent = "Implementar el servicio local de creación y validación estructural de CURP en WASM, servido por HTTPS desde un contenedor y accesible por la red GalaxIA."
+last_updated = "2026-08-05T14:35:00-06:00"
 +++
 
 # Active Session
 
 ## Current state
 
-`idle` — contrato Protobuf, consumidores Portal/Navigator y automatización E2E cerrados. mTLS permanece en backlog; TLS con CA de prueba sigue siendo suficiente para esta iteración.
+`active` — servicio CURP local implementado en SDK y preparado para su despliegue E2E. La lógica corre en WASM/Web Worker en el celular; mTLS permanece fuera de alcance.
+
+## Iniciativa actual (2026-08-05)
+
+- **CURP local en WASM**: se implementó la construcción de 18 posiciones, el
+  dígito verificador público y la validación estructural en TS/AssemblyScript.
+- **Privacidad**: la página no usa API de aplicación ni persistencia; los datos
+  se procesan en el teléfono dentro de un Web Worker.
+- **Despliegue**: el frontend se empaqueta como imagen HTTPS estática y el
+  runner E2E lo publica en el puerto 8444 de la laptop, sobre la red GalaxIA.
+- **Alcance normativo**: la asignación oficial, unicidad, vigencia y existencia
+  en RENAPO/BDNCURP quedan explícitamente fuera de la validación local.
+
+La prueba funcional desde el celular y la publicación en `main` siguen siendo
+las tareas de cierre de `SPEC-CURP-0001`.
 
 ## Qué se completó en esta sesión (2026-07-02)
 
