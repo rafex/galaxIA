@@ -39,7 +39,7 @@ descrita abajo.
    servicio externo que solo ofrece gateway, puede usar su HTTP/HTTPS de
    lectura como excepción de frontera.
 
-La elección es una preferencia explícita del usuario en el Portal (mismo patrón que `preferences.ocrMode`/`preferences.kb` — un control visible en la barra de configuración, no un comportamiento oculto).
+La elección es una preferencia explícita del usuario en el Portal (mismo patrón que `preferences.kb` — un control visible en la barra de configuración, no un comportamiento oculto). El transporte de adjuntos es independiente del procesamiento OCR automático y no requiere confirmación manual.
 
 **Granularidad (DEC-0052):** es una configuración del Portal, no una elección por adjunto individual ni siquiera implícitamente por conversación — el usuario declara de antemano si IPFS está activo y, si lo está, con qué red (pública/privada, DEC-0045). Mientras esa configuración esté activa, los adjuntos van por IPFS; si no está activa, van directo, sin ningún paso intermedio ("sin mayor rodeo").
 
@@ -174,7 +174,7 @@ Dos modos, declarados explícitamente en el Portal al subir el archivo — reemp
 - DEC-0025 — formato generalizado de `privacy.retention` (`{ ttl: ... }`), reutilizado aquí para el default de 3 horas.
 - DEC-0026/DEC-0037 — el protocolo define el contrato, nunca el motor/infraestructura interna de un provider ni de un mecanismo de transporte — aplicado aquí a la elección de red/nodo IPFS.
 - DEC-0028 — `Signal.tags`, mismo patrón de "tipo de protocolo compartido y tipado" que `ArtifactRef` sigue aquí (DEC-0046).
-- `spec-native/specs/ocr-confirmacion/SPEC.md` (SPEC-OCRCONFIRM-0001) — patrón de preferencia configurable en el Portal (`preferences.ocrMode`) que este spec reutiliza para el selector de transporte.
+- `spec-native/specs/ocr-confirmacion/SPEC.md` (SPEC-OCRCONFIRM-0001) — iniciativa histórica superseded; el selector de transporte no depende del flujo OCR.
 - `spec-native/specs/rag-provider/SPEC.md` (SPEC-RAG-0001) — mismo formato de retención con TTL.
 - Issue #12 en GitHub — seguimiento público de esta iniciativa.
 

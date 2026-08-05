@@ -136,10 +136,10 @@ sequenceDiagram
 ## Privacidad
 
 En el flujo Portal ↔ Navigator, los adjuntos viajan como `ArtifactRef` dentro
-de `ChatRequestMessage`. El texto OCR, las recomendaciones de KB y las
-decisiones del usuario (`attachment.decision` y `kb.decision`) son payloads
-Protobuf del mismo stream libp2p; no abren endpoints HTTP, WebSocket ni SSE
-adicionales.
+de `ChatRequestMessage`. El texto OCR se anuncia con `ocr.extracted` y se
+conserva como `DocumentContext` estructurado para preguntas posteriores. Las
+recomendaciones de KB y su decisión son payloads Protobuf del mismo stream
+libp2p; no abren endpoints HTTP, WebSocket ni SSE adicionales.
 
 - **`scope`** en el `MissionOfferMessage` acota qué providers pueden responder — es un filtro de protocolo, no una preferencia.
 - **`privacy.retention`** en el Beacon declara qué hace el nodo con los datos recibidos (`"none"` / `"session"` / etc.).

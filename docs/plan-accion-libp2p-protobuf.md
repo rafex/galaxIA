@@ -41,7 +41,9 @@ La revisión con `codebase-memory` confirmó que el camino P2P actual es un esqu
 - [x] `galaxIA-SDK`: retirados `sse.ts`, `AgentSSEEvent` y la variante MCP `transport: "sse"`; publicado `@rafex_labs/galaxia-fhs-protocol@0.1.33`.
 - [x] `galaxIA-Core/apps/navigator`: retirado el puente NATS del runtime; los eventos del Navigator ya no entran por JSON/NATS.
 - [x] `galaxIA-Core`: agregado el handler de sesión Portal sobre `/fhs/v1/0.1.0`; Portal conecta directamente por libp2p y se retiraron las rutas HTTP/WebSocket/SSE de chat.
-- [x] Completar en la sesión Portal los mensajes Protobuf de decisiones KB/adjuntos y `ArtifactRef`.
+- [x] Completar en la sesión Portal los mensajes Protobuf de KB y `ArtifactRef`.
+- [x] Formalizar `DocumentContext` en `ChatRequestMessage`; el contexto OCR ya no se marca dentro de `Message.content`.
+- [x] Eliminar `AttachmentDecisionMessage`, `sendDecision` y `ocr_mode=confirm`; el OCR es automático y solo se muestra una vista previa.
 - [x] `galaxIA-Core/apps/portal-chat`: servidor estático y Vite de desarrollo requieren HTTPS; generan un certificado autofirmado local y no tienen fallback HTTP.
 - [x] `galaxIA-Core/apps/portal-chat`: el navegador entra por uno o más bootstraps TLS, se une a DHT/GossipSub, verifica `NodeAdvertiseMessage` y `DhtBeaconRecord`, y deriva el peer ID desde el DID sin fijarlo en el bundle.
 - [x] `galaxIA-Core`: Atlas y Navigator exigen certificados para sus transportes `/tls/ws`; los defaults `/ws` fueron eliminados del runtime y de los Containerfiles.
@@ -62,7 +64,7 @@ El commit `92b474f` de `galaxIA-Core` dejó el camino P2P del Navigator en modo 
 - JSON permanece únicamente en identidad local y en la frontera explícita del modelo de aplicación (`tool.function.arguments`), antes/después de convertirse a `DynamicValue`.
 - `fhs-node` y Navigator usan GossipSub como único pub/sub; la validación dirigida de `fhs-node` pasa 5 pruebas y el typecheck/build de Core pasa.
 
-La UI de chat ya no usa interfaces HTTP/SSE/WebSocket de aplicación; su conexión FHS es un stream libp2p. La sesión ya transporta adjuntos `ArtifactRef`, preferencias, OCR, recomendaciones KB y decisiones mediante Protobuf; el SDK valida ese ciclo con round-trip binario y queda la verificación E2E con providers reales.
+La UI de chat ya no usa interfaces HTTP/SSE/WebSocket de aplicación; su conexión FHS es un stream libp2p. La sesión ya transporta adjuntos `ArtifactRef`, `DocumentContext`, preferencias, OCR y recomendaciones KB mediante Protobuf; el SDK valida ese ciclo con round-trip binario.
 
 ### Avance aplicado en Portal discovery — 2026-08-04
 
@@ -98,7 +100,7 @@ La migración del wire ya se completó con `c5fa076` y `ea1d487`:
 - Los cinco providers importan directamente el wire compartido.
 - `satellite-ocr-example` ya no anuncia ni acepta `fileBase64`; la tool exige `file: ArtifactRef` y resuelve `inline` o un CID IPFS mediante el gateway externo declarado.
 
-La representación formal de `ArtifactRef`, la limpieza de la API SSE del SDK, la sustitución de la UI HTTP/WebSocket/SSE por una sesión libp2p y los mensajes Portal de OCR/KB/decisiones ya quedaron resueltos. Permanece pendiente la prueba E2E entre Navigator, Portal y providers.
+La representación formal de `ArtifactRef` y `DocumentContext`, la limpieza de la API SSE del SDK, la sustitución de la UI HTTP/WebSocket/SSE por una sesión libp2p y la ejecución automática de OCR ya quedaron resueltos. Permanece pendiente automatizar y ejecutar la prueba E2E funcional PDF → pregunta inicial → pregunta de seguimiento.
 
 ### Avance aplicado en parser-catalog — 2026-08-04
 
@@ -134,7 +136,7 @@ Repositorio: `galaxIA-SDK`.
 6. Publicar una versión coordinada del paquete sin capa de compatibilidad.
 7. Añadir pruebas de vectores binarios y de round-trip.
 
-El SDK `0.1.33` genera `ArtifactRef`, `InlineArtifact`, `IpfsArtifact` y los mensajes de sesión Portal desde el IDL; ya no exporta contratos SSE y expone subpaths seguros para navegador. Los eventos de Navigator y Portal son tipos locales de aplicación. Los adaptadores de Navigator y `fhs-wire` convierten el shape local `ArtifactRef` a ese `oneof` y de regreso sin serializar JSON en el wire.
+El SDK `0.1.35` genera `ArtifactRef`, `DocumentContext`, `InlineArtifact`, `IpfsArtifact` y los mensajes de sesión Portal desde el IDL; ya no exporta contratos SSE ni `AttachmentDecisionMessage`, y expone subpaths seguros para navegador. Los eventos de Navigator y Portal son tipos locales de aplicación. Los adaptadores de Navigator y `fhs-wire` convierten el shape local `ArtifactRef` a ese `oneof` y de regreso sin serializar JSON en el wire.
 
 ### Fase 2 — Core y nodo libp2p
 

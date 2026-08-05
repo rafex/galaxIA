@@ -1,10 +1,10 @@
 +++
 [session]
-state = "idle"
+state = "active"
 agent = "claude"
 initiative = "fhs-mvp"
-task = "none"
-intent = "PoC funcional end-to-end: chat + OCR determinístico + confirmación de usuario, verificado contra el bastion real."
+task = "protocol-document-context-and-e2e"
+intent = "Formalizar DocumentContext en Protobuf, retirar la confirmación OCR manual y automatizar la E2E PDF + pregunta inicial + seguimiento."
 last_updated = "2026-07-02T15:35:00Z"
 +++
 
@@ -12,7 +12,7 @@ last_updated = "2026-07-02T15:35:00Z"
 
 ## Current state
 
-`idle` — no hay trabajo en curso. La PoC está funcional: subir un documento (imagen o PDF), ver el texto OCR extraído, confirmar su uso, y recibir una respuesta del LLM basada en ese texto, todo verificado end-to-end contra el bastion (192.168.3.173).
+`active` — se está coordinando el contrato Protobuf, los consumidores Portal/Navigator y la automatización E2E. mTLS permanece en backlog; TLS con CA de prueba sigue siendo suficiente para esta iteración.
 
 ## Qué se completó en esta sesión (2026-07-02)
 
@@ -23,7 +23,7 @@ last_updated = "2026-07-02T15:35:00Z"
 - Configuración de modelo movida de hardcodeado a variables de entorno (`MODEL_ID`, `MODEL_TOOL_CALLING_SUPPORTED`, etc.) — DEC-0019.
 - Aislamiento de eventos por `conversationId` en el EventBus (antes se mezclaban entre conversaciones concurrentes) — DEC-0018, verificado con dos inferencias reales en paralelo.
 - **Ejecución determinística de OCR**: ya no depende de que el LLM decida invocar la tool — se ejecuta directo al adjuntar un archivo — DEC-0020.
-- **Flujo de confirmación de OCR** (SPEC-OCRCONFIRM-0001): burbuja colapsada con el texto extraído + botones "Usar documento"/"Descartar", sin gastar una llamada al LLM hasta que el usuario decide. Sienta el precedente de estado por conversación en `chat-ws.ts`.
+- **Flujo histórico de confirmación de OCR** (SPEC-OCRCONFIRM-0001): fue superseded; el flujo vigente es OCR automático, vista previa y `DocumentContext` temporal por conversación.
 - Indicador visual de "pensando" (dots animados) mientras se espera la respuesta del LLM.
 - Documentación extensa: `docs/protocolo.md` con diagramas Mermaid, `docs/protocolo-provider.md` (contrato plug-and-play para providers nuevos), `docs/implementacion-multilenguaje.md` (Python/Rust/Java/TS).
 - Spec de `rag-provider` documentada (SPEC-RAG-0001), sin implementar — próxima iniciativa candidata.

@@ -5,7 +5,12 @@
 - Iniciativa: ocr-confirmacion
 - Spec relacionada: `spec-native/specs/ocr-confirmacion/SPEC.md` (SPEC-OCRCONFIRM-0001)
 - Owner: Raúl Fletes (rafex)
-- Estado general: `done`
+- Estado general: `superseded`
+
+> La confirmación manual se retiró sin retrocompatibilidad. `AttachmentDecisionMessage`,
+> `sendDecision` y `ocr_mode=confirm` ya no forman parte del protocolo. La
+> funcionalidad vigente se valida en la iniciativa de contrato Protobuf y en
+> la prueba E2E PDF → pregunta inicial → seguimiento.
 
 ## Tareas
 

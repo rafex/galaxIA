@@ -1,5 +1,13 @@
 # SPEC-RAG-0001 — RAG provider: indexado y recuperación de documentos por conversación
 
+> **Nota de contrato (2026-08-05):** esta especificación histórica no puede
+> reutilizar `attachment.decision`, `AttachmentDecisionMessage` ni la
+> confirmación manual de OCR: esos elementos fueron retirados del protocolo.
+> El disparador vigente para indexar es el resultado de OCR automático y el
+> `DocumentContext` estructurado recibido en `chat.request`. Antes de
+> implementar una nueva integración RAG, este documento debe actualizarse
+> completamente a ese flujo.
+
 ## Estado
 
 `done (local)` — implementado y verificado con procesos reales en local (2026-07-06). Pendiente verificación contra hardware real (mismo bloqueo que issue #1). El motor de recuperación interno del nodo de referencia es intencionalmente mínimo (Jaccard/solapamiento de palabras) — no una recomendación, ver DEC-0026 y TASK-RAG-0002.
@@ -50,7 +58,7 @@ Un documento de RAG **nunca se comparte ni se deduplica entre `conversationId`**
 
 DEC-0020 estableció el precedente: cuando la intención del usuario ya es inequívoca por la *acción* que tomó, no hace falta que el LLM decida nada — se ejecuta directamente. Para RAG:
 
-1. **Indexado**: se dispara **solo** cuando ocurre un evento explícito y ya confirmado — hoy, la confirmación de adjunto que ya existe en `ocr-confirmacion` (SPEC-OCRCONFIRM-0001, botón "Usar documento"); a futuro, un resultado de websearch. Nunca antes de ese evento, nunca de forma especulativa.
+1. **Indexado**: se dispara **solo** cuando el pipeline tiene un resultado de OCR automático y un `DocumentContext` válido, o ante un resultado explícito de otra fuente como websearch. Nunca antes de disponer de ese contexto, nunca de forma especulativa.
 2. **Recuperación**: se dispara en cada mensaje de una conversación que el propio pipeline ya marcó como "con RAG activo" (ver más abajo dónde vive esa marca) — no se le pregunta al LLM si quiere "buscar en el documento".
 
 Esto hace que `rag-provider` sea **agnóstico a la fuente del texto**: el contrato `document_index(text, conversationId)` no le importa si `text` vino de OCR o de un futuro servicio de websearch — solo indexa lo que se le confirma.
@@ -65,7 +73,7 @@ Esto hace que `rag-provider` sea **agnóstico a la fuente del texto**: el contra
 
 ### Transparencia: qué se muestra al usuario
 
-- La confirmación de adjunto (burbuja + "Usar documento"/"Descartar") se mantiene exactamente como está — ahora cumple doble función: aprobación del usuario y disparo de indexado.
+- La vista previa OCR es informativa; el contexto documental se incorpora automáticamente al turno que incluía el adjunto y queda disponible temporalmente para preguntas posteriores del mismo chat.
 - La recuperación en turnos 2+ es **silenciosa** — no se agrega UI nueva que muestre los fragmentos recuperados turno a turno. Si más adelante hace falta trazabilidad de qué se usó para responder, se resuelve vía DEC-0012 (loggear `requestId`↔`conversationId` en el backend), no en la interfaz de chat.
 
 ### Flujo

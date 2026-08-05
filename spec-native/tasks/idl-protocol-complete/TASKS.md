@@ -284,6 +284,24 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
   El campo `multiaddr` aparece en `NodeSummary` y `NodeDetail` como opcional (P2P endpoint).
 - Validation: Coherente con DEC-0086 y el canal `/atlas/gossip` de asyncapi.yaml.
 
+### TASK-IDL-013 — Contexto documental estructurado y retiro de confirmación OCR
+
+- ID: TASK-IDL-013
+- State: `done`
+- Owner: rafex
+- Dependencies: TASK-IDL-007
+- Expected files:
+  - `idl/fhs-protocol.proto`
+  - `galaxIA-SDK/packages/fhs-protocol/src/generated/fhs-protocol_pb.ts`
+  - consumidores Portal/Navigator del contrato Protobuf
+- Close criteria: `ChatRequestMessage.document_context` usa el mensaje
+  `DocumentContext` con `filename` y `text`; no existe `AttachmentDecisionMessage`,
+  `attachment_decision`, `sendDecision` ni `AgentStartMessage.ocr_mode`.
+  El OCR se ejecuta automáticamente y el contexto puede reutilizarse en un
+  turno posterior del mismo chat.
+- Validation: round-trip Protobuf del SDK, typecheck completo de Core y
+  búsqueda cross-repo sin referencias ejecutables a los símbolos retirados.
+
 ---
 
 ## Dependencias visuales

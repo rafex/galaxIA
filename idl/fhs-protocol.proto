@@ -99,7 +99,8 @@ message Envelope {
     AssistantCompletedMessage assistant_completed = 65;
     OcrExtractedMessage       ocr_extracted       = 66;
     KbRecommendedMessage      kb_recommended      = 67;
-    AttachmentDecisionMessage attachment_decision = 68;
+    // 68 se conserva sin reutilizar: fue attachment.decision en versiones
+    // previas y la decisión de OCR ahora es siempre automática.
     KbDecisionMessage         kb_decision         = 69;
 
     // Ephemeral Satellite (SPEC-EPHSAT-0001)             [70-79]
@@ -391,6 +392,16 @@ message ChatRequestMessage {
   repeated ToolDefinition tools  = 3;
   string              model      = 4;  // Modelo LLM solicitado (opcional)
   repeated ArtifactRef artifacts = 5; // Adjuntos declarativos, no JSON/base64 ad hoc
+  DocumentContext     document_context = 6; // Contexto OCR efímero para este turno
+}
+
+// Contexto documental efímero asociado a una petición de chat.
+// Se transporta como estructura Protobuf para que cualquier implementación
+// pueda reutilizar el resultado OCR en preguntas posteriores sin interpretar
+// marcadores embebidos en Message.content.
+message DocumentContext {
+  string filename = 1;
+  string text     = 2;
 }
 
 // chat.cancel — Portal → Navigator (stream directo)
@@ -623,12 +634,12 @@ message AgentStartMessage {
   string session_id = 1;  // UUID de la sesión Portal
   string scope      = 2;  // "local" | "network" | "community" | "external"
   string model      = 3;  // Modelo LLM preferido (hint)
-  string ocr_mode   = 4;  // "confirm" | "auto"
   string kb         = 5;  // Provider KB elegido manualmente (opcional)
   int32  kb_max_per_question = 6;
   bool   ipfs_enabled = 7;
   string ipfs_network = 8; // "public" | "private"
   string ipfs_retention = 9; // "ephemeral" | "reuse"
+  reserved 4;
 }
 
 // agent.status — Navigator → Portal
@@ -676,7 +687,8 @@ message AssistantCompletedMessage {
 }
 
 // ocr.extracted — Navigator → Portal. El texto se transporta como campo
-// Protobuf para que el Portal pida confirmación sin abrir otro canal.
+// Protobuf para que el Portal muestre una vista previa y conserve el contexto
+// efímero del documento; el uso del OCR es automático cuando hay una pregunta.
 message OcrExtractedMessage {
   string mission_id = 1;
   string filename   = 2;
@@ -694,12 +706,6 @@ message KbRecommendedMessage {
   string mission_id = 1;
   repeated KbCandidate candidates = 2;
   bool chosen_by_llm = 3;
-}
-
-// attachment.decision — Portal → Navigator.
-message AttachmentDecisionMessage {
-  string mission_id = 1;
-  bool use = 2;
 }
 
 // kb.decision — Portal → Navigator. La sesión conserva las candidatas

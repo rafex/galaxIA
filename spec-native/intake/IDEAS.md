@@ -39,3 +39,24 @@ tablero de entrega hasta que se promueven a una spec y sus tareas derivadas.
 - Un cliente sin la CA no puede validar el servicio.
 - Las claves privadas solo viven en secretos o volúmenes protegidos.
 - La E2E P2P continúa usando libp2p + Noise + Protobuf.
+
+## INTAKE-MTLS-0001 — Autenticación mutua opcional para nodos aprobados
+
+- **Estado:** `backlog`
+- **Prioridad:** `medium`
+- **Objetivo:** añadir autenticación mutua TLS para un nivel de confianza
+  reforzado, sin reemplazar la identidad P2P `did:key` ni el transporte
+  libp2p + Protobuf.
+- **Situación actual:** la red usa TLS con CA/certificados de prueba, pero
+  únicamente autentica el servidor; mTLS no está implementado.
+
+### Pasos propuestos
+
+1. Definir el modelo de aprobación y qué CA emite certificados de cliente.
+2. Definir SAN, rotación, revocación y asociación certificado ↔ `did:key`.
+3. Configurar `requestCert` y verificación de cadena en los listeners TLS de
+   Portal, Navigator y providers sin permitir fallback sin cifrar.
+4. Distribuir certificados como secretos Podman y validar el rechazo de un
+   cliente sin certificado o fuera de la CA.
+5. Automatizar una E2E positiva y negativa, y documentar el trade-off de
+   introducir una autoridad de aprobación dentro de la red descentralizada.

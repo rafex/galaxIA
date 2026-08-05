@@ -1,5 +1,11 @@
 # SPEC-OCRCONFIRM-0001 — Confirmación de uso de OCR antes de responder
 
+> **Superseded (2026-08-05):** el producto ya no tiene confirmación manual de
+> OCR. Esta spec queda como registro histórico. El contrato vigente ejecuta
+> OCR automáticamente cuando hay un adjunto, emite la vista previa
+> `ocr.extracted` y transporta el resultado reutilizable como `DocumentContext`
+> estructurado en `chat.request`.
+
 ## Estado
 
 `done`
