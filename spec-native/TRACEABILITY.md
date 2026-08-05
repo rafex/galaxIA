@@ -51,7 +51,8 @@ La iniciativa histórica `ocr-confirmacion` queda superseded: el flujo vigente
 es OCR automático, vista previa `ocr.extracted` y reutilización temporal del
 resultado como `DocumentContext` en `chat.request`. La confirmación manual y
 `ocrMode` no son parte del contrato actual. La prueba automatizada de cierre
-es `galaxIA-E2E/tests/functional-pdf-follow-up.spec.mjs`.
+es `galaxIA-E2E/tests/functional-pdf-follow-up.spec.mjs`; pasó el 2026-08-05
+contra Portal, Navigator, Satellite OCR y Star/LLM desplegados en contenedores.
 
 ## Trazabilidad operacional (runtime) — no confundir con la tabla anterior
 

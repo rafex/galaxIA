@@ -1,18 +1,18 @@
 +++
 [session]
-state = "active"
+state = "idle"
 agent = "claude"
 initiative = "fhs-mvp"
 task = "protocol-document-context-and-e2e"
 intent = "Formalizar DocumentContext en Protobuf, retirar la confirmación OCR manual y automatizar la E2E PDF + pregunta inicial + seguimiento."
-last_updated = "2026-07-02T15:35:00Z"
+last_updated = "2026-08-05T14:00:00-06:00"
 +++
 
 # Active Session
 
 ## Current state
 
-`active` — se está coordinando el contrato Protobuf, los consumidores Portal/Navigator y la automatización E2E. mTLS permanece en backlog; TLS con CA de prueba sigue siendo suficiente para esta iteración.
+`idle` — contrato Protobuf, consumidores Portal/Navigator y automatización E2E cerrados. mTLS permanece en backlog; TLS con CA de prueba sigue siendo suficiente para esta iteración.
 
 ## Qué se completó en esta sesión (2026-07-02)
 
@@ -28,6 +28,7 @@ last_updated = "2026-07-02T15:35:00Z"
 - Documentación extensa: `docs/protocolo.md` con diagramas Mermaid, `docs/protocolo-provider.md` (contrato plug-and-play para providers nuevos), `docs/implementacion-multilenguaje.md` (Python/Rust/Java/TS).
 - Spec de `rag-provider` documentada (SPEC-RAG-0001), sin implementar — próxima iniciativa candidata.
 - Pase de actualización de toda la documentación en `docs/` y `spec-native/` para eliminar referencias obsoletas (Qwen 0.5B, puerto 43110, `containers/ocr-mcp` en Python, SDK MCP).
+- `DocumentContext` formalizado en Protobuf; confirmación OCR manual retirada; `galaxIA-E2E` ejecutó y pasó PDF + pregunta inicial + pregunta de seguimiento el 2026-08-05.
 
 ## Next steps (candidatos, sin iniciativa activa)
 

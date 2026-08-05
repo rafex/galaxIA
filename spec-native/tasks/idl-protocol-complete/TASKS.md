@@ -299,8 +299,11 @@ Campos de `beacon-base` (mínimo obligatorio según `protocolo-provider.md`):
   `attachment_decision`, `sendDecision` ni `AgentStartMessage.ocr_mode`.
   El OCR se ejecuta automáticamente y el contexto puede reutilizarse en un
   turno posterior del mismo chat.
-- Validation: round-trip Protobuf del SDK, typecheck completo de Core y
-  búsqueda cross-repo sin referencias ejecutables a los símbolos retirados.
+- Validation: round-trip Protobuf del SDK, typecheck completo de Core,
+  búsqueda cross-repo sin referencias ejecutables a los símbolos retirados y
+  `galaxIA-E2E`: `just e2e-functional` pasó el 2026-08-05 con PDF, pregunta
+  inicial, OCR, respuesta del LLM y pregunta de seguimiento reutilizando
+  `DocumentContext`.
 
 ---
 

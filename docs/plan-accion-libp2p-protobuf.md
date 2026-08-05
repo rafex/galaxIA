@@ -100,7 +100,7 @@ La migración del wire ya se completó con `c5fa076` y `ea1d487`:
 - Los cinco providers importan directamente el wire compartido.
 - `satellite-ocr-example` ya no anuncia ni acepta `fileBase64`; la tool exige `file: ArtifactRef` y resuelve `inline` o un CID IPFS mediante el gateway externo declarado.
 
-La representación formal de `ArtifactRef` y `DocumentContext`, la limpieza de la API SSE del SDK, la sustitución de la UI HTTP/WebSocket/SSE por una sesión libp2p y la ejecución automática de OCR ya quedaron resueltos. Permanece pendiente automatizar y ejecutar la prueba E2E funcional PDF → pregunta inicial → pregunta de seguimiento.
+La representación formal de `ArtifactRef` y `DocumentContext`, la limpieza de la API SSE del SDK, la sustitución de la UI HTTP/WebSocket/SSE por una sesión libp2p y la ejecución automática de OCR ya quedaron resueltos. La prueba E2E funcional PDF → pregunta inicial → pregunta de seguimiento está automatizada en `galaxIA-E2E/tests/functional-pdf-follow-up.spec.mjs` y fue verificada el 2026-08-05.
 
 ### Avance aplicado en parser-catalog — 2026-08-04
 
