@@ -6,20 +6,26 @@ owner = "rafex"
 created_at = "2026-08-05"
 updated_at = "2026-08-05"
 replaces = "none"
-related_tasks = ["TASK-BROWSER-RAG-0001", "TASK-BROWSER-RAG-0002", "TASK-BROWSER-RAG-0003", "TASK-BROWSER-RAG-0004", "TASK-BROWSER-RAG-0005"]
+related_tasks = ["TASK-BROWSER-RAG-0001", "TASK-BROWSER-RAG-0002", "TASK-BROWSER-RAG-0003", "TASK-BROWSER-RAG-0004", "TASK-BROWSER-RAG-0005", "TASK-BROWSER-RAG-0006"]
 related_decisions = ["DEC-0093"]
 +++
 
-# RAG local en el cliente navegador
+# RAG local en el cliente navegador y selección de fuente RAG
 
 ## Resumen
 
-El Portal Chat debe conservar temporalmente los documentos y sus fragmentos
-semánticos en el navegador del usuario. La recuperación no dependerá de un
-proveedor RAG remoto ni del LLM actualmente seleccionado. El cliente generará
-embeddings con un modelo fijo, almacenará los fragmentos en SQLite WASM con
-`sqlite-vec` sobre OPFS y construirá el `DocumentContext` que viaja al nodo
-seleccionado mediante el protocolo FHS Protobuf.
+El Portal Chat permite elegir una única fuente RAG al crear la conversación:
+`local` (índice temporal del navegador) o `network` (satélite RAG descubierto
+en la red GalaxIA). El MVP no ofrece todavía una opción `ambos`.
+
+En modo local, el Portal conserva temporalmente los documentos y sus fragmentos
+semánticos en el navegador del usuario. La recuperación no depende del LLM
+actualmente seleccionado. El cliente genera embeddings con un modelo fijo,
+almacena los fragmentos en SQLite WASM con `sqlite-vec` sobre OPFS y construye
+el `DocumentContext` que viaja al nodo seleccionado mediante el protocolo FHS
+Protobuf. En modo network, el OCR se indexa explícitamente en un provider que
+anuncia `document.index`/`document.query`; el Navigator recupera por
+`conversationId` + `documentId` antes de llamar al LLM.
 
 ## Problema
 
@@ -48,12 +54,14 @@ Incluye:
 - Modelo de embeddings fijo y versionado; cambiarlo requiere otro índice o
   reindexado explícito.
 - Mensaje Protobuf estructurado `DocumentContext`; no JSON como wire format.
+- `DocumentContext` transporta `DocumentChunk[]`; el OCR completo no se concatena
+  al prompt ni cruza la frontera como contexto de una pregunta.
 - Fallback controlado a IndexedDB + similitud coseno para navegadores donde
   `sqlite-vec`/OPFS no esté disponible.
 
 Fuera de alcance:
 
-- Implementar un servidor RAG remoto.
+- Fusionar simultáneamente RAG local y RAG network (`ambos` queda en backlog).
 - Sincronizar el índice privado con otros navegadores o nodos.
 - Compartir índices entre conversaciones.
 - Sustituir la base de conocimiento curada (`KB`) por este índice temporal.
@@ -72,11 +80,17 @@ Fuera de alcance:
 - **RF-4 — Cambio de LLM**: cambiar de modelo generativo no elimina el índice;
   el cliente reutiliza el mismo contexto recuperado.
 - **RF-5 — DocumentContext**: los resultados recuperados se convierten al
-  campo estructurado `DocumentContext` del IDL antes de crear el mensaje FHS.
+  campo estructurado `DocumentContext.chunks` del IDL antes de crear el mensaje FHS.
 - **RF-6 — Resiliencia**: la búsqueda no debe bloquear la interfaz; todo acceso
   a SQLite, embeddings e indexado ocurre fuera del hilo principal.
 - **RF-7 — Retención local**: el cliente puede eliminar el índice de una
   conversación y debe aplicar la política de retención temporal del chat.
+- **RF-8 — Fuente única**: la conversación conserva `ragSource=local|network`;
+  el Portal no indexa localmente cuando la fuente es network y el Navigator no
+  consulta el provider remoto cuando la fuente es local.
+- **RF-9 — Indexado remoto**: en modo network, el OCR se indexa antes de la
+  respuesta inicial y las preguntas posteriores consultan el mismo
+  `documentId` mediante las tools FHS descubiertas dinámicamente.
 
 ## Requisitos no funcionales
 
@@ -132,6 +146,8 @@ de un índice existente. Cada índice debe conservar `embeddingModel` y
    IndexedDB y la búsqueda coseno para el volumen MVP.
 7. La prueba E2E ejecuta PDF + pregunta inicial + pregunta de seguimiento y
    verifica el contenido del `DocumentContext` y la separación por conversación.
+8. En modo network, la prueba E2E verifica indexado y consulta remotos por
+   `documentId`; la UI no ofrece ni intenta fusionar ambas fuentes.
 
 ## Riesgos y decisiones
 

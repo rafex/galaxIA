@@ -85,3 +85,19 @@ validation = ["npm run test:functional"]
 
 Agregar el escenario al runner multihost sin introducir un transporte HTTP/REST
 para mensajes FHS.
+
+## TASK-BROWSER-RAG-0006 — Integrar RAG network como fuente explícita
+
+```toml
+id = "TASK-BROWSER-RAG-0006"
+title = "Integrar RAG network con selección por conversación"
+state = "done"
+owner = "rafex"
+dependencies = ["TASK-BROWSER-RAG-0003"]
+expected_files = ["idl/fhs-protocol.proto", "apps/navigator/src/p2p/portal-session.ts", "examples/rag-provider/src/*"]
+close_criteria = "La conversación elige local o network, el protocolo transporta RagSource/documentId/DocumentChunk[] y el flujo network indexa y consulta el satélite RAG por documento sin enviar OCR completo al LLM."
+validation = ["npm run typecheck -w apps/portal-chat", "npm run typecheck -w apps/navigator", "npm run typecheck -w examples/rag-provider", "npm test -w packages/fhs-protocol"]
+```
+
+La opción `ambos` queda deliberadamente en backlog hasta definir una política
+de fusión, precedencia y privacidad entre los dos índices.

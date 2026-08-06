@@ -8,10 +8,9 @@
 
 ## Estado
 
-`optional (historical)` — la implementación de referencia remota fue verificada
-localmente, pero no es necesaria para el flujo normal del Portal. Un provider
-remoto no puede sustituir el índice local por defecto ni imponer una base de
-datos, un modelo de embeddings o un transporte distinto del contrato FHS.
+`optional (selected per conversation)` — el Portal puede seleccionar este
+provider de forma explícita al crear una conversación. No se usa por defecto
+ni se fusiona con el índice local en el MVP.
 
 ## Propósito
 
@@ -27,8 +26,8 @@ respetar el transporte FHS sobre libp2p con mensajes Protobuf.
 - `document.query`: recibe pregunta, `conversationId`, `documentId` opcional y
   `topK`; devuelve fragmentos con puntuación.
 - El provider no decide mediante el LLM si debe indexar o consultar: el nodo
-  consumidor dispara ambas operaciones de forma determinista cuando la
-  integración remota está habilitada.
+  consumidor dispara ambas operaciones de forma determinista cuando la fuente
+  `RAG_SOURCE_NETWORK` está habilitada.
 - Los datos de una conversación nunca se comparten con otra conversación.
 - `privacy.retention` y `privacy.warning` son obligatorios cuando el nodo
   conserva contenido.
@@ -38,12 +37,12 @@ respetar el transporte FHS sobre libp2p con mensajes Protobuf.
 El Portal indexa automáticamente el resultado OCR en el navegador y construye
 el `DocumentContext` localmente para preguntas posteriores. La vista previa OCR
 es informativa; no existe confirmación manual ni un botón de autorización para
-activar el contexto. El provider remoto solo se usa si la configuración del
-operador lo solicita y no debe duplicar el flujo local sin una razón explícita.
+activar el contexto. El provider remoto solo se usa si la conversación lo
+solicita explícitamente y el Portal no duplica el documento en el índice local.
 
-El cambio de LLM no debe eliminar el contexto: el Portal puede recuperar los
-fragmentos locales y enviar el mismo campo estructurado `DocumentContext` al
-nodo que resulte seleccionado.
+El cambio de LLM no debe eliminar el contexto. En modo local, el Portal envía
+el mismo campo estructurado `DocumentContext.chunks` al nodo seleccionado; en
+modo network, el Navigator consulta el mismo `documentId` en el provider FHS.
 
 ## Fuera de alcance
 
