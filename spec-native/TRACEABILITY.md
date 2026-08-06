@@ -65,6 +65,19 @@ recuperados se convierten al campo estructurado `DocumentContext` Protobuf y
 se envían por el canal libp2p. La confirmación manual de OCR no participa en
 este flujo.
 
+## Actualización vigente — ámbito RAG por conversación 2026-08-06
+
+La iniciativa activa `conversation-rag-scope` (`SPEC-CONVERSATION-RAG-0001`,
+`DEC-0094`) añade la elección local entre `RAG común` y `RAG independiente` al
+crear una conversación. `ragMode` se persiste únicamente en el historial del
+Portal; el Worker usa `browser-common` o el ID de conversación como ámbito del
+índice SQLite/OPFS o IndexedDB. La prueba local del Worker validó un documento
+recuperable desde otra conversación común (`commonCount=1`) y no recuperable
+desde una independiente (`independentCount=0`). La automatización distribuida
+PDF + pregunta inicial + seguimiento ya contiene la selección independiente,
+pero permanece pendiente ejecutarla contra el despliegue E2E completo antes de
+cerrar la iniciativa.
+
 ## Trazabilidad operacional (runtime) — no confundir con la tabla anterior
 
 La tabla de arriba es trazabilidad **de repositorio**: qué spec/decisión originó qué código. Es distinta de la trazabilidad **de ejecución**: poder reconstruir qué pasó con una petición real de un usuario (`conversationId` → `requestId` → provider → resultado) para diagnosticar un fallo, sin violar la privacidad de contenido.

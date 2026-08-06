@@ -1512,3 +1512,13 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
 - Decisión: El Portal mantendrá temporalmente el índice RAG en el navegador usando SQLite WASM + sqlite-vec + OPFS dentro de un Worker, con fallback IndexedDB. El cliente generará DocumentContext Protobuf y lo enviará por la ruta FHS libp2p; no se crea un transporte nuevo.
 - Consecuencias: El índice no se comparte entre conversaciones ni navegadores. El modelo de embeddings debe ser fijo por índice y versionado. Se asumen cuotas/limpieza del storage del navegador y se encapsula sqlite-vec por ser pre-1.0.
 - Reemplaza: none
+
+### DEC-0094 — Ámbito del RAG elegido por conversación
+
+- Fecha: 2026-08-06
+- Estado: `accepted`
+- Relacionado con specs:
+- Contexto: El RAG local ya conserva documentos en el navegador, pero todas las conversaciones usan actualmente el mismo ámbito implícito por conversationId. El usuario necesita decidir desde el inicio si una conversación participa del RAG común o mantiene un índice independiente.
+- Decisión: Cada conversación nueva debe pedir una elección explícita entre RAG común y RAG independiente. RAG común comparte el índice entre conversaciones del mismo origen del navegador; RAG independiente limita el índice a esa conversación. La elección queda fija para la conversación y no cambia el transporte FHS ni el DocumentContext Protobuf.
+- Consecuencias: El Portal debe persistir ragMode en el historial local, mostrar el modo al crear/abrir conversaciones y aislar las claves del Worker RAG por ámbito. El RAG común no se sincroniza fuera del navegador; limpiar el historial elimina ambos ámbitos. Las conversaciones históricas sin el campo se migran a RAG común.
+- Reemplaza: none
