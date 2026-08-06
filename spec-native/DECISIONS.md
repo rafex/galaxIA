@@ -1502,3 +1502,13 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
   externa, se documenta como pista de recuperación dentro del `DynamicValue`
   Protobuf y no como `endpoint.multiaddr`. Los servicios externos quedan fuera
   del perímetro que FHS puede hacer cumplir.
+
+### DEC-0093 — RAG local en el cliente navegador
+
+- Fecha: 2026-08-06
+- Estado: `accepted`
+- Relacionado con specs: SPEC-BROWSER-RAG-0001; SPEC-RAG-0001 (provider remoto opcional histórico).
+- Contexto: El RAG remoto puede perder o variar el contexto al cambiar de LLM/Navigator y puede exponer documentos privados a un provider externo.
+- Decisión: El Portal mantendrá temporalmente el índice RAG en el navegador usando SQLite WASM + sqlite-vec + OPFS dentro de un Worker, con fallback IndexedDB. El cliente generará DocumentContext Protobuf y lo enviará por la ruta FHS libp2p; no se crea un transporte nuevo.
+- Consecuencias: El índice no se comparte entre conversaciones ni navegadores. El modelo de embeddings debe ser fijo por índice y versionado. Se asumen cuotas/limpieza del storage del navegador y se encapsula sqlite-vec por ser pre-1.0.
+- Reemplaza: none

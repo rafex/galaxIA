@@ -99,8 +99,7 @@ message Envelope {
     AssistantCompletedMessage assistant_completed = 65;
     OcrExtractedMessage       ocr_extracted       = 66;
     KbRecommendedMessage      kb_recommended      = 67;
-    // 68 se conserva sin reutilizar: fue attachment.decision en versiones
-    // previas y la decisión de OCR ahora es siempre automática.
+    // 68 se conserva reservado y no se reutiliza; el OCR es siempre automático.
     KbDecisionMessage         kb_decision         = 69;
 
     // Ephemeral Satellite (SPEC-EPHSAT-0001)             [70-79]

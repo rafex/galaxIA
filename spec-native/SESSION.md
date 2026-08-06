@@ -44,9 +44,22 @@ las tareas de cierre de `SPEC-CURP-0001`.
 - Pase de actualización de toda la documentación en `docs/` y `spec-native/` para eliminar referencias obsoletas (Qwen 0.5B, puerto 43110, `containers/ocr-mcp` en Python, SDK MCP).
 - `DocumentContext` formalizado en Protobuf; confirmación OCR manual retirada; `galaxIA-E2E` ejecutó y pasó PDF + pregunta inicial + pregunta de seguimiento el 2026-08-05.
 
+## Iniciativa browser-rag (2026-08-05)
+
+- Spec activa: `SPEC-BROWSER-RAG-0001`.
+- Decisión: `DEC-0093` — SQLite WASM + `sqlite-vec` + OPFS en Web Worker,
+  fallback IndexedDB/coseno y embeddings locales para conservar contexto al
+  cambiar de LLM.
+- Implementación iniciada en `galaxIA-Core/apps/portal-chat`: chunking,
+  embeddings, almacenamiento vectorial local, recuperación por conversación y
+  documento, e integración automática después de OCR.
+- Validación actual: tests de chunking/aislamiento, typecheck y build del
+  Portal pasan; falta la prueba E2E funcional con PDF y seguimiento.
+
 ## Next steps (candidatos, sin iniciativa activa)
 
-1. `rag-provider` (SPEC-RAG-0001) — indexado y recuperación de documentos largos, reutilizando el estado por conversación que ya existe en `chat-ws.ts`.
+1. Completar `browser-rag` (SPEC-BROWSER-RAG-0001), incluida la prueba E2E
+   automatizada con PDF + pregunta inicial + seguimiento.
 2. Propagar `conversationId` → `requestId` y loggear metadata de trazabilidad (DEC-0012, sigue `proposed`).
 3. Validar manifiesto contra campos obligatorios del contrato de provider en el Registry (DEC-0013, sigue `proposed`).
 4. Evaluar un modelo de chat general (no-Coder) con tool calling para el caso de uso de chat genérico, distinto de OCR.
