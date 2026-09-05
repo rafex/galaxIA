@@ -27,7 +27,7 @@ _Fecha: 2026-08-03 (actualizado) | Repositorio: galaxIA_
 - **Formatos de especificación:** Protobuf proto3, AsyncAPI 3.0, JSON Schema draft-07, Markdown + diagramas Mermaid.
 - **Sitio:** Jekyll (Ruby/kramdown).
 - **Python:** solo el MCP server de SpecNative (`.specnative/.venv`, Python 3.14).
-- **Stack real documentado** (vive en otros repos): TypeScript ≥5 / Node ≥20, Vite, Fastify, Podman/Docker. Rust es la estrategia futura (DEC-0088).
+- **Stack real documentado** (vive en otros repos): TypeScript ≥5 / Node ≥20, Vite, Fastify, Podman/Docker. Rust es obligatorio para los módulos WASM de capacidades de dispositivo.
 - **Red:** libp2p — DHT Kademlia, GossipSub, streams `/fhs/v1/0.1.0` sobre WSS obligatorio (DEC-P2P-001).
 
 ### Sistema de build / dependencias

@@ -16,7 +16,7 @@ celular, sin enviar datos personales a un backend.
   18-10-2021.
 - Validar longitud, forma, fecha, sexo, catálogo de entidad y dígito
   verificador local.
-- Ejecutar la lógica en AssemblyScript/WASM dentro de un Web Worker.
+- Ejecutar la lógica en Rust compilado a WASM dentro de un Web Worker.
 - Servir solamente archivos estáticos por HTTPS desde un contenedor Podman.
 - Mantener explícito que la asignación, unicidad, vigencia y existencia oficial
   requieren RENAPO y no se pueden demostrar offline.

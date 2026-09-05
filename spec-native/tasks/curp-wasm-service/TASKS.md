@@ -18,7 +18,7 @@ repositorios tocados.
 
 - [x] Revisar el Instructivo Normativo compartido y delimitar validación local.
 - [x] Completar construcción de 18 posiciones y validación estructural TS.
-- [x] Completar exportaciones WASM y ejecutarlas en Web Worker.
+- [x] Completar exportaciones Rust/WASM y ejecutarlas en Web Worker.
 - [x] Crear UI de creación y validación sin envío de datos.
 - [x] Agregar contenedor HTTPS del frontend.
 - [x] Integrar el contenedor y puerto 8444 al runner E2E.
