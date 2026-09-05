@@ -60,3 +60,25 @@ tablero de entrega hasta que se promueven a una spec y sus tareas derivadas.
    cliente sin certificado o fuera de la CA.
 5. Automatizar una E2E positiva y negativa, y documentar el trade-off de
    introducir una autoridad de aprobación dentro de la red descentralizada.
+
+## INTAKE-JSON-ADAPTER-0001 — Frontera JSON de adaptadores locales
+
+- **Estado:** `backlog`
+- **Prioridad:** `medium`
+- **Objetivo:** decidir si el JSON usado por los adaptadores locales de
+  `llama.cpp` y por schemas internos debe permanecer como frontera externa o
+  reemplazarse por estructuras Protobuf también fuera del wire FHS.
+- **Situación actual:** el wire protocol FHS ya es libp2p + Protobuf. JSON está
+  aislado en adaptadores de modelo, configuración y parseo local; esta entrada
+  no implica que JSON pueda cruzar streams, pub/sub, DHT o Envelopes FHS.
+
+### Criterios para promover a spec
+
+- Medir el coste de mantener la frontera OpenAI-compatible de llama.cpp.
+- Inventariar schemas internos JSON que no son mensajes FHS.
+- Comparar interoperabilidad, depuración, rendimiento y compatibilidad de
+  herramientas si se migran esos adaptadores a Protobuf.
+- Decidir explícitamente el límite: solo adaptadores locales o también
+  herramientas/modelos externos.
+- Definir una migración coordinada y pruebas de no regresión antes de cambiar
+  la frontera.

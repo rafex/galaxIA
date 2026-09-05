@@ -8,6 +8,28 @@
 
 ## Ahora
 
+### Prioridad real de pendientes — 2026-08-05
+
+La siguiente iniciativa es la prioridad inmediata del MVP y sustituye el
+orden histórico de las tareas antiguas: [`SPEC-MVP-HARDENING-0001`](specs/mvp-hardening/SPEC.md)
+con sus tareas canónicas en [`tasks/mvp-hardening/TASKS.md`](tasks/mvp-hardening/TASKS.md).
+
+1. **P0 — Corregir README y `ECOSYSTEM.md`** en los seis repositorios de
+   trabajo para eliminar instrucciones y descripciones que contradigan
+   libp2p + Protobuf.
+2. **P0 — Integrar el OCR con recuperación local por fragmentos**, evitando
+   enviar el texto completo al LLM y manteniendo el contexto en el navegador.
+3. **P0 — Implementar retry, failover y reasignación de Missions**, con límites
+   de intentos, una única terminación y provenance por intento.
+4. **P0 — Completar la validación de `DelegationToken`** para Ephemeral
+   Satellites, incluyendo firma, issuer, subject, capabilities, hash, TTL y
+   lease.
+
+La decisión sobre si el JSON de los adaptadores locales de llama.cpp y de los
+schemas internos permanece como frontera externa o se reemplaza por
+estructuras Protobuf no forma parte de estos P0; está registrada en el
+backlog como `INTAKE-JSON-ADAPTER-0001`.
+
 - **Completado (DEC-0038):** separación de repos — `galaxIA` queda como protocolo/SDK/servicios core (Atlas, Navigator, Portal); las implementaciones de referencia de providers (`star-example`, `satellite-ocr-example`, `rag-provider`, `kb-provider`) se movieron a [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star) — 2026-07-06. `@galaxia/fhs-protocol` se consume ahí vía git (`github:rafex/galaxIA#fhs-protocol-dist`), no publicado a npm todavía.
 - **Completado (DEC-0039):** renombrado a `@rafex/galaxia-fhs-protocol` y publicado a GitHub Packages en cada push a `main` que lo modifique (`.github/workflows/publish-fhs-protocol.yml`) — 2026-07-06. `spec-native/pipelines/CI.md`/`CD.md` pasaron de templates vacíos a documentos reales; `CI.md` documenta honestamente que no hay validación automatizada de PRs todavía.
 - **Completado (DEC-0040):** `galaxIA-satellite-star` migrado a consumir `@rafex/galaxia-fhs-protocol` vía GitHub Packages (ya no la dependencia git `fhs-protocol-dist`) — 2026-07-06. Se encontró y corrigió un bug real: la versión `0.1.0` publicada en DEC-0039 no incluía `dist/` (npm respeta `.gitignore` sin un campo `files`), corregido en `0.1.1`. Autenticación vía `GH_TOKEN` (`.npmrc` con `${GH_TOKEN}`); los `Containerfile` de providers usan un secret de BuildKit (no build-arg) para no dejar el token en ninguna capa de imagen — verificado con `podman history`. (La sincronización de versión hacia `galaxIA-satellite-star` **no es un pendiente de este repo** — ver DEC-0041: `galaxIA` publica el paquete, cómo y cuándo un consumidor externo se actualiza es responsabilidad de quien opera ese repo, mismo principio de DEC-0026/DEC-0037.)
