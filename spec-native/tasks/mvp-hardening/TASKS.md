@@ -71,3 +71,21 @@ validation = ["token válido", "firma inválida", "issuer fuera de Orbit", "subj
 
 La implementación debe reutilizar la identidad `did:key` existente y devolver
 errores FHS estructurados, sin añadir un directorio central de claves.
+
+## TASK-MVPH-0005 — Visibilizar errores silenciosos de red
+
+```toml
+id = "TASK-MVPH-0005"
+title = "Visibilizar errores silenciosos de red (portal, servidores y doctor)"
+state = "in_progress"
+owner = "rafex"
+dependencies = []
+expected_files = ["galaxIA-Core/apps/portal-chat/src/services/diagnostics.ts", "galaxIA-Core/apps/portal-chat/src/components/diagnostics-panel.ts", "galaxIA-Core/packages/fhs-node/src/diagnostics.ts", "galaxIA-Core/apps/navigator/src/index.ts", "galaxIA-satellite-star/examples/fhs-wire/src/diagnostics.ts", "galaxIA-gitops/scripts/doctor.sh", "galaxIA-Core/docs/diagnostico.md"]
+close_criteria = "Un fallo de red (certificado no aceptado, puerto cerrado, host inalcanzable, reloj desfasado, nodo aislado del bootstrap) se ubica sin inspeccionar sockets: el portal dice en qué etapa y en qué wss:// falló y ofrece aceptar el certificado; los servidores registran bootstrap, conexiones y errores internos de libp2p y exponen /status; doctor.sh lo detecta desde la máquina de la demo antes de abrir el navegador."
+validation = ["tests de describeError, summary y discovery con dial rechazado", "dialBootstraps reintenta hasta conectar", "reproducir en Firefox el rechazo del certificado de :4010 y ver el enlace para aceptarlo", "doctor.sh desde el Mac con y sin Navigator", "reinicio simultáneo de Atlas/Navigator/Star reconecta solo"]
+```
+
+Origen: primera prueba real desde el navegador (E2E-025 en
+`galaxIA-Core/docs/historial-incidencias-e2e.md`). El navegador no expone a
+JavaScript el motivo de un fallo TLS; el diseño lo asume y ofrece el enlace
+para aceptar el certificado en lugar de afirmar una causa.

@@ -6,7 +6,7 @@ owner = "rafex"
 created_at = "2026-08-05"
 updated_at = "2026-08-05"
 replaces = "none"
-related_tasks = ["TASK-MVPH-0001", "TASK-MVPH-0002", "TASK-MVPH-0003", "TASK-MVPH-0004"]
+related_tasks = ["TASK-MVPH-0001", "TASK-MVPH-0002", "TASK-MVPH-0003", "TASK-MVPH-0004", "TASK-MVPH-0005"]
 related_decisions = ["DEC-0093"]
 +++
 
