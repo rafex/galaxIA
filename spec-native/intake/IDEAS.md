@@ -82,3 +82,30 @@ tablero de entrega hasta que se promueven a una spec y sus tareas derivadas.
   herramientas/modelos externos.
 - Definir una migración coordinada y pruebas de no regresión antes de cambiar
   la frontera.
+
+## INTAKE-NOVA-CONSTITUCION-0001 — Nova especialista en la Constitución mexicana
+
+- **Estado:** `backlog`
+- **Prioridad:** `low` — idea futura; no desplaza los pendientes P0 del MVP.
+- **Objetivo:** explorar una Nova especializada en responder preguntas sobre
+  la Constitución Política de los Estados Unidos Mexicanos, usando el texto
+  oficial vigente como fuente y mostrando referencias verificables a los
+  artículos consultados.
+- **Alcance inicial:** definir una especialización de dominio sobre el tipo
+  Nova ya existente; no crear un nuevo tipo de nodo ni cambiar el protocolo
+  FHS por el solo hecho de añadir este caso de uso.
+- **Fuera de alcance por ahora:** implementación, selección de modelo,
+  despliegue en el laboratorio y decisión entre RAG local o de red.
+
+### Criterios para promover a spec
+
+- Identificar y versionar una fuente oficial del texto constitucional vigente,
+  registrando fecha de consulta y cambios entre versiones.
+- Responder con referencias comprobables a título/capítulo/artículo y separar
+  claramente lo que dice la fuente de cualquier explicación generada.
+- Cuando la fuente no alcance para contestar, reconocer la incertidumbre en vez
+  de inventar el contenido o presentar la respuesta como asesoría jurídica.
+- Preparar preguntas de evaluación que comprueben citas, cobertura,
+  actualización y abstención ante información insuficiente.
+- Definir cómo se actualizará el corpus y cómo se conservará la trazabilidad
+  de cada respuesta hacia la versión consultada.
