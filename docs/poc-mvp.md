@@ -109,6 +109,31 @@ El dispatch paralelo está representado en
 La implementación no requiere que una Mission pase por Atlas ni por el servidor
 HTTPS que sirve los estáticos.
 
+## Agente soberano Rust/Rig
+
+El reemplazo controlado del `AgentRuntime` TypeScript de Navigator se desarrolla
+en [`galaxIA-agent`](https://github.com/rafex/galaxIA-agent). El agente se
+ejecuta en un contenedor Podman del Bastion y conserva los puertos del servicio
+Navigator: P2P `4010` y API/observabilidad `8090`.
+
+El controlador Rust crea primero un `RequestPlan`: valida `conversationId` y
+`requestId`, fija el scope de privacidad, escoge exactamente una fuente de RAG
+(`local` o `network`), limita el contexto y asigna `missionId`. Rig `0.42.0`
+se usa como runtime de agente y como frontera `CompletionModel`; su modelo
+concreto es un adaptador que envía `ChatRequestMessage` a Star por FHS. Nunca
+se llama a `llama.cpp` desde Navigator.
+
+El OCR se indexa y se recupera mediante `DocumentChunk`; el campo deprecated
+`DocumentContext.text` permanece vacío. El RAG local continúa en el navegador y
+el RAG de la red se consulta mediante `document.index`/`document.query` como
+Missions FHS. Las tools remotas se registran como tools dinámicas de Rig y cada
+Mission tiene timeout, failover y un máximo inicial de tres rondas.
+
+La transición productiva todavía requiere completar el transporte libp2p Rust,
+el adaptador de eventos Portal y las fixtures de equivalencia. Mientras esas
+pruebas no pasen, el runner E2E conserva el contenedor TypeScript como activo;
+no hay fallback silencioso entre implementaciones.
+
 ## Seguridad y límites actuales
 
 - La PoC usa una CA E2E única para los certificados de prueba de los servicios
