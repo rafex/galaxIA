@@ -7,24 +7,41 @@ especificación, IDL y esquemas.
 ## Topología de repositorios
 
 ```mermaid
-graph TD
-    FHS["🗂️ galaxIA\n(este repo)\nProtocolo FHS — IDL + Schemas\ngithub.com/rafex/galaxIA"]
+flowchart TB
+    galaxia["<b>galaxIA</b><br/>Protocolo FHS: IDL Protobuf,<br/>specs y decisiones"]
 
-    CORE["⚙️ galaxIA-Core\nApps runtime: Atlas, Navigator,\nPortal Chat, Portal TUI, Log Agent\ngithub.com/rafex/galaxIA-Core"]
+    subgraph libs["Librerías compartidas"]
+        direction LR
+        sdk["<b>galaxIA-SDK</b><br/>fhs-protocol en npm<br/>capacidades TS/WASM"]
+        parser["<b>galaxia-parser-catalog</b><br/>perfiles de parseo<br/>de tool calls por modelo"]
+    end
 
-    SDK["📦 galaxIA-SDK\nPaquetes cliente TypeScript/WASM\nfhs-protocol · satellite-capabilities\ngithub.com/rafex/galaxIA-SDK"]
+    subgraph red["Nodos de la red FHS (libp2p)"]
+        direction LR
+        core["<b>galaxIA-Core</b><br/>Atlas · Navigator · Portal"]
+        providers["<b>galaxIA-satellite-star</b><br/>Star · OCR · RAG · KB · Nova"]
+        agent["<b>galaxIA-agent</b><br/>Navigator agente<br/>en Rust + Rig"]
+    end
 
-    STAR["⭐ galaxIA-satellite-star\nImplementaciones de providers de referencia\nStar · Nova · OCR · RAG · KB\ngithub.com/rafex/galaxIA-satellite-star"]
+    subgraph ops["Infraestructura y operación"]
+        direction LR
+        llama["<b>PoC-Llama.cpp</b><br/>compila llama.cpp<br/>por hardware"]
+        gitops["<b>galaxIA-gitops</b><br/>túnel, certificados,<br/>doctor.sh, estado de la PoC"]
+        e2e["<b>galaxIA-E2E</b> (privado)<br/>orquestación del<br/>laboratorio E2E"]
+    end
 
-    PARSER["🗃️ galaxia-parser-catalog\nCatálogo de perfiles de parseo tolerante\npara respuestas de modelos LLM\ngithub.com/rafex/galaxia-parser-catalog"]
-
-    FHS -->|"implementa el protocolo"| CORE
-    FHS -->|"define contratos para"| SDK
-    FHS -->|"define contratos para"| STAR
-    SDK -->|"usa @rafex/galaxia-fhs-protocol"| CORE
-    SDK -->|"referenciado por"| PARSER
-    PARSER -->|"SPEC-PARSER-0001"| FHS
+    galaxia -->|define el contrato| libs
+    galaxia -->|IDL canónico| agent
+    sdk -->|tipos del protocolo| core
+    sdk -->|tipos del protocolo| providers
+    parser -->|perfiles| providers
+    core <-->|missions P2P| providers
+    agent -->|missions P2P| providers
+    llama -->|llama-server| providers
+    ops -->|despliega, prueba y diagnostica| red
 ```
+
+El mismo mapa está en el [`README`](README.md).
 
 ## Descripción de cada repositorio
 
@@ -49,8 +66,8 @@ graph TD
 **Rol:** Runtime del sistema FHS — los procesos que corren en los nodos reales.
 
 **Contiene:**
-- `apps/atlas` — Registro federado de nodos (Hub/Registry)
-- `apps/navigator` — Agent runtime (orquesta LLM + tools via Atlas)
+- `apps/atlas` — Bootstrap peer libp2p: punto de entrada a la red (DHT + GossipSub)
+- `apps/navigator` — Orquestador: publica Missions, recibe bids y abre streams directos a Star y Satellites
 - `apps/portal-chat` — Frontend web de chat
 - `apps/portal-tui` — Cliente TUI (terminal)
 - `apps/log-agent` — Colector de logs operativos
@@ -69,10 +86,10 @@ graph TD
 **Contiene (npm workspaces):**
 - `packages/fhs-protocol` → `@rafex/galaxia-fhs-protocol` — Contratos TypeScript del wire protocol
 - `packages/satellite-capabilities` → `@rafex/galaxia-satellite-capabilities` — Aritmética + CURP (lógica pura)
-- `packages/satellite-capabilities-wasm` → `@rafex/galaxia-satellite-capabilities-wasm` — Puerto AssemblyScript/WASM
+- `packages/satellite-capabilities-wasm` → `@rafex/galaxia-satellite-capabilities-wasm` — Puerto a WASM (Rust, antes AssemblyScript)
 - `apps/satellite-web` — Demo Ephemeral Satellite (Vite + Web Worker + WASM)
 
-**Publicados en:** GitHub Packages (`https://npm.pkg.github.com`).
+**Publicados en:** npmjs.org bajo `@rafex_labs/*`; los consumidores los importan con el alias `@rafex/*` (ver `.npmrc` de cada repo).
 
 ---
 
@@ -102,6 +119,38 @@ graph TD
 - `schema.sql` — Esquema de la base de datos
 
 **Referenciado por:** `ModelParserProfile` en `@rafex/galaxia-fhs-protocol` (SPEC-PARSER-0001).
+
+---
+
+### 🦀 [galaxIA-agent](https://github.com/rafex/galaxIA-agent)
+
+**Rol:** Navigator como agente soberano en Rust sobre [Rig](https://docs.rs/rig).
+
+**Contiene:** plan de petición determinista, ciclo `MissionOffer → bid → assign → ejecución` con failover, IDL FHS generado con `prost`, un `CompletionModel` de Rig que solo habla con Star y herramientas Rig dinámicas para las capacidades de los Satellites.
+
+**Estado:** primera entrega; el transporte libp2p productivo y el stream hacia el Portal son los siguientes cortes.
+
+---
+
+### 🦙 [PoC-Llama.cpp](https://github.com/rafex/PoC-Llama.cpp)
+
+**Rol:** Compila e instala llama.cpp con perfiles por hardware (flags SIMD por CPU, BLAS, Vulkan/Metal) en `/opt/llama.cpp`, más los wrappers `start-server.sh`.
+
+**Usado por:** el `llama-server` que consume Star en el laboratorio (Bastion).
+
+---
+
+### 🛠️ [galaxIA-gitops](https://github.com/rafex/galaxIA-gitops)
+
+**Rol:** Despliegue y operación, separado del código de aplicación.
+
+**Contiene:** túnel inverso (rathole) y certificados Let's Encrypt para demos remotas, `scripts/doctor.sh` para diagnosticar una red nueva, y la arquitectura y el estado de la PoC con diagramas D2.
+
+---
+
+### 🧪 galaxIA-E2E (privado)
+
+**Rol:** Orquestación privada del laboratorio de pruebas de punta a punta (topología, PKI del laboratorio).
 
 ---
 

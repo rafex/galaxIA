@@ -24,11 +24,59 @@ GalaxIA (Galaxy + IA) tiene su propio vocabulario de producto — **Star** (nodo
 | `spec-native/` | Contexto técnico para agentes de IA — specs, decisiones (`DECISIONS.md`), roadmap, trazabilidad |
 | `site/` | Portal web público ([galax-ia.rafex.io](https://galax-ia.rafex.io)), sitio Jekyll |
 
-Este repo es **IDL + schemas + documentación del protocolo**. El runtime de Atlas,
-Navigator y Portal vive en `galaxIA-Core`; los tipos cliente y SDK viven en
-`galaxIA-SDK`; las implementaciones de referencia de Star/Satellite/Nova/RAG/KB
-viven en [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star).
-Ver el mapa completo en [`ECOSYSTEM.md`](ECOSYSTEM.md).
+Este repo es **IDL + schemas + documentación del protocolo**. El código vive en
+los repos del ecosistema.
+
+## Ecosistema
+
+```mermaid
+flowchart TB
+    galaxia["<b>galaxIA</b><br/>Protocolo FHS: IDL Protobuf,<br/>specs y decisiones"]
+
+    subgraph libs["Librerías compartidas"]
+        direction LR
+        sdk["<b>galaxIA-SDK</b><br/>fhs-protocol en npm<br/>capacidades TS/WASM"]
+        parser["<b>galaxia-parser-catalog</b><br/>perfiles de parseo<br/>de tool calls por modelo"]
+    end
+
+    subgraph red["Nodos de la red FHS (libp2p)"]
+        direction LR
+        core["<b>galaxIA-Core</b><br/>Atlas · Navigator · Portal"]
+        providers["<b>galaxIA-satellite-star</b><br/>Star · OCR · RAG · KB · Nova"]
+        agent["<b>galaxIA-agent</b><br/>Navigator agente<br/>en Rust + Rig"]
+    end
+
+    subgraph ops["Infraestructura y operación"]
+        direction LR
+        llama["<b>PoC-Llama.cpp</b><br/>compila llama.cpp<br/>por hardware"]
+        gitops["<b>galaxIA-gitops</b><br/>túnel, certificados,<br/>doctor.sh, estado de la PoC"]
+        e2e["<b>galaxIA-E2E</b> (privado)<br/>orquestación del<br/>laboratorio E2E"]
+    end
+
+    galaxia -->|define el contrato| libs
+    galaxia -->|IDL canónico| agent
+    sdk -->|tipos del protocolo| core
+    sdk -->|tipos del protocolo| providers
+    parser -->|perfiles| providers
+    core <-->|missions P2P| providers
+    agent -->|missions P2P| providers
+    llama -->|llama-server| providers
+    ops -->|despliega, prueba y diagnostica| red
+```
+
+| Repo | Qué es |
+|---|---|
+| [`galaxIA`](https://github.com/rafex/galaxIA) | Este repo: el protocolo FHS (IDL Protobuf, specs, decisiones, sitio público). |
+| [`galaxIA-SDK`](https://github.com/rafex/galaxIA-SDK) | Tipos del protocolo publicados en npmjs como `@rafex_labs/galaxia-fhs-protocol` (los repos lo importan con el alias `@rafex/galaxia-fhs-protocol`) y capacidades de Satellite en TypeScript y WASM (Rust). |
+| [`galaxia-parser-catalog`](https://github.com/rafex/galaxia-parser-catalog) | Catálogo de perfiles de parseo tolerante para modelos que escriben las tool calls como texto. |
+| [`galaxIA-Core`](https://github.com/rafex/galaxIA-Core) | Runtime de la red: Atlas (bootstrap), Navigator (orquestador) y Portal (chat web). |
+| [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star) | Providers de referencia: Star (LLM), OCR, RAG, KB y Nova. |
+| [`galaxIA-agent`](https://github.com/rafex/galaxIA-agent) | Navigator como agente en Rust sobre Rig, que ejecuta Missions FHS hacia Star y Satellites. |
+| [`PoC-Llama.cpp`](https://github.com/rafex/PoC-Llama.cpp) | Compila e instala llama.cpp con perfiles por hardware; da el `llama-server` que usa Star. |
+| [`galaxIA-gitops`](https://github.com/rafex/galaxIA-gitops) | Despliegue y operación: túnel para demos remotas, certificados, `doctor.sh`, arquitectura y estado de la PoC. |
+| `galaxIA-E2E` (privado) | Orquestación del laboratorio de pruebas de punta a punta. |
+
+Detalle por repo en [`ECOSYSTEM.md`](ECOSYSTEM.md).
 
 ## Estado del proyecto
 
