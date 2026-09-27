@@ -111,10 +111,10 @@ HTTPS que sirve los estáticos.
 
 ## Agente soberano Rust/Rig
 
-El reemplazo controlado del `AgentRuntime` TypeScript de Navigator se desarrolla
-en [`galaxIA-agent`](https://github.com/rafex/galaxIA-agent). El agente se
-ejecuta en un contenedor Podman del Bastion y conserva los puertos del servicio
-Navigator: P2P `4010` y API/observabilidad `8090`.
+El reemplazo controlado del `AgentRuntime` TypeScript de Navigator ya está
+operativo como [`galaxIA-agent`](https://github.com/rafex/galaxIA-agent). El
+agente se ejecuta en un contenedor Podman del Bastion y conserva los puertos del
+servicio Navigator: P2P `4010` y API/observabilidad `8090`.
 
 El controlador Rust crea primero un `RequestPlan`: valida `conversationId` y
 `requestId`, fija el scope de privacidad, escoge exactamente una fuente de RAG
@@ -129,10 +129,16 @@ el RAG de la red se consulta mediante `document.index`/`document.query` como
 Missions FHS. Las tools remotas se registran como tools dinámicas de Rig y cada
 Mission tiene timeout, failover y un máximo inicial de tres rondas.
 
-La transición productiva todavía requiere completar el transporte libp2p Rust,
-el adaptador de eventos Portal y las fixtures de equivalencia. Mientras esas
-pruebas no pasen, el runner E2E conserva el contenedor TypeScript como activo;
-no hay fallback silencioso entre implementaciones.
+La ventana de bids tiene máximo de 2 s por defecto. En operaciones con provider
+preferido, el bid de ese provider permite asignar antes sin alterar la regla de
+selección; las demás ofertas conservan la ventana completa. El agente registra
+`bid_wait_ms` para que el efecto se mida en el laboratorio.
+
+La transición de Navigator ya se realizó; la ruta TypeScript queda como
+referencia y no debe arrancarse simultáneamente con Rust porque comparten
+identidad. Las siguientes migraciones obligatorias de backend son Star y luego
+KB/RAG, OCR y Atlas. Su prioridad y los requisitos de medición comparativa están
+en la [ruta Rust/WASM basada en latencia](./migracion-rust-rendimiento.md).
 
 ## Seguridad y límites actuales
 

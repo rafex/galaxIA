@@ -90,9 +90,9 @@ flowchart LR
     SPEC["galaxIA\nContrato FHS, IDL y decisiones"]
     SDK["galaxIA-SDK\nPaquetes TS, capacidades y WASM"]
     PARSER["galaxia-parser-catalog\nPerfiles de salida de modelos"]
-    CORE["galaxIA-Core\nRuntime TypeScript activo\nAtlas · Navigator · Portal"]
+    CORE["galaxIA-Core\nAtlas · Portal Chat\nNavigator TS heredado"]
     PROVIDERS["galaxIA-satellite-star\nStar · OCR · RAG · KB · Nova"]
-    AGENT["galaxIA-agent\nAlternativa de Navigator en Rust/Rig\nEn migración; no reemplaza aún a TS"]
+    AGENT["galaxIA-agent\nNavigator activo en Rust/Rig"]
     LLAMA["PoC-Llama.cpp\nConstruye/prepara llama-server"]
     E2E["galaxIA-E2E (privado)\nLaboratorio y pruebas multi-equipo"]
     OPS["galaxIA-gitops\nDiagnóstico y demo remota"]
@@ -104,12 +104,11 @@ flowchart LR
     SDK -->|biblioteca compartida| CORE
     SDK -->|biblioteca compartida| PROVIDERS
     PARSER -->|normaliza tool calls locales| PROVIDERS
-    CORE <-->|FHS P2P: chat y Missions| PROVIDERS
-    AGENT -.->|destino de migración: Missions FHS| PROVIDERS
+    AGENT <-->|Missions FHS| PROVIDERS
     LLAMA -->|servidor local consumido por Star| PROVIDERS
     E2E -->|construye y despliega contenedores| CORE
     E2E -->|construye y despliega contenedores| PROVIDERS
-    E2E -.->|cuando esté listo, probará| AGENT
+    E2E -->|despliega y valida| AGENT
     OPS -.->|diagnostica / publica demo| CORE
 ```
 
@@ -117,17 +116,17 @@ La vista complementaria D2 se puede abrir aquí:
 
 <figure class="diagram">
   <img src="{{ '/assets/diagrams/ecosistema-piezas.svg' | relative_url }}" alt="Mapa D2 de responsabilidades de los repositorios galaxIA">
-  <figcaption>Las flechas sólidas representan relaciones actuales; las punteadas, una migración o integración pendiente.</figcaption>
+  <figcaption>Las flechas sólidas representan integraciones actuales; la migración de Navigator a Rust ya está operativa.</figcaption>
 </figure>
 
 | Repositorio | Qué hace en términos sencillos | Cuándo suele ser el lugar correcto para cambiar algo |
 |---|---|---|
 | [`galaxIA`](https://github.com/rafex/galaxIA) | Define el idioma y las reglas FHS, conserva IDL Protobuf, especificaciones, decisiones de arquitectura y documentación. No es el servicio de chat que se ejecuta en la red. | Cuando cambian los mensajes, el significado de una regla FHS, la arquitectura conceptual o su documentación. |
 | [`galaxIA-SDK`](https://github.com/rafex/galaxIA-SDK) | Publica paquetes reutilizables: contratos/protocolo para TypeScript, capacidades Satellite y un paquete WASM compilado desde Rust, además de una demo web de Satellite efímero. | Cuando un consumidor TypeScript necesita una biblioteca compartida, una capacidad reutilizable o la implementación WASM asociada. |
-| [`galaxIA-Core`](https://github.com/rafex/galaxIA-Core) | Contiene el runtime TypeScript que hoy une la PoC: Atlas, Navigator, Portal Chat y otros clientes/ayudantes. | Para el Navigator activo, el frontend, el bootstrap y utilidades del runtime actual. |
+| [`galaxIA-Core`](https://github.com/rafex/galaxIA-Core) | Contiene Atlas, Portal Chat y otros clientes/ayudantes; conserva el runtime Navigator TypeScript como implementación histórica/de referencia. | Para Atlas, el frontend, utilidades compartidas y la ruta heredada de Navigator. |
 | [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star) | Contiene providers de ejemplo/referencia que ofrecen LLM, OCR, búsqueda RAG, consulta KB y el agente Nova. | Cuando se modifica cómo un provider anuncia una capacidad o ejecuta una Mission. |
 | [`galaxia-parser-catalog`](https://github.com/rafex/galaxia-parser-catalog) | Enseña a interpretar las respuestas de modelos que escriben llamadas a herramientas como texto JSON en vez de producir llamadas estructuradas. Convierte esa salida local a una llamada tipada antes de enviarla por FHS. | Cuando se necesita soportar la forma peculiar de salida de otro modelo. |
-| [`galaxIA-agent`](https://github.com/rafex/galaxIA-agent) | Proyecto de migración para implementar el control de Navigator en Rust con Rig y separar responsabilidades lógicas. No es todavía el reemplazo de producción. | Para trabajar en el futuro agente Rust, respetando las fases y el estado que documenta su guía de migración. |
+| [`galaxIA-agent`](https://github.com/rafex/galaxIA-agent) | Implementación Rust/Rig activa de Navigator: aplica políticas, descubre providers y coordina Missions FHS. | Para el agente productivo, su observabilidad, optimización y futura transición de los demás backends. |
 | [`PoC-Llama.cpp`](https://github.com/rafex/PoC-Llama.cpp) | Detecta características del equipo y ayuda a compilar/instalar/versionar llama.cpp y administrar modelos. | Cuando cambia cómo se prepara el motor local de inferencia. No contiene el agente ni la federación. |
 | [`galaxIA-E2E`](https://github.com/rafex/galaxIA-E2E) (privado) | Orquesta las pruebas del laboratorio distribuido: crea imágenes/contenedores, despliega por equipo y revisa que la conversación alcance las capacidades reales. | Al cambiar topología, comandos de despliegue, certificados o aceptación E2E. |
 | [`galaxIA-gitops`](https://github.com/rafex/galaxIA-gitops) | Herramientas operativas para diagnósticos y demostraciones remotas, incluidos túnel y certificados de demo cuando se usan. | Al preparar o diagnosticar acceso externo; no es necesario para que una conversación local FHS funcione. |
@@ -137,7 +136,7 @@ La vista complementaria D2 se puede abrir aquí:
 **Dentro de `galaxIA-Core`:**
 
 - `apps/atlas`: proceso bootstrap que entra al swarm y ayuda a otros nodos a incorporarse.
-- `apps/navigator`: proceso coordinador y runtime TypeScript del agente que está activo ahora.
+- `apps/navigator`: runtime TypeScript heredado/referencia; el Navigator operativo está en `galaxIA-agent`.
 - `apps/portal-chat`: interfaz web que corre en el navegador; presenta el chat y la actividad.
 - `apps/portal-tui`: cliente de chat para terminal, útil para integración y diagnóstico sin navegador.
 - `apps/log-agent`: pieza auxiliar para transportar/recoger registros operativos; no procesa peticiones de usuario.
@@ -161,8 +160,8 @@ La vista complementaria D2 se puede abrir aquí:
    provider y `galaxIA-satellite-star`.
 4. ¿Un modelo entrega tool calls en un formato raro? Revisa
    `galaxia-parser-catalog`.
-5. ¿Se quiere reemplazar partes del Navigator TypeScript por Rust? Revisa
-   `galaxIA-agent`, pero no asumas que ya está en producción.
+5. ¿Se modifica Navigator o se migra otro backend a Rust? Revisa
+   `galaxIA-agent` y la [ruta de migración y rendimiento](./migracion-rust-rendimiento.md).
 6. ¿El cambio solo afecta cómo se construye, instala o ejecuta la prueba?
    Revisa `PoC-Llama.cpp`, `galaxIA-E2E` o `galaxIA-gitops`, según corresponda.
 
@@ -229,7 +228,7 @@ Navigator mediante el protocolo FHS. Que el servidor web del Portal se caiga
 impide cargar/recargar la interfaz, pero una vez servidos los archivos el
 camino de mensajes no se convierte por eso en un proxy HTTP.
 
-### Agente Rust/Rig: la ruta futura de Navigator
+### Agente Rust/Rig: Navigator operativo
 
 `galaxIA-agent` separa el trabajo de decisión en piezas lógicas: supervisor,
 política, documentos, recuperación, gestión de Missions y construcción de la
@@ -249,14 +248,12 @@ Rig aporta una estructura para un ciclo de agente y herramientas; no descubre
 peers ni ejecuta el protocolo FHS automáticamente. El agente necesita usar el
 transporte y los mensajes FHS para conversar con Star/Satellites.
 
-El estado es importante: el runtime TypeScript en `galaxIA-Core` sigue siendo
-la ruta activa. El servidor Rust actual conecta el supervisor a
-`UnconfiguredFhsTransport`, que devuelve “transporte FHS aún no configurado”
-para chat y tools. Por lo tanto, aunque hay diseño, código de política y
-fixtures compartidas, el camino Rust no puede todavía ejecutar end-to-end las
-Missions reales ni reemplazar a Navigator. La migración requiere transporte
-P2P real, discovery, offer/bid/assign, streams a Star/Satellites, eventos
-Portal y una prueba E2E de corte.
+El agente Rust/Rig está desplegado como Navigator activo en Bastion y participa
+en la ruta real de Missions. El runtime TypeScript permanece en Core como
+referencia histórica; no se ejecutan ambos con la misma identidad. La prioridad
+ya no es volver a migrar Navigator, sino medir/optimizarlo y completar el SDK
+FHS Rust compartido antes de migrar Star, KB/RAG, OCR y Atlas. Consulta la
+[ruta de migración a Rust y WASM basada en latencia](./migracion-rust-rendimiento.md).
 
 ## 5. El recorrido de una petición
 
@@ -268,7 +265,7 @@ sequenceDiagram
     actor U as Persona
     participant P as Portal en el navegador
     participant A as Atlas
-    participant N as Navigator TypeScript activo
+    participant N as Navigator Rust/Rig activo
     participant S as Star
     participant L as llama-server
     participant O as OCR Satellite
@@ -396,12 +393,16 @@ independiente de que Atlas no sea proxy FHS.
 Esta guía describe la PoC/MVP actual, no una promesa de producción. La
 separación importante es:
 
-- **Activo:** el Navigator TypeScript de `galaxIA-Core`, el Portal y los
+- **Activo:** el Navigator Rust/Rig de `galaxIA-agent`, el Portal y los
   providers de referencia que estén habilitados en el laboratorio.
 - **Contrato:** el IDL Protobuf y las reglas FHS en `galaxIA`; los runtimes
   necesitan implementarlas correctamente.
-- **En transición:** `galaxIA-agent` en Rust/Rig. La existencia de código no
-  significa que ya sea el Navigator productivo.
+- **Heredado:** el runtime Navigator TypeScript permanece en `galaxIA-Core`
+  como referencia; no debe arrancarse junto al Rust activo con la misma
+  identidad.
+- **Siguiente migración:** el plan prioriza SDK FHS Rust compartido, Star,
+  KB/RAG, OCR y Atlas; el orden combina obligatoriedad backend y participación
+  en la ruta crítica, sin asumir una ganancia automática por cambiar de lenguaje.
 - **MVP ligero:** las primeras recuperaciones KB/RAG sirven para demostrar el
   flujo, pero deben madurar antes de tomarse por un buscador semántico robusto.
 - **Pruebas:** `galaxIA-E2E` comprueba la conexión real entre contenedores y
@@ -433,9 +434,10 @@ administrativo a las Raspberry Pi.
 
 - [Mapa y detalle por repositorio](../ECOSYSTEM.md)
 - [PoC/MVP: máquinas, IPs, puertos y diagramas operativos](./poc-mvp.md)
+- [Ruta de migración Rust/WASM basada en latencia](./migracion-rust-rendimiento.md)
 - [Vocabulario completo](./vocabulario.md)
 - [Reglas FHS explicadas](./protocolo.md)
 - [Cómo se descubre la red](./p2p.md)
 - [Qué es una Mission](./mission.md)
 - [Transporte y Protobuf](./transport.md)
-- [Migración del agente Rust](https://github.com/rafex/galaxIA-agent/blob/main/docs/migracion-desde-ts.md)
+- [Agente Navigator Rust/Rig](https://github.com/rafex/galaxIA-Core/blob/main/docs/agente-rust-rig.md)

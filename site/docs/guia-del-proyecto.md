@@ -13,7 +13,7 @@ desde el navegador hasta el provider que la resuelve.
 
 <figure class="diagram">
   <img src="{{ '/assets/diagrams/ecosistema-piezas.svg' | relative_url }}" alt="Responsabilidades de los repositorios del ecosistema galaxIA">
-  <figcaption>Contrato → bibliotecas y runtimes → operación. La línea punteada identifica la migración Rust todavía pendiente de completar.</figcaption>
+  <figcaption>Contrato → bibliotecas y runtimes → operación. Navigator Rust/Rig ya es el agente activo.</figcaption>
 </figure>
 
 <figure class="diagram">
@@ -30,16 +30,15 @@ RAG y KB. FHS define el formato y las reglas para comunicarse entre ellas.
 
 - **galaxIA** define el contrato FHS: IDL Protobuf, especificaciones y
   decisiones. No contiene el chat runtime.
-- **galaxIA-Core** contiene la aplicación y el runtime TypeScript que siguen
-  activos: Atlas, Navigator y Portal Chat, entre otras piezas.
+- **galaxIA-Core** contiene Atlas, Portal Chat y otros clientes; conserva el
+  Navigator TypeScript como referencia histórica.
 - **galaxIA-SDK** distribuye bibliotecas compartidas de protocolo/capacidades y
   una implementación Rust compilada a WASM para la demo Satellite.
 - **galaxIA-satellite-star** tiene los providers de referencia: Star, OCR,
   RAG, KB y Nova.
 - **galaxia-parser-catalog** adapta las tool calls expresadas como texto por
   algunos modelos a la representación tipada que usa FHS.
-- **galaxIA-agent** es la migración de Navigator a Rust/Rig; todavía no es el
-  reemplazo operativo de Navigator TypeScript.
+- **galaxIA-agent** es el Navigator Rust/Rig operativo en Bastion.
 - **PoC-Llama.cpp** prepara el motor de inferencia; Star lo consume.
 - **galaxIA-E2E** despliega/prueba el laboratorio; **galaxIA-gitops** ayuda con
   diagnóstico y demostraciones remotas.
@@ -67,11 +66,12 @@ semánticos maduros.
 
 ## Estado que no hay que confundir
 
-El camino activo de la PoC es el runtime TypeScript de `galaxIA-Core`. El
-servicio Rust tiene separación de componentes, pero el transporte actual es
-`UnconfiguredFhsTransport`; aún faltan P2P real, discovery y ejecución completa
-de Missions/E2E. Rig organiza el ciclo del agente, pero no implementa por sí
-mismo el transporte FHS.
+El camino activo de la PoC es `galaxIA-agent` Rust/Rig; la implementación
+TypeScript de `galaxIA-Core` es de referencia y no debe operar en paralelo con
+la identidad Rust. La siguiente ruta obligatoria migra los otros runtimes
+backend en orden medido y evalúa kernels WASM del chat solo si las pruebas en
+ThinkPad y Android muestran una mejora real. La guía canónica está en
+[`docs/migracion-rust-rendimiento.md`](https://github.com/{{ site.repository }}/blob/main/docs/migracion-rust-rendimiento.md).
 
 En el laboratorio, todo servicio corre en un contenedor Podman salvo
 `llama-server`. La Mac solo usa el navegador y no requiere instalar nada.

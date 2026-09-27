@@ -12,7 +12,7 @@ parser: "galaxia-parser-catalog\nPerfiles para normalizar\nsalida de modelos" {
   shape: package
 }
 
-core: "galaxIA-Core\nRuntime TypeScript activo\nAtlas · Navigator · Portal" {
+core: "galaxIA-Core\nAtlas · Portal Chat\nNavigator TS heredado" {
   shape: hexagon
   style.fill: "#d9ecff"
 }
@@ -22,7 +22,7 @@ providers: "galaxIA-satellite-star\nStar · OCR · RAG · KB · Nova" {
   style.fill: "#e1f5df"
 }
 
-agent: "galaxIA-agent\nAlternativa Navigator\nRust/Rig en transición" {
+agent: "galaxIA-agent\nNavigator activo\nRust/Rig" {
   shape: hexagon
   style.fill: "#fff0d6"
 }
@@ -46,18 +46,11 @@ spec -> agent: "IDL para Rust"
 sdk -> core: "bibliotecas compartidas"
 sdk -> providers: "bibliotecas compartidas"
 parser -> providers: "perfiles de parseo locales"
-core <-> providers: "FHS P2P\nchat y Missions"
-agent -> providers: "destino: Missions FHS" {
-  style.stroke-dash: 5
-  style.stroke: "#d28a00"
-}
+agent <-> providers: "Missions FHS"
 llama -> providers: "Star consume llama-server"
 e2e -> core: "construye/despliega contenedores"
 e2e -> providers: "construye/despliega contenedores"
-e2e -> agent: "probará tras completar la migración" {
-  style.stroke-dash: 5
-  style.stroke: "#d28a00"
-}
+e2e -> agent: "despliega y valida"
 gitops -> core: "diagnostica / publica demo" {
   style.stroke-dash: 5
 }

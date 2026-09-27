@@ -1,0 +1,48 @@
+direction: right
+
+baseline: "0 · Línea base\nTTFT, total, etapas, CPU/RAM" {
+  shape: oval
+  style.fill: "#d9ecff"
+}
+sdk: "1 · galaxIA-SDK\nFHS Rust compartido\nfixtures + interop" {
+  shape: package
+}
+star: "2 · Star Rust\nmedir overhead\nllama.cpp sin cambio" {
+  shape: hexagon
+}
+query: "3 · KB y RAG de red\nrecuperación + wire + bytes" {
+  shape: hexagon
+}
+ocr: "4 · OCR Rust\nTesseract se mide aparte" {
+  shape: hexagon
+}
+atlas: "5 · Atlas Rust\nbootstrap/control plane" {
+  shape: hexagon
+}
+baseline -> sdk -> star -> query -> ocr -> atlas
+
+ts: "RAG local: optimizar TypeScript\nmedir fallback IndexedDB" {
+  shape: package
+  style.fill: "#eee8ff"
+}
+wasm: "Comparación Rust/WASM\npor lotes · un hilo\nThinkPad + Android" {
+  shape: package
+  style.fill: "#eee8ff"
+}
+accept: "Aceptar solo si\np95 mejora en ambos\n+ paridad + sin regresión" {
+  shape: diamond
+  style.fill: "#e1f5df"
+}
+fallback: "Si no mejora\nqueda TypeScript" {
+  shape: diamond
+  style.fill: "#ffe4e1"
+}
+ts -> wasm -> accept
+accept -> fallback: "gate no pasa" {
+  style.stroke-dash: 5
+}
+
+note: "Cada runtime backend migra obligatoriamente;\nRust no equivale automáticamente a menor latencia.\nEl chat/DOM sigue en TS salvo evidencia." {
+  shape: rectangle
+}
+note -> baseline

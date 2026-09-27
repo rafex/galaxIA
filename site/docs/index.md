@@ -67,8 +67,12 @@ Documentación técnica del protocolo, mantenida junto al IDL en
     <p>Mapa físico de la PoC, servicios por equipo, puertos, arranque y dispatch concurrente hacia Star, OCR, KB y RAG.</p>
   </li>
   <li>
+    <a href="{{ '/docs/migracion-rust-rendimiento/' | relative_url }}">Migración Rust/WASM y rendimiento</a>
+    <p>Orden de migración de los backends, mediciones de TTFT/etapas y gates para aceptar kernels WASM en Android y ThinkPad.</p>
+  </li>
+  <li>
     <a href="https://github.com/rafex/galaxIA-agent">Agente soberano Rust/Rig</a>
-    <p>Implementación en transición del agente Navigator: RequestPlan, selección de providers, Missions FHS, RAG por fragmentos y adaptador Rig sobre Star.</p>
+    <p>Implementación Rust/Rig activa de Navigator: RequestPlan, selección de providers, Missions FHS, RAG por fragmentos y adaptador Rig sobre Star.</p>
   </li>
   <li>
     <a href="https://github.com/{{ site.repository }}/blob/main/docs/p2p.md">Red P2P (libp2p)</a>

@@ -1,0 +1,42 @@
+direction: right
+
+portal: "Portal Chat\nTypeScript + DOM" {
+  shape: person
+}
+agent: "Navigator\ngalaxIA-agent · Rust/Rig\nactivo; medir/optimizar" {
+  shape: hexagon
+  style.fill: "#d9ecff"
+}
+star: "Star\npróximo backend Rust" {
+  shape: hexagon
+  style.fill: "#fff0d6"
+}
+llama: "llama.cpp\nGGUF e inferencia" {
+  shape: cylinder
+}
+providers: "Providers condicionales" {
+  ocr: "OCR / Tesseract\nsolo con adjunto"
+  kb: "KB de red\nconsulta de conocimiento"
+  rag: "RAG de red\nfragmentos recuperados"
+}
+local: "RAG local en Worker\nTransformers.js / WebGPU\nranking TS → piloto WASM" {
+  shape: cylinder
+  style.fill: "#eee8ff"
+}
+
+portal -> agent: "FHS Protobuf\nTTFT extremo a extremo"
+agent -> star: "Mission\noferta → bid → assign → stream"
+star -> llama: "adaptador local\nmedir overhead separado"
+llama -> star: "tokens de inferencia"
+star -> agent: "stream de respuesta"
+agent -> portal: "assistant.delta / completed"
+agent -> providers.ocr: "Mission solo si aplica"
+agent -> providers.kb: "Mission si KB elegida"
+agent -> providers.rag: "Mission si RAG de red elegido"
+portal -> local: "consulta local\nmedir embedding y ranking aparte"
+local -> portal: "top-K local"
+
+note: "No atribuir el tiempo de llama.cpp a Rust/TS.\nMismo GGUF, prompt y parámetros para A/B.\nEl wire FHS e IDL no cambian." {
+  shape: rectangle
+}
+note -> star
