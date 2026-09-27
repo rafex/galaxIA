@@ -186,14 +186,21 @@ fallback TypeScript y no se declara aceptación general.
 
 ## Estado y registro de evidencia
 
-| Etapa | Estado inicial de esta iniciativa | Evidencia requerida |
+| Etapa | Estado (2026-09-27) | Evidencia |
 |---|---|---|
-| Navigator Rust | Ya activo en Bastion; optimizar/observar, no volver a migrar | Health/E2E y desglose de sus etapas |
-| SDK FHS Rust | Pendiente de consolidación compartida | Fixtures golden + interop TS/Rust |
-| Star Rust | Siguiente runtime a migrar | Paridad E2E y A/B con llama.cpp constante |
-| KB/RAG, OCR, Atlas Rust | Pendientes en ese orden | Paridad por servicio + E2E + perfil |
+| Navigator Rust | En Bastion (`galaxIA-agent`) | `tests/e2e` del Portal: 5/5 (DHT, descubrimiento, KB, OCR + RAG de red y local) |
+| SDK FHS Rust | `galaxIA-SDK/rust/fhs` (`galaxia-fhs`), usado por el agente, los providers y Atlas | Fixtures dorados del TS; misión completa entre nodos reales (`tests/provider_mission.rs`) |
+| Star Rust | En Bastion (`galaxIA-satellite-star/rust/star`) | E2E 4/4. A/B con llama.cpp y prompt iguales, 3 corridas calientes: primer delta dentro de Star 199–237 ms (TS: 235–245 ms); memoria del contenedor 3.2 MB (TS: 57 MB) |
+| KB/RAG, OCR Rust | Código y pruebas listos (`rust/kb`, `rust/rag`, `rust/ocr`); imágenes aarch64 en la Raspi4B | Pendiente: paridad E2E en la red del laboratorio |
+| Atlas Rust | En Bastion (`galaxIA-Core/rust/atlas`), mismo PeerId | E2E 5/5, también tras reiniciar Atlas. Descubrimiento del Navigator desde el Portal: 1.09 s y 1.12 s (TS: 17.0 s y 1.2 s), porque Atlas reenvía los anuncios vigentes a cada suscriptor nuevo |
 | Ranking TypeScript | Optimización inicial y medición local en curso | Tests de equivalencia y telemetría por consulta |
 | Ranking Rust/WASM | No iniciado hasta completar comparación física | p95 mejor en ThinkPad y Android, paridad, carga/memoria |
+
+Lectura honesta de la A/B de Star: el tiempo al primer delta no cambió (lo
+domina `llama.cpp`), como anticipaba esta ruta; lo que baja es la memoria. La
+mejora de descubrimiento no es de lenguaje sino de diseño (reenvío en el
+bootstrap), y se midió con n = 2 por lado: sirve para dirigir, no como línea
+base estadística.
 
 La telemetría del navegador registra TTFT extremo a extremo y duración del
 ranking IndexedDB; el agente registra la espera de pujas por Mission. Los demás
