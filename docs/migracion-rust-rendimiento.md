@@ -191,7 +191,7 @@ fallback TypeScript y no se declara aceptación general.
 | Navigator Rust | En Bastion (`galaxIA-agent`) | `tests/e2e` del Portal: 5/5 (DHT, descubrimiento, KB, OCR + RAG de red y local) |
 | SDK FHS Rust | `galaxIA-SDK/rust/fhs` (`galaxia-fhs`), usado por el agente, los providers y Atlas | Fixtures dorados del TS; misión completa entre nodos reales (`tests/provider_mission.rs`) |
 | Star Rust | En Bastion (`galaxIA-satellite-star/rust/star`) | E2E 4/4. A/B con llama.cpp y prompt iguales, 3 corridas calientes: primer delta dentro de Star 199–237 ms (TS: 235–245 ms); memoria del contenedor 3.2 MB (TS: 57 MB) |
-| KB/RAG, OCR Rust | Código y pruebas listos (`rust/kb`, `rust/rag`, `rust/ocr`); imágenes aarch64 en la Raspi4B | Pendiente: paridad E2E en la red del laboratorio |
+| KB/RAG, OCR Rust | En las Raspberry Pi (`galaxIA-satellite-star/rust/{kb,rag,ocr}`), mismos DID | E2E 5/5 con todo el backend en Rust; OCR de imagen con Tesseract `spa` en 0.9 s. Memoria: KB y RAG 10.4 MB cada uno; la Raspi3B (1 GB) pasó de 188 a 97 MiB usados. OCR 71.6 MB en TS. Imagen OCR 227 MB (TS: 1.29 GB) |
 | Atlas Rust | En Bastion (`galaxIA-Core/rust/atlas`), mismo PeerId | E2E 5/5, también tras reiniciar Atlas. Descubrimiento del Navigator desde el Portal: 1.09 s y 1.12 s (TS: 17.0 s y 1.2 s), porque Atlas reenvía los anuncios vigentes a cada suscriptor nuevo |
 | Ranking TypeScript | Optimización inicial y medición local en curso | Tests de equivalencia y telemetría por consulta |
 | Ranking Rust/WASM | No iniciado hasta completar comparación física | p95 mejor en ThinkPad y Android, paridad, carga/memoria |
