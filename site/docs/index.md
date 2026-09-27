@@ -17,6 +17,10 @@ Documentación técnica del protocolo, mantenida junto al IDL en
 
 <ul class="doc-list">
   <li>
+    <a href="{{ '/docs/guia-del-proyecto/' | relative_url }}">Guía sencilla del proyecto</a>
+    <p>Mapa de cada repositorio, servicio y recorrido de una petición; separa el runtime activo de la migración Rust/Rig.</p>
+  </li>
+  <li>
     <a href="https://github.com/{{ site.repository }}/blob/main/docs/protocolo.md">Protocolo FHS</a>
     <p>Las 10 reglas del protocolo P2P: DHT, GossipSub, dispatch de Missions, privacidad y reputación distribuida. El punto de entrada para entender el sistema.</p>
   </li>

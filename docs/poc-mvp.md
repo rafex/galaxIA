@@ -147,6 +147,7 @@ no hay fallback silencioso entre implementaciones.
 
 ## Documentos relacionados
 
+- [`guia-del-proyecto.md`](./guia-del-proyecto.md) — explicación sencilla del ecosistema y del ciclo de una petición.
 - [`architecture.md`](./architecture.md) — arquitectura lógica P2P.
 - [`network.md`](./network.md) — DHT, GossipSub y streams FHS.
 - [`mission.md`](./mission.md) — ciclo de vida de una Mission.

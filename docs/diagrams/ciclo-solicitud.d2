@@ -1,0 +1,57 @@
+direction: right
+
+browser: "Navegador\nPortal Chat" {
+  shape: person
+}
+
+atlas: "Atlas\nBootstrap solamente" {
+  shape: hexagon
+}
+
+navigator: "Navigator TypeScript\nactivo: política + coordinación" {
+  shape: hexagon
+  style.fill: "#d9ecff"
+}
+
+dispatch: "Missions FHS" {
+  star: "Star\ngeneración de texto"
+  ocr: "OCR\nextrae texto"
+  rag: "RAG de red\nrecupera fragmentos"
+  kb: "KB\nconsulta conocimiento"
+}
+
+local: "RAG local\nse ejecuta en el navegador" {
+  shape: cylinder
+  style.fill: "#eee8ff"
+}
+
+llama: "llama-server\nmotor de inferencia" {
+  shape: cylinder
+}
+
+answer: "Respuesta +\nprocedencia" {
+  shape: document
+}
+
+browser -> atlas: "bootstrap al entrar" {
+  style.stroke-dash: 5
+}
+browser -> navigator: "chat por stream FHS directo"
+browser -> local: "si el usuario elige RAG local"
+navigator -> dispatch.ocr: "solo si hay documento"
+navigator -> dispatch.rag: "si se elige RAG de red"
+navigator -> dispatch.kb: "si la petición requiere KB"
+navigator -> dispatch.star: "texto y fragmentos acotados"
+dispatch.star -> llama: "inferencia"
+llama -> dispatch.star: "tokens/texto"
+dispatch -> navigator: "resultados de providers"
+local -> navigator: "contexto seleccionado, si aplica" {
+  style.stroke-dash: 5
+}
+navigator -> answer: "arma resultado"
+answer -> browser: "FHS"
+
+note: "Atlas no reenvía conversaciones.\nNo mandar OCR completo al LLM:\nindexar y recuperar fragmentos acotados.\nRAG local o de red; ambos fuera del MVP." {
+  shape: rectangle
+}
+note -> navigator: "reglas del flujo"

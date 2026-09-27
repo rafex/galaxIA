@@ -25,6 +25,7 @@ galaxIA es un experimento para construir un **chat de IA comunitario y soberano*
 
 | Documento | Contenido |
 |---|---|
+| [`guia-del-proyecto.md`](./guia-del-proyecto.md) | Guía de reentrada: explica cada repositorio/servicio con palabras sencillas, estado real de Rust, topología y recorrido de una pregunta; incluye Mermaid y diagramas D2. |
 | [`protocolo.md`](./protocolo.md) | Las 10 reglas del protocolo FHS P2P: DHT, GossipSub, dispatch de Missions, privacidad, reputación distribuida |
 | [`protocolo-provider.md`](./protocolo-provider.md) | Contrato P2P que todo provider debe cumplir para participar en la red |
 | [`implementacion-multilenguaje.md`](./implementacion-multilenguaje.md) | Cómo implementar FHS en Go, Python, Rust y TypeScript |

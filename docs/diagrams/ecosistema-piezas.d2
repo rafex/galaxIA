@@ -1,0 +1,63 @@
+direction: right
+
+spec: "galaxIA\nContrato FHS, IDL Protobuf,\nespecificaciones y decisiones" {
+  shape: document
+}
+
+sdk: "galaxIA-SDK\nPaquetes TypeScript,\ncapacidades y Rust → WASM" {
+  shape: package
+}
+
+parser: "galaxia-parser-catalog\nPerfiles para normalizar\nsalida de modelos" {
+  shape: package
+}
+
+core: "galaxIA-Core\nRuntime TypeScript activo\nAtlas · Navigator · Portal" {
+  shape: hexagon
+  style.fill: "#d9ecff"
+}
+
+providers: "galaxIA-satellite-star\nStar · OCR · RAG · KB · Nova" {
+  shape: hexagon
+  style.fill: "#e1f5df"
+}
+
+agent: "galaxIA-agent\nAlternativa Navigator\nRust/Rig en transición" {
+  shape: hexagon
+  style.fill: "#fff0d6"
+}
+
+llama: "PoC-Llama.cpp\nPrepara motor y modelos\n(llama-server)" {
+  shape: cylinder
+}
+
+e2e: "galaxIA-E2E (privado)\nDespliega y valida\nel laboratorio" {
+  shape: package
+}
+
+gitops: "galaxIA-gitops\nDiagnóstico y demo remota" {
+  shape: package
+}
+
+spec -> sdk: "contrato implementado"
+spec -> core: "reglas del runtime"
+spec -> providers: "reglas de providers"
+spec -> agent: "IDL para Rust"
+sdk -> core: "bibliotecas compartidas"
+sdk -> providers: "bibliotecas compartidas"
+parser -> providers: "perfiles de parseo locales"
+core <-> providers: "FHS P2P\nchat y Missions"
+agent -> providers: "destino: Missions FHS" {
+  style.stroke-dash: 5
+  style.stroke: "#d28a00"
+}
+llama -> providers: "Star consume llama-server"
+e2e -> core: "construye/despliega contenedores"
+e2e -> providers: "construye/despliega contenedores"
+e2e -> agent: "probará tras completar la migración" {
+  style.stroke-dash: 5
+  style.stroke: "#d28a00"
+}
+gitops -> core: "diagnostica / publica demo" {
+  style.stroke-dash: 5
+}

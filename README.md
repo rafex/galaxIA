@@ -43,7 +43,7 @@ flowchart TB
         direction LR
         core["<b>galaxIA-Core</b><br/>Atlas · Navigator · Portal"]
         providers["<b>galaxIA-satellite-star</b><br/>Star · OCR · RAG · KB · Nova"]
-        agent["<b>galaxIA-agent</b><br/>Navigator agente<br/>en Rust + Rig"]
+        agent["<b>galaxIA-agent</b><br/>Migración futura de Navigator<br/>Rust + Rig (aún no reemplaza TS)"]
     end
 
     subgraph ops["Infraestructura y operación"]
@@ -59,7 +59,7 @@ flowchart TB
     sdk -->|tipos del protocolo| providers
     parser -->|perfiles| providers
     core <-->|missions P2P| providers
-    agent -->|missions P2P| providers
+    agent -.->|cuando se complete la migración| providers
     llama -->|llama-server| providers
     ops -->|despliega, prueba y diagnostica| red
 ```
@@ -71,7 +71,7 @@ flowchart TB
 | [`galaxia-parser-catalog`](https://github.com/rafex/galaxia-parser-catalog) | Catálogo de perfiles de parseo tolerante para modelos que escriben las tool calls como texto. |
 | [`galaxIA-Core`](https://github.com/rafex/galaxIA-Core) | Runtime de la red: Atlas (bootstrap), Navigator (orquestador) y Portal (chat web). |
 | [`galaxIA-satellite-star`](https://github.com/rafex/galaxIA-satellite-star) | Providers de referencia: Star (LLM), OCR, RAG, KB y Nova. |
-| [`galaxIA-agent`](https://github.com/rafex/galaxIA-agent) | Navigator como agente en Rust sobre Rig, que ejecuta Missions FHS hacia Star y Satellites. |
+| [`galaxIA-agent`](https://github.com/rafex/galaxIA-agent) | Migración propuesta de Navigator a Rust/Rig; todavía no reemplaza el runtime TypeScript activo ni completa Missions FHS en producción. |
 | [`PoC-Llama.cpp`](https://github.com/rafex/PoC-Llama.cpp) | Compila e instala llama.cpp con perfiles por hardware; da el `llama-server` que usa Star. |
 | [`galaxIA-gitops`](https://github.com/rafex/galaxIA-gitops) | Despliegue y operación: túnel para demos remotas, certificados, `doctor.sh`, arquitectura y estado de la PoC. |
 | `galaxIA-E2E` (privado) | Orquestación del laboratorio de pruebas de punta a punta. |
@@ -86,9 +86,15 @@ validar DHT, GossipSub y el stream directo antes de considerarse conformes.
 Sigue una metodología **spec-first** ("SpecNative").
 
 - **Hecho en el contrato:** FHS P2P alpha con Envelope Protobuf, DHT, GossipSub, Mission dispatch, handshake directo y provenance (DEC-0090).
-- **En curso / próximo:** `rag-provider` y `kb-provider` (ya implementados en `galaxIA-satellite-star`), descubrimiento por mDNS, SDKs de referencia en Python/Rust/Java.
+- **Implementado en el MVP:** providers iniciales RAG y KB en `galaxIA-satellite-star`; su recuperación todavía es ligera y debe madurar.
+- **En transición:** `galaxIA-agent` prepara un Navigator Rust/Rig, pero el runtime activo y desplegable continúa siendo el Navigator TypeScript de `galaxIA-Core`.
+- **Siguiente madurez:** mejorar recuperación de conocimiento y completar las fases de migración antes de cambiar el runtime productivo.
 - **Roadmap público:** [Project — galaxIA Roadmap](https://github.com/users/rafex/projects/9) e [Issues](https://github.com/rafex/galaxIA/issues).
 
 ## Empezar
 
 Documentación completa para humanos en [`docs/README.md`](docs/README.md) — incluye cómo desplegar, cómo integrar un nuevo provider, y el contrato plug-and-play que debe cumplir. Contexto técnico exhaustivo (specs, decisiones, tareas) en [`spec-native/`](spec-native/).
+
+Si estás retomando el proyecto después de un tiempo, empieza por la
+[`guía sencilla del proyecto`](docs/guia-del-proyecto.md): explica qué hace
+cada pieza y sigue una petición a través de la red.

@@ -20,7 +20,7 @@ flowchart TB
         direction LR
         core["<b>galaxIA-Core</b><br/>Atlas · Navigator · Portal"]
         providers["<b>galaxIA-satellite-star</b><br/>Star · OCR · RAG · KB · Nova"]
-        agent["<b>galaxIA-agent</b><br/>Navigator agente<br/>en Rust + Rig"]
+        agent["<b>galaxIA-agent</b><br/>Migración de Navigator<br/>Rust/Rig aún no activo"]
     end
 
     subgraph ops["Infraestructura y operación"]
@@ -36,7 +36,7 @@ flowchart TB
     sdk -->|tipos del protocolo| providers
     parser -->|perfiles| providers
     core <-->|missions P2P| providers
-    agent -->|missions P2P| providers
+    agent -.->|cuando se complete la migración| providers
     llama -->|llama-server| providers
     ops -->|despliega, prueba y diagnostica| red
 ```
@@ -126,9 +126,16 @@ El mismo mapa está en el [`README`](README.md).
 
 **Rol:** Navigator como agente soberano en Rust sobre [Rig](https://docs.rs/rig).
 
-**Contiene:** plan de petición determinista, ciclo `MissionOffer → bid → assign → ejecución` con failover, IDL FHS generado con `prost`, un `CompletionModel` de Rig que solo habla con Star y herramientas Rig dinámicas para las capacidades de los Satellites.
+**Contiene:** separación lógica de responsabilidades del agente (supervisor,
+política, documentos, recuperación, gestión de Missions y respuesta), plan de
+petición, estructuras de protocolo y fixtures interlingüísticas.
 
-**Estado:** primera entrega; el transporte libp2p productivo y el stream hacia el Portal son los siguientes cortes.
+**Estado real:** migración en curso; no reemplaza todavía al Navigator
+TypeScript de `galaxIA-Core`. El punto de entrada actual instancia un
+`UnconfiguredFhsTransport`, por lo que no puede completar chat ni tools por
+FHS. Faltan transporte libp2p productivo, discovery, flujo completo
+offer/bid/assign, streams a providers, eventos Portal y aceptación E2E. Ver
+[`docs/migracion-desde-ts.md`](https://github.com/rafex/galaxIA-agent/blob/main/docs/migracion-desde-ts.md).
 
 ---
 
@@ -170,9 +177,16 @@ graph LR
     style PROTO fill:#4a90d9,color:#fff
 ```
 
-La fuente de verdad del protocolo son los tipos TypeScript en `galaxIA-SDK/packages/fhs-protocol`.
-Los artefactos JSON de `schemas/` son auxiliares de documentación y validación; no se generan ni se transmiten como parte del wire.
-Las definiciones AsyncAPI y Protobuf en `idl/` son transcripciones formales del mismo contrato libp2p.
+La fuente canónica del contrato de red es el IDL Protobuf de `galaxIA/idl`,
+acompañado por las especificaciones del mismo repositorio. `galaxIA-SDK` ofrece
+paquetes reutilizables (incluidos los tipos y herramientas TypeScript) para que
+los runtimes consuman/implementen ese contrato. Los artefactos JSON de
+`schemas/` son auxiliares de documentación y validación: no forman el wire.
+AsyncAPI documenta canales y flujos; Protobuf define los mensajes tipados
+transmitidos por libp2p.
+
+Para una explicación gradual, con mapa Mermaid/D2 y estado actual, consulta la
+[guía del proyecto](docs/guia-del-proyecto.md).
 
 ## Registro de decisiones de arquitectura
 
