@@ -1,0 +1,18 @@
+shape: sequence_diagram
+
+mac: "Mac\nnavegador"
+thinkpad: "ThinkPad\nPortal Chat"
+atlas: "Bastion\nAtlas :4001"
+navigator: "Bastion\nNavigator :4010"
+providers: "Peers\nStar / OCR / KB / RAG"
+
+mac -> thinkpad: GET HTTPS :8443
+thinkpad -> mac: HTML, JS y configuración de bootstrap
+mac -> atlas: TLS/WSS bootstrap
+atlas -> mac: Beacon y acceso al swarm
+atlas -> providers: discovery DHT/GossipSub
+providers -> atlas: NodeAdvertise firmado
+mac -> navigator: resolver Beacon y abrir stream FHS
+navigator -> mac: handshake y Pulse
+navigator -> providers: capacidades disponibles
+providers -> navigator: Beacons verificados

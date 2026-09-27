@@ -1,0 +1,42 @@
+direction: down
+
+router: "Router OpenWrt\n192.168.1.1" {
+  shape: cloud
+}
+
+galaxia: "Red GalaxIA\n192.168.1.0/24" {
+  bastion: "Bastion\n192.168.1.139 · x86_64" {
+    atlas: "fhs-atlas\n4001 / 8081"
+    navigator: "fhs-navigator\n4010 / 8090"
+    star: "fhs-star\n4002"
+    llama: "llama.cpp · host\n43110"
+    atlas -> navigator: bootstrap y discovery
+    navigator -> star: stream FHS
+    star -> llama: localhost
+  }
+
+  ocr: "Raspi4B\n192.168.1.167 · aarch64" {
+    service: "fhs-satellite-ocr\n4003 · Podman"
+  }
+
+  portal_pi: "Raspi3B portal-pi\n192.168.1.181 · aarch64" {
+    kb: "fhs-kb-provider\n4006 · Podman"
+    rag: "fhs-rag-provider\n4005 · Podman"
+  }
+
+  thinkpad: "ThinkPad\n192.168.1.239 · x86_64" {
+    portal: "fhs-portal-chat\n8443 HTTPS · Podman"
+  }
+}
+
+mac: "Mac\n192.168.1.102 · arm64\nnavegador solamente" {
+  shape: person
+}
+
+router -> galaxia: red soberana
+mac -> thinkpad.portal: descarga del Portal HTTPS
+mac -> bastion.atlas: TLS/WSS bootstrap
+mac -> bastion.navigator: stream FHS directo
+bastion.navigator -> ocr.service: tool.call OCR
+bastion.navigator -> portal_pi.kb: document.query KB
+bastion.navigator -> portal_pi.rag: document.query RAG

@@ -59,3 +59,6 @@ data/
 .opencode/worktrees.db
 .opencode/worktrees.log
 .opencode/node_modules/
+
+# Diagramas D2 generados durante el build del sitio
+site/assets/diagrams/

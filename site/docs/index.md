@@ -59,6 +59,10 @@ Documentación técnica del protocolo, mantenida junto al IDL en
     <p>Topología de red, nodos, roles (Star/Satellite/Nova/Navigator/Atlas/Portal) y modelo de federación.</p>
   </li>
   <li>
+    <a href="{{ '/docs/poc-mvp/' | relative_url }}">PoC/MVP — topología operativa</a>
+    <p>Mapa físico de la PoC, servicios por equipo, puertos, arranque y dispatch concurrente hacia Star, OCR, KB y RAG.</p>
+  </li>
+  <li>
     <a href="https://github.com/{{ site.repository }}/blob/main/docs/p2p.md">Red P2P (libp2p)</a>
     <p>DHT Kademlia, GossipSub, descubrimiento de peers, DhtBeaconRecord, NodeAdvertiseMessage y reputación distribuida.</p>
   </li>

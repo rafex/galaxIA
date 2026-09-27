@@ -47,6 +47,7 @@ galaxIA es un experimento para construir un **chat de IA comunitario y soberano*
 | [`transport.md`](./transport.md) | Capa de transporte única: libp2p + Protobuf |
 | [`network.md`](./network.md) | Topología completa de la red libp2p FHS |
 | [`ephemeral-satellite.md`](./ephemeral-satellite.md) | Ephemeral Satellite: WASM en dispositivos móviles, delegación, confianza |
+| [`poc-mvp.md`](./poc-mvp.md) | Topología física de la PoC/MVP, servicios, puertos y flujos D2 |
 
 ---
 

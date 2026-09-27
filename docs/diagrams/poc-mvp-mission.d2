@@ -1,0 +1,30 @@
+direction: right
+
+portal: "Portal Chat\nsolicitud del usuario" {
+  shape: person
+}
+
+navigator: "Navigator\nMission dispatcher" {
+  shape: hexagon
+}
+
+dispatch: "Dispatch concurrente" {
+  star: "Star\nchat.generate\nBastion :4002"
+  ocr: "Satellite OCR\ndocument.ocr\nRaspi4B :4003"
+  kb: "KB provider\ndocument.query\nportal-pi :4006"
+  rag: "RAG provider\ndocument.query\nportal-pi :4005"
+}
+
+response: "Respuesta FHS\ncontexto y procedencia"
+
+portal -> navigator: chat.request
+navigator -> dispatch.star: Mission asignada
+navigator -> dispatch.ocr: Mission asignada
+navigator -> dispatch.kb: Mission asignada
+navigator -> dispatch.rag: Mission asignada
+dispatch.star -> navigator: texto generado
+dispatch.ocr -> navigator: texto OCR
+dispatch.kb -> navigator: fragmentos KB
+dispatch.rag -> navigator: fragmentos RAG
+navigator -> response: combinar resultados
+response -> portal: chat.response
