@@ -1571,3 +1571,53 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
   y repetir la compuerta. La recuperación desde Internet (`ipfs.io`) no se
   garantiza (NAT) y no es parte de la compuerta.
 - Reemplaza: none
+
+### DEC-0095 — IPFS nativo en la red pública para la demo, con paso a red privada
+
+- Fecha: 2026-09-27
+- Estado: `accepted`
+- Relacionado con specs: SPEC-IPFS-0001.
+- Relacionado con decisiones: DEC-0044, DEC-0045, DEC-0046, DEC-0051, DEC-0052,
+  DEC-0053, DEC-0092.
+- Contexto: el Navigator en Rust manda todos los adjuntos inline y el OCR en Rust
+  descarga un `ArtifactRef` IPFS por HTTP desde `gatewayUrl`, sin verificar el CID
+  ni limitar el tamaño. Para la demo se quiere mostrar IPFS funcionando sobre la
+  red pública; una red privada queda para después y no debe exigir cambios de
+  código.
+- Decisión:
+  1. Cada host que sube o lee corre su propio nodo **Kubo** (implementación de
+     referencia de IPFS, en Go): Bastion para el Navigator y Raspi4B para el OCR,
+     conectados a la red IPFS pública, con DHT en modo cliente
+     (`Routing.Type=autoclient`), swarm en el puerto **4101** (4001 es de Atlas),
+     mDNS apagado, `Addresses.NoAnnounce` con los rangos privados y
+     `Peering.Peers` estático entre los dos por la LAN.
+  2. Navigator y OCR hablan solo con su Kubo local por la API en loopback
+     (`127.0.0.1:5001`), protegida con `API.Authorizations` (token *bearer* por
+     cliente, rutas completas permitidas; tokens leídos de archivo). Los bloques
+     viajan por bitswap; Kubo verifica cada bloque contra su hash (DEC-0092:
+     IPFS operado por galaxIA → lectura nativa).
+  3. El OCR **nunca** usa `gatewayUrl`; el valor `https://ipfs.io/ipfs` solo es una
+     pista para lectores externos. Se retira la descarga HTTP por gateway.
+  4. La misión OCR de un adjunto IPFS pide `document.ocr` **y**
+     `ipfs.native.<network>`. Un provider anuncia `ipfs.native.<network>` solo
+     mientras su Kubo local está sano (API responde y el peer de Bastion está
+     conectado). Un provider puja solo si tiene **todas** las capacidades
+     requeridas, y el Navigator descarta pujas con capacidades parciales.
+  5. El Navigator lleva un libro persistente de pines con leases por turno
+     (WAL con `only-hash`, gracia de 30 s tras éxito y 5 min tras error o
+     reinicio, barrido cada minuto, unpin idempotente) y cuotas (1 subida por
+     sesión, 4 en total, 1 GB de CIDs únicos, 80 % de `StorageMax`, ≥ 2 GB libres).
+     `reuse` se libera por una API de administración en loopback con token.
+  6. Tope de protocolo: frame FHS de 33 MB y adjunto de 32 MB; el Navigator
+     acepta 20 MB por defecto.
+  7. El Portal avisa sin eufemismos que un archivo enviado por IPFS público puede
+     descargarlo cualquiera que conozca su CID; la demo usa solo documentos no
+     sensibles.
+- Consecuencias: lo publicado en la fase pública no se puede retirar (el unpin y
+  el GC solo lo quitan de nuestros nodos). El paso a red privada es de
+  configuración con procedimiento de corte: manifiesto, detener los Kubo
+  públicos, identidades nuevas, `swarm.key` + `LIBP2P_FORCE_PNET=1`,
+  `Bootstrap=[]`, `Routing.Type=none`, peering regenerado, `IPFS_NETWORK=private`
+  y repetir la compuerta. La recuperación desde Internet (`ipfs.io`) no se
+  garantiza (NAT) y no es parte de la compuerta.
+- Reemplaza: none
