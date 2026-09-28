@@ -9,7 +9,26 @@
 
 ## Estado
 
-`done (local)` — implementado y verificado con `npm run typecheck`/`build` en `galaxIA` (protocolo, Navigator, Portal) y `galaxIA-satellite-star` (`satellite-ocr-example`); UI verificada en `portal-dev` real. Ver DEC-0044, DEC-0045, DEC-0046, DEC-0047, DEC-0051, DEC-0052, DEC-0053.
+`active (red pública, demo)` — desde 2026-09-27 el backend Rust implementa
+IPFS **nativo** según **DEC-0095**, que precisa y en parte reemplaza lo de
+abajo:
+
+- Un nodo Kubo por host (Bastion para el Navigator, Raspi4B para el OCR) en la
+  red IPFS pública, con API en loopback protegida por tokens y peering
+  estático por la LAN (`galaxIA-gitops/docs/ipfs.md`).
+- El Navigator sube el adjunto inline a su Kubo y lleva un libro de pines con
+  leases por turno, cuotas, barrido y auditoría (`galaxIA-agent`, `src/ipfs/`).
+- El OCR lee el CID **solo** por su Kubo local; `gatewayUrl` es una pista para
+  terceros y nunca se usa. La misión pide `document.ocr` + `ipfs.native.<red>`.
+- El Portal avisa que lo enviado por IPFS público es descargable por
+  cualquiera que conozca el CID; la red privada queda para después (DEC-0095,
+  procedimiento de corte).
+- Compuerta del 2026-09-27: e2e del Portal 6/6 (incluido el caso IPFS), GC en
+  ambos nodos, `reuse` liberado por la API de admin, reinicio del Navigator
+  durante la gracia y capacidad dinámica al detener Kubo.
+
+Historial: la primera versión (TS, gateway HTTP) quedó `done (local)` con
+DEC-0044, DEC-0045, DEC-0046, DEC-0047, DEC-0051, DEC-0052 y DEC-0053.
 
 ## Owner
 
