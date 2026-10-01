@@ -1596,3 +1596,36 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
   Rust debe exigir la asignación y llevar una prueba de conformidad. Se añade la regla a
   `spec-native/CONVENTIONS.md` y a los `AGENTS.md` de los repos que implementan el despacho.
 - Reemplaza: none
+
+### DEC-0097 — Nodo móvil de la PoC: `math.arithmetic.solve` y autorización expresa por uso
+
+- Fecha: 2026-10-01
+- Estado: `accepted`
+- Relacionado con specs: SPEC-EPHSAT-0001, SPEC-KB-0002.
+- Relacionado con decisiones: DEC-0096, DEC-0095.
+- Contexto: para la demo se necesita un teléfono como nodo de la red con una capacidad simple.
+  La capacidad canónica en el código es `math.arithmetic.solve` (no `arithmetic.solve`, como
+  decían `ephemeral-satellite.md` y `handshake.md`); la herramienta es `arithmetic_solve
+  {expression}`.
+- Decisión:
+  1. El celular es un Ephemeral Satellite **sin delegación** en la PoC: no escucha conexiones,
+     marca a Atlas y al Navigator, y el Navigator abre el stream sobre esa conexión
+     (`provider_multiaddrs` y `multiaddrs` vacías). El Navigator resuelve el DID a PeerId y
+     reutiliza la conexión viva.
+  2. El despacho cumple DEC-0096: oferta → puja → asignación → stream. El celular solo ejecuta
+     con una asignación válida (oferta y asignación firmadas por el mismo Navigator conectado,
+     `mission_id` de esa oferta, DID propio, vigencia, un solo uso).
+  3. Un nodo móvil solo gana si su DID está en `FHS_CALC_NODES` del Navigator; la lista restringe
+     quién puede ganar, no acorta el ciclo.
+  4. Los **comandos** (`/calc`) piden autorización expresa del usuario por cada uso, antes de
+     publicar la oferta (generaliza SPEC-KB-0002). Para la PoC se reutiliza
+     `kb.recommended`/`kb.decision` con una marca en `description`; la migración a mensajes
+     `tool.authorization.*` del IDL queda como deuda. OCR, RAG y KB aún no piden autorización.
+  5. Contrato: resultado `{"result":"<n>"}` (`^-?[0-9]+(\.[0-9]+)?$`, ≤ 64 caracteres); errores
+     exactos `MATH_DIVISION_BY_ZERO`, `MATH_NOT_FINITE`, `MATH_SYNTAX`, `MATH_TIMEOUT`,
+     `MATH_LIMIT`. Límites del nodo: 200 caracteres, profundidad 32, 2 s.
+- Consecuencias: las firmas FHS no cubren `multiaddrs`, `trust_level` ni las capacidades de la
+  oferta y no hay anti-replay; se tratan como pistas no confiables (seguimiento). Quedan como
+  seguimiento: `provider::serve` del SDK Rust debe exigir la asignación, mensajes
+  `tool.authorization.*` en el IDL y autorización para OCR/RAG/KB.
+- Reemplaza: none

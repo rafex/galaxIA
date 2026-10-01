@@ -124,7 +124,7 @@ sequenceDiagram
 message DelegationToken {
   string          issuer       = 1;  // did:key:z<host>
   string          subject      = 2;  // did:key:z<efímero>
-  repeated string capabilities = 3;  // ["arithmetic.solve", "curp.compute"]
+  repeated string capabilities = 3;  // ["math.arithmetic.solve", "curp.compute"]
   string          wasm_hash    = 4;  // "sha256:<64 hex chars>"
   int64           expires_at   = 5;  // Unix ms
   bytes           signature    = 6;  // Ed25519 sobre canonical proto(1-5)

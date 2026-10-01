@@ -111,7 +111,7 @@ Campos clave para Ephemeral Satellites:
 Beacon {
   fhs_version: "1"
   provider: { id: "did:key:z<efímero>", type: PROVIDER_TYPE_SATELLITE, visibility: VISIBILITY_COMMUNITY, ephemeral: true, delegated_by: "did:key:z<host>", lease_seconds: 3600 }
-  capabilities: { id: "arithmetic.solve", name: "Aritmética" }
+  capabilities: { id: "math.arithmetic.solve", name: "Aritmética" }
   capabilities: { id: "curp.compute", name: "Cálculo de CURP" }
   device: { platform: DEVICE_PLATFORM_BROWSER, wasm_tier: WASM_TIER_BASELINE, fingerprint: "sha256:<hash-no-reversible>" }
   endpoint: { multiaddr: "/ip4/192.0.2.10/tcp/4001/p2p/<ephemeralPeerId>" }
