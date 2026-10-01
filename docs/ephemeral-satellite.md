@@ -13,6 +13,11 @@ Un **Ephemeral Satellite** es un Satellite que:
 
 El dispositivo móvil no es un actor anónimo — es una extensión computacional de un nodo conocido.
 
+> **Ningún documento autoriza despachar una misión sin oferta, puja y asignación.**
+Un Ephemeral Satellite **no es una excepción**: solo atiende un stream del Navigator si antes
+recibió y validó la asignación de esa misión (ver
+[`mission.md`](./mission.md#regla-de-despacho-normativa-dec-0096)).
+
 ## Flujo de Vida Completo
 
 ```mermaid

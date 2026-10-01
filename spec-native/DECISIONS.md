@@ -1572,3 +1572,27 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
   y repetir la compuerta. La recuperación desde Internet (`ipfs.io`) no se
   garantiza (NAT) y no es parte de la compuerta.
 - Reemplaza: none
+
+### DEC-0096 — Toda Mission se despacha con oferta, puja y asignación
+
+- Fecha: 2026-10-01
+- Estado: `accepted`
+- Relacionado con specs: SPEC-EPHSAT-0001, SPEC-KB-0002.
+- Relacionado con decisiones: DEC-0090, DEC-0092, DEC-0095.
+- Contexto: al planear el nodo celular se propuso, para simplificar, llamar al nodo
+  directamente (sin oferta, puja ni asignación). La documentación solo describe el stream
+  directo **posterior a la asignación** y la implementación del Navigator ejecuta el ciclo
+  en cada llamada, pero ninguna regla escrita prohibía la variante.
+- Decisión: **Ningún documento autoriza despachar una misión sin oferta, puja y
+  asignación.** Todo despacho Navigator → Star/Satellite/Nova sigue oferta → puja →
+  asignación → stream directo (`docs/mission.md`, "Regla de despacho"). El provider no
+  ejecuta una Mission sin una asignación válida a su DID. `preferred_provider`, las listas de
+  permitidos y las políticas restringen quién puede ganar, no eliminan el ciclo. La
+  autorización del usuario es adicional. No hay excepciones: una variante exige una DEC que
+  enmiende esta.
+- Consecuencias: se descarta el despacho directo para el comando `/calc` y para cualquier
+  capacidad futura. El nodo móvil debe validar la asignación (firma, Navigator, `missionId`,
+  vigencia y un solo uso) desde su primera versión. Brecha abierta: `provider::serve` del SDK
+  Rust debe exigir la asignación y llevar una prueba de conformidad. Se añade la regla a
+  `spec-native/CONVENTIONS.md` y a los `AGENTS.md` de los repos que implementan el despacho.
+- Reemplaza: none

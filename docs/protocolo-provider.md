@@ -172,6 +172,7 @@ Tu provider puede participar sin configuración especial en Navigator si:
 - [ ] Publica `NodeAdvertiseMessage` periódicamente con su Beacon y multiaddrs.
 - [ ] Responde `MissionBidMessage` solo cuando puede satisfacer la oferta.
 - [ ] Acepta el stream directo post-assign y completa el handshake.
+- [ ] **No ejecuta ninguna Mission sin una asignación válida a su DID** (firma, mismo Navigator que la oferta, vigente y de un solo uso): ver la regla de despacho en [`mission.md`](./mission.md#regla-de-despacho-normativa-dec-0096).
 - [ ] El Pulse (ping/pong) corre en paralelo — no bloqueado por el procesamiento de Missions.
 - [ ] Usa los códigos de error estandarizados.
 - [ ] El Beacon incluye todos los campos obligatorios, incluyendo `privacy.retention`.

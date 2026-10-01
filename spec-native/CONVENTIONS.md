@@ -7,6 +7,14 @@
 - Seguir la estructura definida en `ARCHITECTURE.md`.
 - Usar TypeScript estricto (`strict: true`) en todos los paquetes y aplicaciones.
 
+## Protocolo FHS
+
+> **Ningún documento autoriza despachar una misión sin oferta, puja y asignación.**
+
+Todo despacho Navigator → provider sigue oferta → puja → asignación → stream directo
+(`docs/mission.md`, DEC-0096). Un cambio que lo omita, lo acorte o lo sustituya requiere
+una DEC previa que enmiende la regla.
+
 ## Naming
 
 - **Archivos y carpetas:** `kebab-case` (ej. `llm-gateway.ts`, `event-bus.ts`).

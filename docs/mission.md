@@ -11,6 +11,69 @@ missionId = UUID que acompaña cada mensaje del ciclo de vida:
   agent.start  → agent.status → assistant.delta* → assistant.completed
 ```
 
+## Regla de despacho (normativa, DEC-0096)
+
+> **Ningún documento autoriza despachar una misión sin oferta, puja y asignación.**
+
+Toda Mission que un Navigator encomienda a un Star, un Satellite o un Nova
+(`chat.request`, `tool.call`, trabajo de un agente) se despacha con el ciclo
+completo, en este orden:
+
+1. **Oferta:** el Navigator publica un `MissionOfferMessage` firmado en
+   `fhs/v1/missions/offer`. La oferta lleva el tipo de misión y las capacidades
+   requeridas; **nunca** los argumentos, los mensajes ni los archivos.
+2. **Puja:** los providers que cubren **todas** las capacidades requeridas responden
+   con un `MissionBidMessage` firmado en `fhs/v1/missions/bid`.
+3. **Asignación:** el Navigator elige y publica un `MissionAssignMessage` firmado en
+   `fhs/v1/missions/assign`.
+4. **Stream directo:** solo entonces el Navigator abre `/fhs/v1/0.1.0` **con el provider
+   asignado**, y solo por ese stream viajan los datos de la misión.
+
+### Qué exige a cada parte
+
+- **Navigator:** no abre un stream de misión hacia un provider para el que no haya
+  publicado una asignación de ese `missionId`. No existe "llamada directa", "modo local"
+  ni "nodo de confianza" que omita el ciclo.
+- **Provider:** no ejecuta `chat.request`, `tool.call` ni `tool.list` sin una **asignación
+  válida a su DID para ese `missionId`**: firma verificada, mismo Navigator que firmó la
+  oferta, no vencida y de **un solo uso**. Si el stream llega antes que la asignación
+  (GossipSub y el stream directo son canales distintos), espera la asignación un tiempo
+  acotado y, si no llega, rechaza.
+- **Selección:** `preferred_provider`, las listas de permitidos y las políticas de privacidad
+  **restringen quién puede ganar**; no eliminan ni acortan el ciclo.
+- **Autorización del usuario** (`kb.decision`, `tool.authorization.*`): es un requisito
+  **adicional**; no sustituye ni se salta el ciclo.
+
+### Qué no cubre
+
+La regla se refiere al despacho **Navigator → providers**. No aplica a la sesión Portal ↔
+Navigator (`agent.start`, `chat.request` del usuario), a los anuncios (`NodeAdvertise`,
+`DhtBeaconRecord`) ni al `ping/pong` dentro de un stream ya asignado.
+
+### Por qué
+
+- **Distribución:** cualquier nodo calificado puede competir; ningún despacho depende de
+  conocer de antemano a un nodo.
+- **Buen gobierno:** oferta, puja y asignación firmadas dejan constancia de **quién fue
+  elegido, para qué y por qué**; sobre ellas se apoyan la reputación y la auditoría.
+- **Seguridad:** un provider solo atiende streams que su Navigator justificó con una
+  asignación.
+
+### Sin excepciones
+
+Cualquier variante (despacho directo, caché de asignaciones, delegación) exige **una DEC
+que enmiende esta regla antes de implementarse**; una spec, un plan o una nota de PR no
+bastan.
+
+### Cumplimiento (estado a 2026-10-01)
+
+- Navigator Rust (`client::chat` / `client::call_tool`): ejecuta el ciclo completo en cada
+  llamada.
+- Provider Rust del SDK (`provider::serve`): **todavía no exige** la asignación antes de
+  ejecutar. Brecha conocida: debe cerrarse (con prueba de conformidad) antes de admitir
+  providers de terceros.
+- Nodo móvil (Ephemeral Satellite en navegador): debe exigirla desde su primera versión.
+
 ## Flujo Completo: Portal → Navigator → Star → Satellite
 
 ```mermaid

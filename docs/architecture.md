@@ -85,6 +85,10 @@ graph TB
 - `-->` stream directo siempre activo (Portal↔Navigator)
 - `-.->` stream directo temporal (solo durante Mission activa, post-assign)
 
+> **Ningún documento autoriza despachar una misión sin oferta, puja y asignación.**
+Todo despacho Navigator → provider sigue oferta → puja → asignación → stream directo; ver
+[`mission.md`](./mission.md#regla-de-despacho-normativa-dec-0096).
+
 ## Cómo se forma el swarm
 
 ```mermaid
