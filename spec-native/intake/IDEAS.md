@@ -109,3 +109,42 @@ tablero de entrega hasta que se promueven a una spec y sus tareas derivadas.
   actualización y abstención ante información insuficiente.
 - Definir cómo se actualizará el corpus y cómo se conservará la trazabilidad
   de cada respuesta hacia la versión consultada.
+
+## INTAKE-RUST-MIGRATION-0001 — Migrar los componentes de GalaxIA a Rust
+
+- **Estado:** `backlog`
+- **Prioridad:** `medium` — iniciativa amplia posterior a la PoC funcional; no
+  implica reescritura inmediata ni detiene el MVP actual.
+- **Objetivo:** migrar gradualmente a Rust los componentes ejecutables del
+  ecosistema GalaxIA, conservando el Portal Chat como excepción explícita.
+- **Motivación:** la PoC ya demostró que el flujo integrado funciona; la
+  siguiente etapa es evaluar una implementación común en Rust para runtimes y
+  providers, manteniendo compatibilidad entre nodos y con dispositivos de
+  recursos limitados.
+- **Alcance candidato:** Atlas; Navigator/agente; Star; providers Satellite
+  (OCR, RAG y KB); Nova; y las bibliotecas compartidas de protocolo y catálogo
+  de parsers cuando formen parte de esos runtimes. La capacidad CURP ya está
+  implementada en Rust/WASM y debe conservarse/integrarse, no reescribirse por
+  defecto.
+- **Excepción:** Portal Chat —su interfaz web y experiencia de usuario quedan
+  fuera de esta migración. Esto no impide que consuma bibliotecas Rust
+  compiladas a WASM si se justifica y mantiene la compatibilidad del navegador.
+- **Fuera de alcance inicial:** cambiar el contrato FHS o el IDL Protobuf;
+  reescribir documentación, schemas declarativos o infraestructura únicamente
+  por uniformidad de lenguaje; retirar el runtime TypeScript antes de validar
+  su reemplazo componente por componente.
+
+### Criterios para promover a spec
+
+- Inventariar componentes, dependencias entre repositorios y versiones activas;
+  clasificar cada pieza como runtime, librería compartida, interfaz o tooling.
+- Definir fases y orden de migración, estrategia de convivencia temporal con
+  TypeScript y criterios de rollback por componente.
+- Mantener interoperabilidad FHS (libp2p, Protobuf, identidad y semántica de
+  Missions) sin cambios incompatibles al protocolo.
+- Definir pruebas de paridad funcional y rendimiento en x86_64 y aarch64,
+  incluyendo el hardware limitado del laboratorio.
+- Acordar cómo se integrarán los providers Rust con llama.cpp y otros servicios
+  externos sin incorporar al LLM dentro de esta migración.
+- Migrar el tráfico productivo de cada componente solo después de superar sus
+  pruebas unitarias, de protocolo e E2E; mantener Chat operativo sin cambios.
