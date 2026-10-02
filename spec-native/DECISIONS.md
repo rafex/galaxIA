@@ -1653,3 +1653,28 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
   conformidad en el límite de salida. Cada llamada del LLM a una herramienta abre una
   autorización nueva. Más tarjetas por turno: la consolidación por turno lo compensa.
 - Reemplaza: none
+
+### DEC-0100 — Comandos de chat autodescubiertos desde el anuncio de los nodos
+
+- Fecha: 2026-10-02
+- Estado: `accepted`
+- Relacionado con specs: SPEC-CMD-0001, SPEC-AUTH-0001.
+- Relacionado con decisiones: DEC-0096, DEC-0097, DEC-0099.
+- Contexto: `/calc` estaba cableado en el Navigator (parser, capacidad, herramienta,
+  validación y `FHS_CALC_NODES`); un comando nuevo exigía código nuevo y un `/leer` sin nodo
+  viajaba al LLM. Revisado por Codex en 5 rondas.
+- Decisión: **los comandos se definen en el protocolo.** Un nodo declara en `Beacon.commands`
+  (campo 11, firmado) el nombre, los argumentos tipados y la forma del resultado; el
+  Navigator los admite según el registro cerrado `idl/command-capabilities.json` (qué
+  capacidades pueden ser comandos, qué herramientas, admisión `open`/`trusted`, textos de
+  error propios) y su política, agrupa por huella del contrato (conflicto = deshabilitado),
+  parsea con una gramática normativa y ejecuta tras la autorización por uso. Resultados solo
+  numéricos o booleanos en texto decimal canónico. Un comando desconocido se responde
+  localmente y no llega al LLM. `fhs_version` 0.2. El contrato (huella y digest del registro)
+  se ata al `Grant` como ligadura de contexto y entra al `batch_digest`.
+- Consecuencias: cambio del IDL (Beacon 11, `AuthorizationItem` 19–21, mensajes 94–95), un
+  registro versionado, `FHS_COMMAND_NODES` y `FHS_COMMAND_REGISTRY` sustituyen a
+  `FHS_CALC_NODES`, frescura mínima del anuncio, orden de despliegue SDK → Atlas →
+  Navigator → nodo móvil → Portal. Agregar una capacidad invocable es decisión del estándar o
+  del operador, no del nodo.
+- Reemplaza: el cableado de `/calc` de DEC-0097.

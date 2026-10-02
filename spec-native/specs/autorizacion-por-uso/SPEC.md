@@ -128,6 +128,16 @@ archivo (dominio `ipfs`). Al subirlo, el Dispatcher registra `CID → digest aut
 o libp2p) solo se despachan si el CID está en ese registro y el nodo destino coincide con el
 autorizado. Un CID que el registro no conoce no sale del Navigator.
 
+## Enmienda: comandos (SPEC-CMD-0001, DEC-0100)
+
+`AuthorizationItem` gana `contract_fingerprint` (19), `tool_name` (20) y `registry_digest`
+(21), vacíos si el ítem no es un comando. La clase `command_args` usa el dominio
+`fhs/auth/command_args` y el digest cv1 de `{args, tool}`. La huella y el `registry_digest` son
+una **ligadura de contexto del `Grant`**, no bytes enviados: el Dispatcher los revalida al
+consumir y entran al `batch_digest` (cada campo UTF-8 con su longitud de 4 bytes, después de
+los existentes). La bitácora los registra sin contenido. Los ítems que no son comando llevan
+esos tres campos vacíos.
+
 ## Atribución
 
 La firma del Envelope prueba la posesión de la clave de la sesión, no que una persona aprobó.
