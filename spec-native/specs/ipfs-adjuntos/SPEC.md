@@ -1,5 +1,14 @@
 # SPEC-IPFS-0001 — Transporte de adjuntos vía IPFS, configurable por el usuario
 
+> **Autorización por uso (2026-10-01, DEC-0099):** subir un adjunto a IPFS
+> exige un ítem de autorización propio (`ipfs.upload`, destino `network` o
+> `public_ipfs`, retención de mejor esfuerzo) ligado al digest de los bytes
+> y al CID resultante, que el Dispatcher registra para las lecturas posteriores
+> ([`SPEC-AUTH-0001`](../autorizacion-por-uso/SPEC.md)). Un adjunto se sube una sola vez por turno y los
+> reintentos reutilizan el mismo CID; volver a subir exige un ítem nuevo. La
+> preferencia de sesión de IPFS solo fija red y retención por defecto, nunca
+> autoriza el envío.
+
 > **Transporte vigente (DEC-0090, DEC-0091 y DEC-0092):** FHS transporta sus
 > mensajes únicamente por libp2p y los serializa únicamente con Protobuf. Un
 > gateway HTTP/HTTPS de IPFS externo es una excepción de integración: se admite

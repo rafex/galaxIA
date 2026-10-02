@@ -122,6 +122,12 @@ Se distingue (a) lo que controla el Navigator (qué sube, cuándo, a qué red, s
 de la red pública: cualquiera con el CID puede leerlo y copiarlo. Un archivo se sube **una
 sola vez** por adjunto; reintentos con el mismo CID. Volver a subir exige un ítem propio.
 
+**Ligadura del CID.** El ítem `ipfs.upload` se autoriza con el digest de los bytes del
+archivo (dominio `ipfs`). Al subirlo, el Dispatcher registra `CID → digest autorizado`; los
+ítems posteriores que referencian ese archivo por CID (OCR por IPFS, lecturas por el gateway
+o libp2p) solo se despachan si el CID está en ese registro y el nodo destino coincide con el
+autorizado. Un CID que el registro no conoce no sale del Navigator.
+
 ## Atribución
 
 La firma del Envelope prueba la posesión de la clave de la sesión, no que una persona aprobó.

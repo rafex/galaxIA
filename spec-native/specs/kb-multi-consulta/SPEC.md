@@ -1,5 +1,13 @@
 # SPEC-KB-0002 — Consulta de múltiples KBs por pregunta
 
+> **Parcialmente superseded (2026-10-01, DEC-0099):** la confirmación
+> `kb.recommended`/`kb.decision` se sustituye por la autorización por uso de
+> [`SPEC-AUTH-0001`](../autorizacion-por-uso/SPEC.md): una tarjeta consolidada (`authorization.requested`)
+> con un ítem por envío, ligado al digest y al nodo. Se elimina además la
+> fusión de varias KBs por RAG de red; los fragmentos van directo, cada conjunto
+> con su propia autorización de seguimiento. Los mensajes 67/69 quedan en el IDL
+> como obsoletos. Lo demás (candidatos, citas, límite por pregunta) sigue vigente.
+
 ## Estado
 
 `done (local)` — implementado y verificado con `npm run typecheck`/`build` en `galaxIA` y `galaxIA-satellite-star`; UI verificada en `portal-dev` real. Extiende `SPEC-KB-0001` (`done (local)`). Dos puntos siguen explícitamente diferidos (prioridad normativa, mecánica de calificación del usuario) — ver DEC-0048, DEC-0054.

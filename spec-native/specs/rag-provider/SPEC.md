@@ -1,5 +1,10 @@
 # SPEC-RAG-0001 — Provider RAG remoto opcional
 
+> **Autorización por uso (2026-10-01, DEC-0099):** indexar texto (`document.index`)
+> y consultar (`document.query`) en un nodo RAG remoto son ítems explícitos de
+> [`SPEC-AUTH-0001`](../autorizacion-por-uso/SPEC.md), con el DID del nodo fijado antes de la oferta. Ningún
+> texto ni consulta sale del Navigator sin una autorización vigente que cubra su digest.
+
 > **Contrato vigente (2026-08-05):** el RAG privado y temporal del Portal vive
 > por defecto en el navegador y está definido en
 > [`SPEC-BROWSER-RAG-0001`](../browser-rag/SPEC.md). Este documento conserva
