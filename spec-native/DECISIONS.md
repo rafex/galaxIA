@@ -1629,3 +1629,27 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
   seguimiento: `provider::serve` del SDK Rust debe exigir la asignación, mensajes
   `tool.authorization.*` en el IDL y autorización para OCR/RAG/KB.
 - Reemplaza: none
+
+### DEC-0099 — Autorización explícita por uso como parte del estándar FHS
+
+- Fecha: 2026-10-01
+- Estado: `accepted`
+- Relacionado con specs: SPEC-AUTH-0001, SPEC-KB-0002, SPEC-IPFS (adjuntos).
+- Relacionado con decisiones: DEC-0096, DEC-0097, DEC-0095.
+- Contexto: solo `/calc` y la KB pedían permiso; OCR, RAG de red e IPFS se ejecutaban solos,
+  las herramientas pedidas por el LLM corrían con argumentos del modelo, y el failover o la
+  selección de la subasta podía enviar datos a un nodo que el usuario no vio. Revisado por
+  Codex en 4 rondas.
+- Decisión: **todo contenido del usuario que salga del Navigator hacia otro nodo exige una
+  autorización explícita, de un solo uso, ligada a los bytes exactos (digest canónico) y al
+  nodo exacto (DID)**, salvo el mensaje literal al Star elegido (consentimiento implícito
+  emitido como `Grant`). Modelo por etapas: las salidas derivadas se autorizan antes de
+  reenviarse. Tarjeta consolidada por turno con protocolo por ítems. Un único `Dispatcher`
+  en el Navigator es el único código que envía contenido. No hay "recordar mi elección" en
+  la primera versión. Sin retrocompatibilidad: los mensajes `kb.recommended`/`kb.decision` quedan
+  obsoletos y el Navigator TS queda como reversa no conforme.
+- Consecuencias: cambio del IDL (mensajes 90–93), digests compartidos Rust/TypeScript con
+  fixtures, un portón obligatorio en el Navigator, tarjeta nueva en el Portal y suite de
+  conformidad en el límite de salida. Cada llamada del LLM a una herramienta abre una
+  autorización nueva. Más tarjetas por turno: la consolidación por turno lo compensa.
+- Reemplaza: none

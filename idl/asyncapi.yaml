@@ -480,6 +480,36 @@ components:
       payload:
         $ref: "#/components/schemas/MissionFeedbackMessage"
 
+    # ── Autorización explícita por uso (SPEC-AUTH-0001) ──────────────────────
+    AuthorizationRequestedMessage:
+      name: authorization.requested
+      title: El Navigator pide autorizar un envío de contenido a un nodo
+      summary: |
+        Stream Portal ↔ Navigator. Lista de ítems con nodo (DID), clase de dato, resumen,
+        destino, retención y digest canónico. Sin decisión vigente no sale nada.
+      payload:
+        $ref: "#/components/schemas/AuthorizationRequestedMessage"
+
+    AuthorizationDecisionMessage:
+      name: authorization.decision
+      title: Decisión del usuario por ítem
+      summary: Cliente → Navigator, en Envelope firmado con la clave de la sesión.
+      payload:
+        $ref: "#/components/schemas/AuthorizationDecisionMessage"
+
+    AuthorizationResolvedMessage:
+      name: authorization.resolved
+      title: Resultado de una autorización (lote y por ítem)
+      summary: Navigator → cliente; también responde a authorization.status_request.
+      payload:
+        $ref: "#/components/schemas/AuthorizationResolvedMessage"
+
+    AuthorizationStatusRequestMessage:
+      name: authorization.status_request
+      title: Consulta del estado de una autorización tras reconectar
+      payload:
+        $ref: "#/components/schemas/AuthorizationStatusRequestMessage"
+
   schemas:
     # ── Envelope (frame raíz del stream directo, DEC-0087) ────────────────────
     Envelope:
@@ -1238,6 +1268,70 @@ components:
               type: string
             delegatedBy:
               type: string
+
+    AuthorizationItem:
+      type: object
+      properties:
+        itemId: {type: string}
+        capabilityId: {type: string}
+        providerDid: {type: string, description: DID fijado por el Navigator antes de la oferta}
+        providerName: {type: string, description: autodeclarado, solo informativo}
+        trustLevel: {type: string, description: derivado por el Navigator}
+        policyVersion: {type: string}
+        dataClass: {type: string, enum: [USER_MESSAGE, DERIVED_TEXT, DOCUMENT, COMMAND_ARGS, QUERY, TOOL_ARGS, TOOL_OUTPUT_TO_LLM]}
+        dataSummary: {type: string, description: tipo, tamaño y caracteres; nunca el contenido}
+        payloadDigest: {type: string, description: SHA-256 canónico (SPEC-AUTH-0001), hex}
+        destination: {type: string, enum: [LOCAL, NETWORK, COMMUNITY, EXTERNAL, PUBLIC_IPFS]}
+        retention: {type: string, enum: [EPHEMERAL, REUSE, PERMANENT]}
+        dependsOn: {type: array, items: {type: string}}
+        firstTimeNode: {type: boolean}
+        publicNetwork: {type: boolean}
+        failover: {type: boolean}
+        sideEffects: {type: boolean}
+        retry: {type: boolean}
+        implicit: {type: boolean}
+
+    AuthorizationRequestedMessage:
+      type: object
+      properties:
+        authorizationId: {type: string, format: uuid}
+        conversationId: {type: string}
+        turnId: {type: string}
+        expiresAt: {type: integer, description: informativo; el vencimiento lo mide el Navigator}
+        batchDigest: {type: string}
+        items: {type: array, items: {$ref: "#/components/schemas/AuthorizationItem"}}
+
+    AuthorizationDecisionMessage:
+      type: object
+      properties:
+        authorizationId: {type: string, format: uuid}
+        batchDigest: {type: string}
+        decisions:
+          type: array
+          items:
+            type: object
+            properties:
+              itemId: {type: string}
+              allow: {type: boolean}
+
+    AuthorizationResolvedMessage:
+      type: object
+      properties:
+        authorizationId: {type: string, format: uuid}
+        outcome: {type: string, enum: [PENDING, ALLOWED, DENIED, EXPIRED, CANCELLED, CONSUMED, SENT, FAILED, PARTIAL]}
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              itemId: {type: string}
+              outcome: {type: string}
+              reason: {type: string}
+
+    AuthorizationStatusRequestMessage:
+      type: object
+      properties:
+        authorizationId: {type: string, format: uuid}
 
 servers:
   libp2p:
