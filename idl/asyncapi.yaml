@@ -480,7 +480,7 @@ components:
       payload:
         $ref: "#/components/schemas/MissionFeedbackMessage"
 
-    # ── Autorización explícita por uso (SPEC-AUTH-0001) ──────────────────────
+    # ── Autorización explícita por uso (SPEC-AUTHZ-0001) ──────────────────────
     AuthorizationRequestedMessage:
       name: authorization.requested
       title: El Navigator pide autorizar un envío de contenido a un nodo
@@ -1296,7 +1296,7 @@ components:
         policyVersion: {type: string}
         dataClass: {type: string, enum: [USER_MESSAGE, DERIVED_TEXT, DOCUMENT, COMMAND_ARGS, QUERY, TOOL_ARGS, TOOL_OUTPUT_TO_LLM]}
         dataSummary: {type: string, description: tipo, tamaño y caracteres; nunca el contenido}
-        payloadDigest: {type: string, description: SHA-256 canónico (SPEC-AUTH-0001), hex}
+        payloadDigest: {type: string, description: SHA-256 canónico (SPEC-AUTHZ-0001), hex}
         destination: {type: string, enum: [LOCAL, NETWORK, COMMUNITY, EXTERNAL, PUBLIC_IPFS]}
         retention: {type: string, enum: [EPHEMERAL, REUSE, PERMANENT]}
         dependsOn: {type: array, items: {type: string}}

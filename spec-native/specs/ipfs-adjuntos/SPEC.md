@@ -4,7 +4,7 @@
 > exige un ítem de autorización propio (`ipfs.upload`, destino `network` o
 > `public_ipfs`, retención de mejor esfuerzo) ligado al digest de los bytes
 > y al CID resultante, que el Dispatcher registra para las lecturas posteriores
-> ([`SPEC-AUTH-0001`](../autorizacion-por-uso/SPEC.md)). Un adjunto se sube una sola vez por turno y los
+> ([`SPEC-AUTHZ-0001`](../autorizacion-por-uso/SPEC.md)). Un adjunto se sube una sola vez por turno y los
 > reintentos reutilizan el mismo CID; volver a subir exige un ítem nuevo. La
 > preferencia de sesión de IPFS solo fija red y retención por defecto, nunca
 > autoriza el envío.

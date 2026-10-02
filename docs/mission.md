@@ -41,7 +41,7 @@ completo, en este orden:
   acotado y, si no llega, rechaza.
 - **Selección:** `preferred_provider`, las listas de permitidos y las políticas de privacidad
   **restringen quién puede ganar**; no eliminan ni acortan el ciclo.
-- **Autorización del usuario** (`authorization.*`, SPEC-AUTH-0001): es un requisito
+- **Autorización del usuario** (`authorization.*`, SPEC-AUTHZ-0001): es un requisito
   **adicional**; no sustituye ni se salta el ciclo.
 
 ### Qué no cubre

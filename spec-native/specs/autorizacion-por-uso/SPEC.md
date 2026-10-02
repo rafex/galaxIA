@@ -1,6 +1,10 @@
-# SPEC-AUTH-0001 — Autorización explícita por uso
+# SPEC-AUTHZ-0001 — Autorización explícita por uso
 
 ## Estado
+
+> **Renumerada el 2026-10-02:** antes `SPEC-AUTH-0001`, id que ya usa la spec de identidad de
+> usuario (`specs/authentication/`, pausada). Las referencias históricas de DEC-0099 y de commits
+> anteriores a esa fecha a «SPEC-AUTH-0001» como autorización por uso corresponden a esta spec.
 
 `active` — decisión DEC-0099. Reemplaza el uso de `kb.recommended`/`kb.decision` como
 autorización (SPEC-KB-0002 queda superseded en ese punto) y la marca de `description` de

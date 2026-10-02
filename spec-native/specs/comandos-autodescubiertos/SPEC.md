@@ -15,7 +15,7 @@ al LLM como texto.
 
 **Un nodo declara en su anuncio firmado los comandos que ofrece; el Navigator los admite según
 un registro cerrado y su política, y los ejecuta por el ciclo de siempre (oferta → puja →
-asignación → stream) tras la autorización por uso (SPEC-AUTH-0001). El LLM no interviene.**
+asignación → stream) tras la autorización por uso (SPEC-AUTHZ-0001). El LLM no interviene.**
 Lo que el nodo controla es un contrato acotado; lo que el Navigator muestra a la persona
 (textos de error, plantilla de la tarjeta) es del Navigator.
 
@@ -111,7 +111,7 @@ que incumpla la gramática se rechaza como "error del nodo". Un error del nodo e
 `tool_error` cuyo `error` es **exactamente** un código de `error_codes` del registro; el texto
 mostrado es el del Navigator. Cualquier otra cosa es "error del nodo".
 
-## Autorización (enmienda a SPEC-AUTH-0001)
+## Autorización (enmienda a SPEC-AUTHZ-0001)
 
 - Clase de dato `command_args`. `payload_digest = SHA-256("fhs/auth/command_args" ‖ 0x00 ‖ "1" ‖
   0x00 ‖ cv1(objeto))` con el valor cv1 `{ "args": <objeto de argumentos tipados>, "tool":

@@ -1634,7 +1634,8 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
 
 - Fecha: 2026-10-01
 - Estado: `accepted`
-- Relacionado con specs: SPEC-AUTH-0001, SPEC-KB-0002, SPEC-IPFS (adjuntos).
+- Relacionado con specs: SPEC-AUTHZ-0001, SPEC-KB-0002, SPEC-IPFS (adjuntos).
+- Nota (2026-10-02): esta decisión se redactó como `SPEC-AUTH-0001`; la spec se renumeró a `SPEC-AUTHZ-0001` porque ese id ya es el de la identidad de usuario (pausada).
 - Relacionado con decisiones: DEC-0096, DEC-0097, DEC-0095.
 - Contexto: solo `/calc` y la KB pedían permiso; OCR, RAG de red e IPFS se ejecutaban solos,
   las herramientas pedidas por el LLM corrían con argumentos del modelo, y el failover o la
@@ -1658,7 +1659,7 @@ Dado que este es un protocolo **alpha (0.1.x) sin consumidores externos reales**
 
 - Fecha: 2026-10-02
 - Estado: `accepted`
-- Relacionado con specs: SPEC-CMD-0001, SPEC-AUTH-0001.
+- Relacionado con specs: SPEC-CMD-0001, SPEC-AUTHZ-0001.
 - Relacionado con decisiones: DEC-0096, DEC-0097, DEC-0099.
 - Contexto: `/calc` estaba cableado en el Navigator (parser, capacidad, herramienta,
   validación y `FHS_CALC_NODES`); un comando nuevo exigía código nuevo y un `/leer` sin nodo
