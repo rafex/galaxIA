@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://galax-ia.rafex.io/idl/command-capabilities.schema.json",
+  "title": "Registro cerrado de capacidades invocables como comando (SPEC-CMD-0001)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["registry_version", "entries"],
+  "properties": {
+    "registry_version": { "type": "integer", "const": 1 },
+    "entries": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)+$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tools", "admission", "error_codes"],
+        "properties": {
+          "tools": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" }
+          },
+          "admission": { "type": "string", "enum": ["open", "trusted"] },
+          "error_codes": {
+            "type": "object",
+            "maxProperties": 16,
+            "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]{0,31}$" },
+            "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 120 }
+          }
+        }
+      }
+    }
+  }
+}

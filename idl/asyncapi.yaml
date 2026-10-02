@@ -510,6 +510,22 @@ components:
       payload:
         $ref: "#/components/schemas/AuthorizationStatusRequestMessage"
 
+    # ── Comandos de chat autodescubiertos (SPEC-CMD-0001) ────────────────────
+    CommandsAvailableMessage:
+      name: commands.available
+      title: Comandos vigentes (Navigator → cliente)
+      summary: |
+        Tras el handshake y en cada cambio de la tabla (altas y bajas por TTL).
+        `revision` es monótono dentro de la sesión. Solo metadatos.
+      payload:
+        $ref: "#/components/schemas/CommandsAvailableMessage"
+
+    CommandsListRequestMessage:
+      name: commands.list_request
+      title: Pide la lista de comandos vigentes (cliente → Navigator, tras reconectar)
+      payload:
+        $ref: "#/components/schemas/CommandsListRequestMessage"
+
   schemas:
     # ── Envelope (frame raíz del stream directo, DEC-0087) ────────────────────
     Envelope:
@@ -1332,6 +1348,52 @@ components:
       type: object
       properties:
         authorizationId: {type: string, format: uuid}
+
+    CommandArg:
+      type: object
+      properties:
+        name: {type: string, pattern: "^[a-z][a-z0-9_]{0,23}$"}
+        description: {type: string, maxLength: 80}
+        type: {type: string, enum: [STRING, INTEGER, NUMBER, BOOLEAN, ENUM]}
+        required: {type: boolean}
+        rest: {type: boolean, description: solo STRING y solo el último}
+        maxLength: {type: integer, minimum: 1, maximum: 1024}
+        allowedChars: {type: string, maxLength: 128}
+        enumValues: {type: array, maxItems: 16, items: {type: string, minLength: 1, maxLength: 64}}
+        maxNesting: {type: integer, minimum: 0, maximum: 64}
+
+    CommandDescriptor:
+      type: object
+      description: Elemento de Beacon.commands (campo 11, fhs_version ≥ 0.2); ≤ 8 por Beacon, ordenados por name.
+      properties:
+        name: {type: string, pattern: "^[a-z][a-z0-9-]{0,23}$"}
+        capabilityId: {type: string}
+        toolName: {type: string}
+        summary: {type: string, maxLength: 120}
+        args: {type: array, maxItems: 4, items: {$ref: "#/components/schemas/CommandArg"}}
+        result:
+          type: object
+          properties:
+            type: {type: string, enum: [INTEGER, NUMBER, BOOLEAN]}
+            maxChars: {type: integer, minimum: 1, maximum: 64}
+
+    CommandsAvailableMessage:
+      type: object
+      properties:
+        revision: {type: integer}
+        commands:
+          type: array
+          items:
+            type: object
+            properties:
+              name: {type: string}
+              usage: {type: string}
+              summary: {type: string}
+              nodesCount: {type: integer}
+              conflict: {type: boolean}
+
+    CommandsListRequestMessage:
+      type: object
 
 servers:
   libp2p:
