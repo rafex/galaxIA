@@ -1,0 +1,2082 @@
+{
+ "version": "1",
+ "registry_digest": "824f9de173d3312011a475ab8d001b6dcc5c08e8162cd889ed589a5585725698",
+ "descriptors": {
+  "calc": {
+   "name": "calc",
+   "capability_id": "math.arithmetic.solve",
+   "tool_name": "arithmetic_solve",
+   "summary": "Calcula una expresión aritmética",
+   "args": [
+    {
+     "name": "expression",
+     "description": "Expresión con + - * / ^ y paréntesis",
+     "type": "STRING",
+     "required": true,
+     "rest": true,
+     "max_length": 200,
+     "allowed_chars": " ()*+-./0123456789^",
+     "max_nesting": 32
+    }
+   ],
+   "result": {
+    "type": "NUMBER",
+    "max_chars": 64
+   }
+  },
+  "sumar": {
+   "name": "sumar",
+   "capability_id": "math.arithmetic.solve",
+   "tool_name": "arithmetic_solve",
+   "summary": "Suma con opciones",
+   "args": [
+    {
+     "name": "x",
+     "description": "entero",
+     "type": "INTEGER",
+     "required": true
+    },
+    {
+     "name": "y",
+     "description": "decimal",
+     "type": "NUMBER",
+     "required": true
+    },
+    {
+     "name": "redondear",
+     "description": "",
+     "type": "BOOLEAN",
+     "required": false
+    },
+    {
+     "name": "modo",
+     "description": "",
+     "type": "ENUM",
+     "required": false,
+     "enum_values": [
+      "deg",
+      "rad"
+     ]
+    }
+   ],
+   "result": {
+    "type": "INTEGER",
+    "max_chars": 20
+   }
+  }
+ },
+ "valid": [
+  {
+   "case": "calc y sumar",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    },
+    {
+     "name": "sumar",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Suma con opciones",
+     "args": [
+      {
+       "name": "x",
+       "description": "entero",
+       "type": "INTEGER",
+       "required": true
+      },
+      {
+       "name": "y",
+       "description": "decimal",
+       "type": "NUMBER",
+       "required": true
+      },
+      {
+       "name": "redondear",
+       "description": "",
+       "type": "BOOLEAN",
+       "required": false
+      },
+      {
+       "name": "modo",
+       "description": "",
+       "type": "ENUM",
+       "required": false,
+       "enum_values": [
+        "deg",
+        "rad"
+       ]
+      }
+     ],
+     "result": {
+      "type": "INTEGER",
+      "max_chars": 20
+     }
+    }
+   ],
+   "fingerprints": {
+    "calc": "d80463b96da7c7482819b9daba01094edbb0429daef94abfe59c4dc0a766070f",
+    "sumar": "ce53e80931c09bf31373d5178ccdb3da35aa527f1b1a3851cd3d6c317d0de5aa"
+   }
+  }
+ ],
+ "invalid": [
+  {
+   "case": "nombre con mayúsculas",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "Calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "nombre reservado",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "ayuda",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "nombre vacío",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "nombre demasiado largo",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "aaaaaaaaaaaaaaaaaaaaaaaaa",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "capacidad fuera del registro",
+   "capabilities": [
+    "chat"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "chat",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "capacidad no anunciada en el Beacon",
+   "capabilities": [
+    "otra.cosa"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "herramienta no permitida",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "otra_herramienta",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "summary con salto de línea",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "uno\ndos",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "summary con control bidi U+202E",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "abc‮def",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "summary demasiado largo",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "description con espacio no separador U+00A0",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "a b",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "cinco argumentos",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "sumar",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Suma con opciones",
+     "args": [
+      {
+       "name": "x",
+       "description": "entero",
+       "type": "INTEGER",
+       "required": true
+      },
+      {
+       "name": "y",
+       "description": "decimal",
+       "type": "NUMBER",
+       "required": true
+      },
+      {
+       "name": "redondear",
+       "description": "",
+       "type": "BOOLEAN",
+       "required": false
+      },
+      {
+       "name": "modo",
+       "description": "",
+       "type": "ENUM",
+       "required": false,
+       "enum_values": [
+        "deg",
+        "rad"
+       ]
+      },
+      {
+       "name": "e",
+       "description": "",
+       "type": "BOOLEAN",
+       "required": false
+      }
+     ],
+     "result": {
+      "type": "INTEGER",
+      "max_chars": 20
+     }
+    }
+   ]
+  },
+  {
+   "case": "argumento repetido",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "sumar",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Suma con opciones",
+     "args": [
+      {
+       "name": "x",
+       "description": "entero",
+       "type": "INTEGER",
+       "required": true
+      },
+      {
+       "name": "x",
+       "description": "decimal",
+       "type": "NUMBER",
+       "required": true
+      }
+     ],
+     "result": {
+      "type": "INTEGER",
+      "max_chars": 20
+     }
+    }
+   ]
+  },
+  {
+   "case": "obligatorio después de opcional",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "sumar",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Suma con opciones",
+     "args": [
+      {
+       "name": "redondear",
+       "description": "",
+       "type": "BOOLEAN",
+       "required": false
+      },
+      {
+       "name": "x",
+       "description": "entero",
+       "type": "INTEGER",
+       "required": true
+      }
+     ],
+     "result": {
+      "type": "INTEGER",
+      "max_chars": 20
+     }
+    }
+   ]
+  },
+  {
+   "case": "rest que no es el último",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      },
+      {
+       "name": "z",
+       "description": "",
+       "type": "BOOLEAN",
+       "required": false
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "STRING sin max_length",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 0,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "STRING con max_length 1025",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 1025,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "allowed_chars desordenado",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": "ba",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "allowed_chars con duplicados",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": "aab",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "max_nesting fuera de rango",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 65
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "ENUM con valores desordenados",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "sumar",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Suma con opciones",
+     "args": [
+      {
+       "name": "x",
+       "description": "entero",
+       "type": "INTEGER",
+       "required": true
+      },
+      {
+       "name": "y",
+       "description": "decimal",
+       "type": "NUMBER",
+       "required": true
+      },
+      {
+       "name": "redondear",
+       "description": "",
+       "type": "BOOLEAN",
+       "required": false
+      },
+      {
+       "name": "modo",
+       "description": "",
+       "type": "ENUM",
+       "required": false,
+       "enum_values": [
+        "rad",
+        "deg"
+       ]
+      }
+     ],
+     "result": {
+      "type": "INTEGER",
+      "max_chars": 20
+     }
+    }
+   ]
+  },
+  {
+   "case": "ENUM con valor con espacio",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "sumar",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Suma con opciones",
+     "args": [
+      {
+       "name": "x",
+       "description": "entero",
+       "type": "INTEGER",
+       "required": true
+      },
+      {
+       "name": "y",
+       "description": "decimal",
+       "type": "NUMBER",
+       "required": true
+      },
+      {
+       "name": "redondear",
+       "description": "",
+       "type": "BOOLEAN",
+       "required": false
+      },
+      {
+       "name": "modo",
+       "description": "",
+       "type": "ENUM",
+       "required": false,
+       "enum_values": [
+        "a b",
+        "c"
+       ]
+      }
+     ],
+     "result": {
+      "type": "INTEGER",
+      "max_chars": 20
+     }
+    }
+   ]
+  },
+  {
+   "case": "ENUM sin valores",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "sumar",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Suma con opciones",
+     "args": [
+      {
+       "name": "x",
+       "description": "entero",
+       "type": "INTEGER",
+       "required": true
+      },
+      {
+       "name": "y",
+       "description": "decimal",
+       "type": "NUMBER",
+       "required": true
+      },
+      {
+       "name": "redondear",
+       "description": "",
+       "type": "BOOLEAN",
+       "required": false
+      },
+      {
+       "name": "modo",
+       "description": "",
+       "type": "ENUM",
+       "required": false,
+       "enum_values": []
+      }
+     ],
+     "result": {
+      "type": "INTEGER",
+      "max_chars": 20
+     }
+    }
+   ]
+  },
+  {
+   "case": "escalar con max_length",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "sumar",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Suma con opciones",
+     "args": [
+      {
+       "name": "x",
+       "description": "entero",
+       "type": "INTEGER",
+       "required": true,
+       "max_length": 5
+      },
+      {
+       "name": "y",
+       "description": "decimal",
+       "type": "NUMBER",
+       "required": true
+      },
+      {
+       "name": "redondear",
+       "description": "",
+       "type": "BOOLEAN",
+       "required": false
+      },
+      {
+       "name": "modo",
+       "description": "",
+       "type": "ENUM",
+       "required": false,
+       "enum_values": [
+        "deg",
+        "rad"
+       ]
+      }
+     ],
+     "result": {
+      "type": "INTEGER",
+      "max_chars": 20
+     }
+    }
+   ]
+  },
+  {
+   "case": "escalar con rest",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "sumar",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Suma con opciones",
+     "args": [
+      {
+       "name": "x",
+       "description": "entero",
+       "type": "INTEGER",
+       "required": true
+      },
+      {
+       "name": "y",
+       "description": "decimal",
+       "type": "NUMBER",
+       "required": true,
+       "rest": true
+      },
+      {
+       "name": "redondear",
+       "description": "",
+       "type": "BOOLEAN",
+       "required": false
+      },
+      {
+       "name": "modo",
+       "description": "",
+       "type": "ENUM",
+       "required": false,
+       "enum_values": [
+        "deg",
+        "rad"
+       ]
+      }
+     ],
+     "result": {
+      "type": "INTEGER",
+      "max_chars": 20
+     }
+    }
+   ]
+  },
+  {
+   "case": "resultado de tipo ENUM",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "ENUM",
+      "max_chars": 10
+     }
+    }
+   ]
+  },
+  {
+   "case": "resultado con max_chars 65",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 65
+     }
+    }
+   ]
+  },
+  {
+   "case": "resultado con max_chars 0",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 0
+     }
+    }
+   ]
+  },
+  {
+   "case": "comandos desordenados",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "sumar",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Suma con opciones",
+     "args": [
+      {
+       "name": "x",
+       "description": "entero",
+       "type": "INTEGER",
+       "required": true
+      },
+      {
+       "name": "y",
+       "description": "decimal",
+       "type": "NUMBER",
+       "required": true
+      },
+      {
+       "name": "redondear",
+       "description": "",
+       "type": "BOOLEAN",
+       "required": false
+      },
+      {
+       "name": "modo",
+       "description": "",
+       "type": "ENUM",
+       "required": false,
+       "enum_values": [
+        "deg",
+        "rad"
+       ]
+      }
+     ],
+     "result": {
+      "type": "INTEGER",
+      "max_chars": 20
+     }
+    },
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "comandos con nombre repetido",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    },
+    {
+     "name": "calc",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  },
+  {
+   "case": "más de ocho comandos",
+   "capabilities": [
+    "math.arithmetic.solve"
+   ],
+   "commands": [
+    {
+     "name": "c0",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    },
+    {
+     "name": "c1",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    },
+    {
+     "name": "c2",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    },
+    {
+     "name": "c3",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    },
+    {
+     "name": "c4",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    },
+    {
+     "name": "c5",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    },
+    {
+     "name": "c6",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    },
+    {
+     "name": "c7",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    },
+    {
+     "name": "c8",
+     "capability_id": "math.arithmetic.solve",
+     "tool_name": "arithmetic_solve",
+     "summary": "Calcula una expresión aritmética",
+     "args": [
+      {
+       "name": "expression",
+       "description": "Expresión con + - * / ^ y paréntesis",
+       "type": "STRING",
+       "required": true,
+       "rest": true,
+       "max_length": 200,
+       "allowed_chars": " ()*+-./0123456789^",
+       "max_nesting": 32
+      }
+     ],
+     "result": {
+      "type": "NUMBER",
+      "max_chars": 64
+     }
+    }
+   ]
+  }
+ ],
+ "parse": [
+  {
+   "descriptor": "calc",
+   "rest": " 2+2",
+   "ok": [
+    {
+     "name": "expression",
+     "type": "string",
+     "value": "2+2"
+    }
+   ]
+  },
+  {
+   "descriptor": "calc",
+   "rest": "   (12+8)*3^2/4   ",
+   "ok": [
+    {
+     "name": "expression",
+     "type": "string",
+     "value": "(12+8)*3^2/4"
+    }
+   ]
+  },
+  {
+   "descriptor": "calc",
+   "rest": "1 + 2 * 3",
+   "ok": [
+    {
+     "name": "expression",
+     "type": "string",
+     "value": "1 + 2 * 3"
+    }
+   ]
+  },
+  {
+   "descriptor": "calc",
+   "rest": "",
+   "error": "missing"
+  },
+  {
+   "descriptor": "calc",
+   "rest": "   ",
+   "error": "missing"
+  },
+  {
+   "descriptor": "calc",
+   "rest": " 111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+   "error": "too_long"
+  },
+  {
+   "descriptor": "calc",
+   "rest": " 2+a",
+   "error": "bad_char"
+  },
+  {
+   "descriptor": "calc",
+   "rest": " ２+2",
+   "error": "bad_char"
+  },
+  {
+   "descriptor": "calc",
+   "rest": " (((((((((((((((((((((((((((((((((1)))))))))))))))))))))))))))))))))",
+   "error": "too_deep"
+  },
+  {
+   "descriptor": "calc",
+   "rest": " ((((((((((((((((((((((((((((((((1))))))))))))))))))))))))))))))))",
+   "ok": [
+    {
+     "name": "expression",
+     "type": "string",
+     "value": "((((((((((((((((((((((((((((((((1))))))))))))))))))))))))))))))))"
+    }
+   ]
+  },
+  {
+   "descriptor": "calc",
+   "rest": " 11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+   "ok": [
+    {
+     "name": "expression",
+     "type": "string",
+     "value": "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+    }
+   ]
+  },
+  {
+   "descriptor": "calc",
+   "rest": " 111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+   "error": "line_too_long"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": " 7 1.5",
+   "ok": [
+    {
+     "name": "x",
+     "type": "integer",
+     "value": "7"
+    },
+    {
+     "name": "y",
+     "type": "number",
+     "value": "1.5"
+    }
+   ]
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "7\t\t-0",
+   "ok": [
+    {
+     "name": "x",
+     "type": "integer",
+     "value": "7"
+    },
+    {
+     "name": "y",
+     "type": "number",
+     "value": "0"
+    }
+   ]
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "-0 -0.0",
+   "ok": [
+    {
+     "name": "x",
+     "type": "integer",
+     "value": "0"
+    },
+    {
+     "name": "y",
+     "type": "number",
+     "value": "0.0"
+    }
+   ]
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "7 1.50 true rad",
+   "ok": [
+    {
+     "name": "x",
+     "type": "integer",
+     "value": "7"
+    },
+    {
+     "name": "y",
+     "type": "number",
+     "value": "1.50"
+    },
+    {
+     "name": "redondear",
+     "type": "boolean",
+     "value": "true"
+    },
+    {
+     "name": "modo",
+     "type": "enum",
+     "value": "rad"
+    }
+   ]
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "7 1 false",
+   "ok": [
+    {
+     "name": "x",
+     "type": "integer",
+     "value": "7"
+    },
+    {
+     "name": "y",
+     "type": "number",
+     "value": "1"
+    },
+    {
+     "name": "redondear",
+     "type": "boolean",
+     "value": "false"
+    }
+   ]
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "007 1",
+   "error": "bad_integer"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "9223372036854775808 1",
+   "error": "bad_integer"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "9223372036854775807 1",
+   "ok": [
+    {
+     "name": "x",
+     "type": "integer",
+     "value": "9223372036854775807"
+    },
+    {
+     "name": "y",
+     "type": "number",
+     "value": "1"
+    }
+   ]
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "100000000000000000000000000000000 1",
+   "error": "bad_integer"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "7 1.",
+   "error": "bad_number"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "7 .5",
+   "error": "bad_number"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "7 1e9",
+   "error": "bad_number"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "7 -",
+   "error": "bad_number"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "7 01",
+   "error": "bad_number"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "7 1 yes",
+   "error": "bad_boolean"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "7 1 True",
+   "error": "bad_boolean"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "7 1 true gradians",
+   "error": "bad_enum"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "7 1 true rad extra",
+   "error": "extra"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "7",
+   "error": "missing"
+  },
+  {
+   "descriptor": "sumar",
+   "rest": "",
+   "error": "missing"
+  }
+ ],
+ "classify": [
+  {
+   "line": "hola",
+   "kind": "plain"
+  },
+  {
+   "line": "  hola",
+   "kind": "plain"
+  },
+  {
+   "line": "/calc 2+2",
+   "kind": "command",
+   "name": "calc",
+   "rest": " 2+2"
+  },
+  {
+   "line": "  /CALC   2+2  ",
+   "kind": "command",
+   "name": "calc",
+   "rest": "   2+2"
+  },
+  {
+   "line": "/calc",
+   "kind": "command",
+   "name": "calc",
+   "rest": ""
+  },
+  {
+   "line": "/leer",
+   "kind": "command",
+   "name": "leer",
+   "rest": ""
+  },
+  {
+   "line": "/",
+   "kind": "command",
+   "name": "",
+   "rest": ""
+  },
+  {
+   "line": "//calc 2+2",
+   "kind": "escaped",
+   "text": "/calc 2+2"
+  },
+  {
+   "line": "/etc/passwd dime",
+   "kind": "command",
+   "name": "etc/passwd",
+   "rest": " dime"
+  }
+ ],
+ "results": [
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": "45"
+     }
+    }
+   },
+   "ok": "45"
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": "-12.5"
+     }
+    }
+   },
+   "ok": "-12.5"
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": "-0"
+     }
+    }
+   },
+   "ok": "0"
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": "-0.0"
+     }
+    }
+   },
+   "ok": "0.0"
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": "0.5"
+     }
+    }
+   },
+   "ok": "0.5"
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": "007"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": "1e9"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": "NaN"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": "Infinity"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": ""
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": " 1"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": "11111111111111111111111111111111111111111111111111111111111111111"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 3,
+   "value": {
+    "object": {
+     "result": {
+      "string": "1234"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": "**1**"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": "1‮2"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "INTEGER",
+   "max_chars": 20,
+   "value": {
+    "object": {
+     "result": {
+      "string": "12"
+     }
+    }
+   },
+   "ok": "12"
+  },
+  {
+   "type": "INTEGER",
+   "max_chars": 20,
+   "value": {
+    "object": {
+     "result": {
+      "string": "-0"
+     }
+    }
+   },
+   "ok": "0"
+  },
+  {
+   "type": "INTEGER",
+   "max_chars": 20,
+   "value": {
+    "object": {
+     "result": {
+      "string": "1.5"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "INTEGER",
+   "max_chars": 20,
+   "value": {
+    "object": {
+     "result": {
+      "string": "9223372036854775808"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "BOOLEAN",
+   "max_chars": 5,
+   "value": {
+    "object": {
+     "result": {
+      "string": "true"
+     }
+    }
+   },
+   "ok": "true"
+  },
+  {
+   "type": "BOOLEAN",
+   "max_chars": 5,
+   "value": {
+    "object": {
+     "result": {
+      "string": "false"
+     }
+    }
+   },
+   "ok": "false"
+  },
+  {
+   "type": "BOOLEAN",
+   "max_chars": 5,
+   "value": {
+    "object": {
+     "result": {
+      "string": "True"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "number": 45
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "result": {
+      "string": "45"
+     },
+     "extra": {
+      "string": "x"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {
+     "resultado": {
+      "string": "45"
+     }
+    }
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "object": {}
+   },
+   "error": true
+  },
+  {
+   "type": "NUMBER",
+   "max_chars": 64,
+   "value": {
+    "string": "45"
+   },
+   "error": true
+  }
+ ]
+}

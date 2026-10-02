@@ -6,8 +6,9 @@
     "document:bytes": "313a06cedc9b87b5031278dc6cde4bb8fa739da2ad75a44f5c4cd328d1591f4e",
     "ipfs:cid": "0d07a1b28db273c7cb26f501a73be5f367c0524ca72df416144e4ef653dbe7ab",
     "derived_text:chunks": "745f5f2358c27e82db8d1f49a42525f74e6d3de31dc7f0fd6cef51faa6bf73d5",
-    "command_args:expression": "bfb793749d8083df591f9856b89bfc92a791dbc2959ec851985fbd3757e6165c",
+    "command_args:calc": "90feee9d717a98a09d3ef5cf8d490c4434cb96c545319cbbef9b7d13420e5b0c",
     "tool_args:mixed": "943b934b5a3c05e7aac41a23e713e1f9a4a3229210f32332deb93fab0a6b9625",
-    "batch:two_items": "d619318192e04b86b23ad915f287b4e36e66519f6b7e4ac2cae0f5cb96ec12da"
+    "batch:two_items": "aad7de0bbe83b1d9e45ca36d81a4d6835af8a506a495e5fe72d5d8d93970d6fd",
+    "batch:command_item": "21bbf159ea2ecf82c85d5f401ba82cbccf3f6b23df617398c08a8f969813591a"
   }
 }
